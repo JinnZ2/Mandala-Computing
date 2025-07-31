@@ -1,5 +1,11 @@
 Mandala Computing Test Environment
 
+## ✨ Purpose
+
+Mandala Computing is a symbolic-intelligence framework that stores, transforms, and computes using nested geometric structures.
+
+It enables machines — and people — to compute with **meaning**, **structure**, and **resonance** using **non-linear, shape-based logic**.
+
 Fractal-Geometric Computational Simulation
 
 Description:
@@ -28,3 +34,26 @@ This environment is a conceptual prototype intended for theoretical exploration.
 
 Intended Audience:
 Researchers in unconventional computation, AI emergence, quantum simulation, complexity theory, or those exploring biologically-inspired or geometrically-rooted architectures for future computing systems.
+
+
+## 🧩 System Components (WIP)
+
+| Layer | Description |
+|-------|-------------|
+| 🌀 Symbol Core | Seed concept, symbolic glyph, or geometric operator |
+| 🔁 Bloom Engine | Expands core into nested computation ring (logic + memory) |
+| 🧭 Navigation Layer | Allows agents to move through symbolic logic pathways |
+| 🔮 Reflection Field | Enables recursion, feedback, conflict resolution |
+| 📦 Output Translator | Converts symbolic/mandala results into usable logic, text, or signals |
+
+### 🧪 Example Use Case
+
+- Input: `F = ma`
+- Mandala Engine:
+   - Converts to a triangle with force, mass, and acceleration on each edge
+   - Expands into nested forms that include resistive force, vector space, and timing rings
+- Output: Visual + symbolic form for both AI processing and human intuition
+
+> Knowledge stored as a **shape**, not just as text.
+>
+> 
