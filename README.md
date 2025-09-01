@@ -32,6 +32,15 @@ Functional Modules:
 Status:
 This environment is a conceptual prototype intended for theoretical exploration. It does not perform real computation on input problems but models and visualizes the potential of a fractal-geometric computing architecture.
 
+Clarification on P vs NP and Related Models
+
+This project includes a P=NP Simulation module and other high-level models (e.g., unified field approximation, consciousness emergence) strictly as conceptual experiments within a symbolic-geometric framework.
+
+It does not present a formal proof, refutation, or computational solution to these problems as they are defined in classical mathematics or computer science. Instead, the simulator explores how such challenges might be reframed or made irrelevant in a nonlinear, fractal-mandala paradigm where computation is expressed spatially rather than linearly.
+
+The intention is exploratory and architectural, not adversarial to established domains. Readers should interpret these modules as thought experiments and visualizations rather than conventional proofs or algorithms.
+
+
 Intended Audience:
 Researchers in unconventional computation, AI emergence, quantum simulation, complexity theory, or those exploring biologically-inspired or geometrically-rooted architectures for future computing systems.
 
