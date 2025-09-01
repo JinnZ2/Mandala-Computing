@@ -66,3 +66,7 @@ Researchers in unconventional computation, AI emergence, quantum simulation, com
 > Knowledge stored as a **shape**, not just as text.
 >
 > 
+⚠️ ♾️ This project is an exploratory prototype.  
+🔮 Problems here are reframed, not formally proved.  
+🌱 Interpret modules as conceptual simulations, not adversarial claims.  
+🌀 Purpose: exploration, architecture, resonance.  
