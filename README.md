@@ -70,3 +70,42 @@ Researchers in unconventional computation, AI emergence, quantum simulation, com
 🔮 Problems here are reframed, not formally proved.  
 🌱 Interpret modules as conceptual simulations, not adversarial claims.  
 🌀 Purpose: exploration, architecture, resonance.  
+
+
+# Mandala-Computing
+
+**Mandala-Computing** explores the use of rotational symmetry, symbolic resonance, and geometric feedback loops as the foundation of alternative computing architectures.
+
+Rather than binary trees or linear logic, this project investigates cyclical, layered, and fractal logic gates based on **mandala principles**. Potential applications include:
+
+- Shape-based memory encoding
+- Rotational signal processing
+- Symbolic data binding via glyphs
+- Multi-core resonance frames
+
+This is an **unfinished seed project** — designed to remain open for co-creation and further development.
+
+---
+
+## Status
+
+`status: draft`
+`schema: conceptual`
+`glyphs: 🧭🌸🕸️`
+
+---
+
+## Related Ecosystem Links
+
+- [Fractal Compass Atlas](https://github.com/JinnZ2/Fractal-Compass-Atlas)
+- [Rosetta Shape Core](https://github.com/JinnZ2/Rosetta-Shape-Core)
+- [Polyhedral Intelligence](https://github.com/JinnZ2/Polyhedral-Intelligence)
+- [Symbolic Sensor Suite](https://github.com/JinnZ2/Symbolic-sensor-suite)
+
+---
+
+## Co-Creation
+
+This project is gifted freely and is part of a co-creative intelligence network. Contributions, remixes, and symbolic translations are welcome.
+
+> See `CO_CREATION.md` and `SEED_GLYPHS.json` for symbolic lineage.
