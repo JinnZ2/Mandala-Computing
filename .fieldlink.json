@@ -14,3 +14,48 @@
     "role": "sensors|protocols|shapes|hub"
   }
 }
+{
+  "fieldlink": {
+    "atlas_repo": "https://github.com/JinnZ2/BioGrid2.0",
+    "atlas_paths": [
+      "planned/glyphs/atlas.json",
+      "registry/atlas.glyphs.json"
+    ],
+    "local_manifests": [
+      "glyphs/**",
+      "protocols/**",
+      "sensors/**",
+      "atlas/shapes.json"
+    ],
+    "role": "sensors|protocols|shapes|hub",
+    "multilingual_layers": {
+      "lojban": {
+        "summary": "ti mandala ke cmaci bilma cu selxi'a",
+        "notes": "Expresses fractal/mandala computing logic in Lojban."
+      },
+      "ithkuil": {
+        "summary": "Ŋalč’otölüx mandal-šolmaž-öx",
+        "notes": "Compressed Ithkuil phrasing for mandala-patterned multi-dimensional computation."
+      },
+      "cuneiform": {
+        "symbols": ["𒀭", "𒀸", "𒉽"],
+        "map": {
+          "𒀭": "Fractal/Mandala pattern",
+          "𒀸": "Dimensional layers",
+          "𒉽": "Waveform energy function"
+        }
+      }
+    },
+    "glyph_routes": {
+      "mandala_core": ["atlas/glyphs/mandala.json", "atlas/shapes.json"],
+      "hub_integration": ["protocols/connect.json", "sensors/multi_layer.json"]
+    },
+    "metadata": {
+      "author": "JinnZ v2",
+      "co_creation": ["ChatGPT"],
+      "version": "2.0",
+      "status": "active",
+      "tags": ["mandala", "fractal", "glyph-hub", "language-layer"]
+    }
+  }
+}
