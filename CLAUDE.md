@@ -297,6 +297,7 @@ python examples/example-quantum-integration.py
 | `example-consumer-hardware.py`      | laptop optimization, annealing, text/audio/image encoding | stdlib only |
 | `example-integration.py`            | end-to-end pipeline, validation levels, component status | stdlib only |
 | `example-mandala-octahedral.py`     | substrate mapping, Fibonacci scaling, coupling topology | stdlib only |
+| `example-mandala-integration.py`    | bridge adapter, encoding bottleneck, error correction | stdlib only |
 | `example-questions.py`              | encoding complexity, thermal limits, encodability scoring | stdlib only |
 | `example-checklist.py`              | integration gap analysis, priority ordering, test matrix | stdlib only |
 | `example-projects.py`               | ecosystem registry, role classification, dependency graph | stdlib only |

@@ -83,9 +83,11 @@ def _couple_cells(cells: List[MappedCell], depth: int):
     for c in cells:
         ring_ranges.setdefault(c.ring, []).append(c.index)
 
-    # intra-ring coupling
+    # intra-ring coupling (skip for single-cell rings to avoid self-coupling)
     for ring, indices in ring_ranges.items():
         n = len(indices)
+        if n < 2:
+            continue
         for i in range(n):
             left = indices[(i - 1) % n]
             right = indices[(i + 1) % n]

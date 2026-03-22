@@ -7,11 +7,28 @@ Demonstrates concepts from Math.md:
   - Thermal error probability
 """
 
-import numpy as np
-from scipy.linalg import eigh
+try:
+    import numpy as np
+    from scipy.linalg import eigh
+    HAS_NUMPY = True
+except ImportError:
+    HAS_NUMPY = False
+    print("note: numpy/scipy not installed — eigenvalue demo will be skipped")
+    print("install with: pip install numpy scipy\n")
+
+import math
 
 
-PHI = (1 + np.sqrt(5)) / 2
+PHI = (1 + math.sqrt(5)) / 2
+
+
+def auto_dim(N: int) -> int:
+    """Choose Hamiltonian dimension large enough to contain all factors of N.
+
+    Factors range from 2 to 2+dim-1, so dim must be >= (largest_factor - 1).
+    Largest possible factor is N//2, so dim = N//2 covers everything.
+    """
+    return max(8, N // 2)
 
 
 def build_factorization_hamiltonian(N: int, dim: int = 8) -> np.ndarray:
@@ -92,7 +109,7 @@ def thermal_error_probability(delta_E: float, temperature_K: float) -> float:
     kT = k_B * temperature_K
     if kT == 0:
         return 0.0
-    return np.exp(-delta_E / kT)
+    return math.exp(-delta_E / kT)
 
 
 def demo_thermal_errors():
@@ -113,15 +130,19 @@ if __name__ == "__main__":
     print("example-math: factorization via eigenvalue decomposition")
     print("=" * 60)
 
-    # factorize small numbers
-    for N in [15, 21, 35, 77, 143]:
-        result = find_factors_via_eigenvalues(N)
-        status = "ok" if result["verified"] else "MISS"
-        print(
-            f"  N={N:>4}  ->  {result['factor_a']} x {result['factor_b']} "
-            f"= {result['product']}  [{status}]  "
-            f"E0={result['ground_energy']:.4f}"
-        )
+    if HAS_NUMPY:
+        # factorize small numbers (auto_dim ensures factors are in range)
+        for N in [15, 21, 35, 77, 143]:
+            dim = auto_dim(N)
+            result = find_factors_via_eigenvalues(N, dim=dim)
+            status = "ok" if result["verified"] else "MISS"
+            print(
+                f"  N={N:>4}  ->  {result['factor_a']} x {result['factor_b']} "
+                f"= {result['product']}  [{status}]  "
+                f"E0={result['ground_energy']:.4f}  (dim={dim})"
+            )
+    else:
+        print("  (skipped — numpy/scipy required)")
 
     energy_landscape(15, max_factor=8)
     demo_thermal_errors()

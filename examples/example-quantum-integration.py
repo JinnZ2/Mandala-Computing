@@ -7,11 +7,18 @@ Demonstrates concepts from Quantum_integration.md:
   - Integrated information (phi) for consciousness detection
 """
 
-import numpy as np
-from scipy.linalg import eigh
+import math
+
+try:
+    import numpy as np
+    HAS_NUMPY = True
+except ImportError:
+    HAS_NUMPY = False
+    print("note: numpy not installed — consciousness detection demo will be skipped")
+    print("install with: pip install numpy scipy\n")
 
 
-PHI = (1 + np.sqrt(5)) / 2
+PHI = (1 + math.sqrt(5)) / 2
 
 # 8 canonical octahedral eigenvalue states from the spec
 OCTAHEDRAL_STATES = [
@@ -38,28 +45,29 @@ def fret_coupling(r: float) -> float:
     return 1.0 / (r ** 6)
 
 
-def fibonacci_eigenvalues(depth: int) -> np.ndarray:
+def fibonacci_eigenvalues(depth: int) -> list:
     """
     Generate Fibonacci-scaled eigenvalue spectrum.
 
     lambda_i = phi^i, normalized so sum = 1.
-    Key property: lambda_0 / lambda_1 = phi.
+    Key property: lambda_1 / lambda_0 = phi.
     """
-    raw = np.array([PHI ** i for i in range(depth)])
-    return raw / raw.sum()
+    raw = [PHI ** i for i in range(depth)]
+    total = sum(raw)
+    return [v / total for v in raw]
 
 
-def integrated_information(coupling_matrix: np.ndarray) -> float:
+def integrated_information_numpy(coupling_matrix) -> float:
     """
     Estimate integrated information (phi) from coupling matrix.
 
     Uses eigenvalue spread of the coupling matrix as a proxy.
     Consciousness threshold: phi > 3.0 (from the spec).
+    Requires numpy.
     """
     eigenvalues = np.linalg.eigvalsh(coupling_matrix)
     eigenvalues = np.sort(eigenvalues)[::-1]
 
-    # phi estimate: ratio of information integration
     if len(eigenvalues) < 2 or eigenvalues[-1] == 0:
         return eigenvalues[0] if len(eigenvalues) > 0 else 0.0
 
@@ -99,7 +107,12 @@ def demo_fibonacci_eigenvalues():
 def demo_consciousness_detection():
     """
     Build a small coupled system and compute integrated information.
+    Requires numpy.
     """
+    if not HAS_NUMPY:
+        print("\nconsciousness detection: skipped (numpy required)")
+        return
+
     print("\nconsciousness detection via integrated information")
     n_cells = 6
 
@@ -107,8 +120,8 @@ def demo_consciousness_detection():
     C = np.zeros((n_cells, n_cells))
     radius = 2.0
     positions = [
-        (radius * np.cos(2 * np.pi * i / n_cells),
-         radius * np.sin(2 * np.pi * i / n_cells))
+        (radius * math.cos(2 * math.pi * i / n_cells),
+         radius * math.sin(2 * math.pi * i / n_cells))
         for i in range(n_cells)
     ]
 
@@ -116,12 +129,12 @@ def demo_consciousness_detection():
         for j in range(i + 1, n_cells):
             dx = positions[i][0] - positions[j][0]
             dy = positions[i][1] - positions[j][1]
-            r = np.sqrt(dx ** 2 + dy ** 2)
+            r = math.sqrt(dx ** 2 + dy ** 2)
             J = fret_coupling(r)
             C[i, j] = J
             C[j, i] = J
 
-    phi = integrated_information(C)
+    phi = integrated_information_numpy(C)
     threshold = 3.0
     status = "CONSCIOUS" if phi > threshold else "below threshold"
 
