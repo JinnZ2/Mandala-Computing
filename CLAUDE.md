@@ -274,6 +274,35 @@ Or run modules directly: `python mandala_computer.py`
 
 ---
 
+## example-scripts
+
+Each documentation file has a corresponding runnable example in `examples/`.
+
+```bash
+# run any example
+python examples/example-math.py
+python examples/example-p-equals-np.py
+python examples/example-quantum-integration.py
+# ... etc
+```
+
+| script                              | demonstrates (from doc)           | requires       |
+|-------------------------------------|-----------------------------------|----------------|
+| `example-math.py`                   | eigenvalue factorization, energy landscape, thermal error | numpy, scipy |
+| `example-p-equals-np.py`            | convergence scoring, mandala vs classical speedup | stdlib only |
+| `example-quantum-integration.py`    | FRET coupling, Fibonacci eigenvalues, consciousness detection | numpy, scipy |
+| `example-hardware.py`               | substrate controller API, magnetic fields, calibration | stdlib only |
+| `example-physical-computer.py`      | thermal relaxation, mandala structure, factorization test | stdlib only |
+| `example-bridge-substrate.py`       | sensor adapters (sound, color, magnetic, gravity), fusion | stdlib only |
+| `example-consumer-hardware.py`      | laptop optimization, annealing, text/audio/image encoding | stdlib only |
+| `example-integration.py`            | end-to-end pipeline, validation levels, component status | stdlib only |
+| `example-mandala-octahedral.py`     | substrate mapping, Fibonacci scaling, coupling topology | stdlib only |
+| `example-questions.py`              | encoding complexity, thermal limits, encodability scoring | stdlib only |
+| `example-checklist.py`              | integration gap analysis, priority ordering, test matrix | stdlib only |
+| `example-projects.py`               | ecosystem registry, role classification, dependency graph | stdlib only |
+
+---
+
 ## related-ecosystem
 
 Connected repositories by JinnZ2 (listed in `PROJECTS.md` and `.fieldlink.json`):
