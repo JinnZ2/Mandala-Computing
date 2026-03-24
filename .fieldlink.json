@@ -11,22 +11,6 @@
       "sensors/**",
       "atlas/shapes.json"
     ],
-    "role": "sensors|protocols|shapes|hub"
-  }
-}
-{
-  "fieldlink": {
-    "atlas_repo": "https://github.com/JinnZ2/BioGrid2.0",
-    "atlas_paths": [
-      "planned/glyphs/atlas.json",
-      "registry/atlas.glyphs.json"
-    ],
-    "local_manifests": [
-      "glyphs/**",
-      "protocols/**",
-      "sensors/**",
-      "atlas/shapes.json"
-    ],
     "role": "sensors|protocols|shapes|hub",
     "multilingual_layers": {
       "lojban": {
@@ -34,7 +18,7 @@
         "notes": "Expresses fractal/mandala computing logic in Lojban."
       },
       "ithkuil": {
-        "summary": "Ŋalč’otölüx mandal-šolmaž-öx",
+        "summary": "Ŋalč'otölüx mandal-šolmaž-öx",
         "notes": "Compressed Ithkuil phrasing for mandala-patterned multi-dimensional computation."
       },
       "cuneiform": {
