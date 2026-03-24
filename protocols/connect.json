@@ -35,9 +35,19 @@
     "sources": [
       {
         "repo": "Rosetta-Shape-Core",
-        "expected_path": "glyphs/*.json OR atlas/*.json",
-        "use": "Shape-to-meaning translation tables for encoding problem geometry.",
-        "status": "pending — Rosetta does not yet export JSON data files"
+        "paths": [
+          "shapes/octahedron.json",
+          "bridges/rosetta-bridges.json",
+          "data/math_constants.json",
+          "data/sacred_geometry.json",
+          "protocols/mandala-compute-protocol.md",
+          "schema/shape.schema.json",
+          "ontology/_vocab.json",
+          "ontology/_id_registry.json"
+        ],
+        "entity_ids": ["SHAPE.OCTA", "CONST.PHI", "CAP.SEED_EXPANSION", "PROTO.MANDALA_COMPUTE"],
+        "use": "Shape-to-meaning translation, octahedral geometry bridge, schema validation.",
+        "status": "active — Rosetta fieldlink v1.1 lists Mandala-Computing as a source, mounts at atlas/remote/mandala/"
       },
       {
         "repo": "Geometric-to-Binary-Computational-Bridge",

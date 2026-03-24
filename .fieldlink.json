@@ -7,9 +7,9 @@
     ],
     "local_manifests": [
       "glyphs/**",
+      "atlas/**",
       "protocols/**",
-      "sensors/**",
-      "atlas/shapes.json"
+      "sensors/**"
     ],
     "role": "sensors|protocols|shapes|hub",
     "multilingual_layers": {
@@ -31,8 +31,15 @@
       }
     },
     "glyph_routes": {
-      "mandala_core": ["atlas/glyphs/mandala.json", "atlas/shapes.json"],
+      "mandala_core": ["glyphs/mandala.json", "atlas/glyphs/mandala.json", "atlas/shapes.json"],
       "hub_integration": ["protocols/connect.json", "sensors/multi_layer.json"]
+    },
+    "rosetta_link": {
+      "repo": "https://github.com/JinnZ2/Rosetta-Shape-Core",
+      "protocol": "mandala_compute_v1.0",
+      "entities": ["SHAPE.OCTA", "CONST.PHI", "CAP.SEED_EXPANSION", "PROTO.MANDALA_COMPUTE"],
+      "mount_as": "atlas/remote/mandala/",
+      "status": "active"
     },
     "metadata": {
       "author": "JinnZ v2",
