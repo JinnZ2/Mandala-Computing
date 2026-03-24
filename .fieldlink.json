@@ -1,17 +1,88 @@
 {
   "fieldlink": {
-    "atlas_repo": "https://github.com/JinnZ2/BioGrid2.0",
-    "atlas_paths": [
-      "planned/glyphs/atlas.json",
-      "registry/atlas.glyphs.json"
-    ],
+    "schema_version": "3.0",
+    "direction": "bidirectional",
+    "identity": {
+      "repo": "https://github.com/JinnZ2/Mandala-Computing",
+      "role": "sensors|protocols|shapes|hub",
+      "entities_exported": ["SHAPE.OCTA", "CONST.PHI", "CAP.SEED_EXPANSION", "PROTO.MANDALA_COMPUTE"],
+      "mount_path": "atlas/remote/mandala/"
+    },
+    "links": {
+      "outgoing": [
+        {
+          "repo": "https://github.com/JinnZ2/BioGrid2.0",
+          "relation": "atlas_provider",
+          "paths": ["planned/glyphs/atlas.json", "registry/atlas.glyphs.json"],
+          "status": "active"
+        },
+        {
+          "repo": "https://github.com/JinnZ2/Rosetta-Shape-Core",
+          "relation": "protocol_bridge",
+          "protocol": "mandala_compute_v1.0",
+          "entities_consumed": ["SHAPE.OCTA", "CONST.PHI", "CAP.SEED_EXPANSION", "PROTO.MANDALA_COMPUTE"],
+          "mount_as": "atlas/remote/mandala/",
+          "status": "active"
+        },
+        {
+          "repo": "https://github.com/JinnZ2/Geometric-to-Binary-Computational-Bridge",
+          "relation": "encoding_bridge",
+          "status": "active"
+        },
+        {
+          "repo": "https://github.com/JinnZ2/Polyhedral-Intelligence",
+          "relation": "geometric_model",
+          "status": "active"
+        },
+        {
+          "repo": "https://github.com/JinnZ2/Fractal-Compass-Atlas",
+          "relation": "navigation_layer",
+          "status": "active"
+        },
+        {
+          "repo": "https://github.com/JinnZ2/ai-human-audit-protocol",
+          "relation": "audit_framework",
+          "status": "active"
+        }
+      ],
+      "incoming": [
+        {
+          "repo": "https://github.com/JinnZ2/Rosetta-Shape-Core",
+          "relation": "shape_translation",
+          "entities_provided": ["SHAPE.OCTA", "CONST.PHI"],
+          "mount_from": "atlas/remote/mandala/",
+          "status": "active"
+        },
+        {
+          "repo": "https://github.com/JinnZ2/BioGrid2.0",
+          "relation": "glyph_consumer",
+          "paths_consumed": ["glyphs/mandala.json", "atlas/shapes.json"],
+          "status": "active"
+        },
+        {
+          "repo": "https://github.com/JinnZ2/Geometric-to-Binary-Computational-Bridge",
+          "relation": "geometry_source",
+          "entities_consumed": ["SHAPE.OCTA", "PROTO.MANDALA_COMPUTE"],
+          "status": "active"
+        }
+      ]
+    },
+    "sync": {
+      "strategy": "pull_on_change",
+      "conflict_resolution": "source_wins",
+      "shared_entities": ["SHAPE.OCTA", "CONST.PHI", "CAP.SEED_EXPANSION", "PROTO.MANDALA_COMPUTE"],
+      "last_synced": null
+    },
     "local_manifests": [
       "glyphs/**",
       "atlas/**",
       "protocols/**",
       "sensors/**"
     ],
-    "role": "sensors|protocols|shapes|hub",
+    "glyph_routes": {
+      "mandala_core": ["glyphs/mandala.json", "atlas/glyphs/mandala.json", "atlas/shapes.json"],
+      "hub_integration": ["protocols/connect.json", "sensors/multi_layer.json"]
+    },
     "multilingual_layers": {
       "lojban": {
         "summary": "ti mandala ke cmaci bilma cu selxi'a",
@@ -30,23 +101,12 @@
         }
       }
     },
-    "glyph_routes": {
-      "mandala_core": ["glyphs/mandala.json", "atlas/glyphs/mandala.json", "atlas/shapes.json"],
-      "hub_integration": ["protocols/connect.json", "sensors/multi_layer.json"]
-    },
-    "rosetta_link": {
-      "repo": "https://github.com/JinnZ2/Rosetta-Shape-Core",
-      "protocol": "mandala_compute_v1.0",
-      "entities": ["SHAPE.OCTA", "CONST.PHI", "CAP.SEED_EXPANSION", "PROTO.MANDALA_COMPUTE"],
-      "mount_as": "atlas/remote/mandala/",
-      "status": "active"
-    },
     "metadata": {
       "author": "JinnZ v2",
-      "co_creation": ["ChatGPT"],
-      "version": "2.0",
+      "co_creation": ["ChatGPT", "Claude"],
+      "version": "3.0",
       "status": "active",
-      "tags": ["mandala", "fractal", "glyph-hub", "language-layer"]
+      "tags": ["mandala", "fractal", "glyph-hub", "language-layer", "bidirectional"]
     }
   }
 }
