@@ -53,6 +53,14 @@ No `requirements.txt` exists. Dependencies are not pinned.
 
 **optional:** `matplotlib` (referenced in README, not imported in code)
 
+**dependency layers:**
+
+| Layer | Modules | Requires | Why |
+|-------|---------|----------|-----|
+| Representation | `octahedral_arithmetic.py`, `glyph_convert.py` | stdlib only | Meaning lives in glyph space, no numeric assumptions |
+| Classical solving | `mandala_computer.py`, `holographic_mandala.py` | numpy | Random sampling, fast arrays — convenience, not necessity |
+| Quantum solving | `quantum_mandala.py` | numpy + scipy | Matrix expm, eigendecomposition — fundamentally linear algebra |
+
 ---
 
 ## key-modules
