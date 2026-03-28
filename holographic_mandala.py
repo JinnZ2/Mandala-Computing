@@ -634,13 +634,13 @@ class HolographicMandala(MandalaComputer):
         # Seed target ring: use entanglement links where possible
         seeded = set()
         for link in self.entanglement_links:
+            if link.cell_a >= self.num_cells or link.cell_b >= self.num_cells:
+                continue  # stale link, skip
             if link.depth_a == to_depth and link.depth_b == from_depth:
-                source_cell = self.cells[link.cell_b]
-                self.cells[link.cell_a].state = source_cell.state
+                self.cells[link.cell_a].state = self.cells[link.cell_b].state
                 seeded.add(link.cell_a)
             elif link.depth_b == to_depth and link.depth_a == from_depth:
-                source_cell = self.cells[link.cell_a]
-                self.cells[link.cell_b].state = source_cell.state
+                self.cells[link.cell_b].state = self.cells[link.cell_a].state
                 seeded.add(link.cell_b)
 
         # Remaining cells in target ring: seed with dominant

@@ -511,6 +511,7 @@ class QuantumMandalaComputer:
                 best_energy = result.fun
                 print(f"   Nelder-Mead converged: E={best_energy:.6f} ({result.nfev} evals)")
             except ImportError:
+                print("   scipy.optimize not available, falling back to random search")
                 optimize = False  # fall through to random search
 
         if not optimize:

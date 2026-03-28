@@ -20,6 +20,8 @@ import pathlib
 import copy
 import math
 
+# Optional: glyph-native arithmetic. If unavailable, factorization solutions
+# omit glyph representations but all computation still works.
 try:
     from octahedral_arithmetic import OctahedralNumber, states_to_number, factor_pair_glyphs
     HAS_GLYPH_MATH = True
@@ -230,6 +232,8 @@ class MandalaComputer:
         """
         max_factor = int(math.isqrt(N)) + 1
         digits = 1
+        # Factor range is [2, 2 + base^digits - 1] = [2, base^digits + 1]
+        # so base^digits + 1 must be >= max_factor
         while (base ** digits) + 1 < max_factor:
             digits += 1
         return digits
