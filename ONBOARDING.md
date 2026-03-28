@@ -28,12 +28,12 @@ Symbolic glyphs            →          Problem encodings
 
 These Rosetta entities map directly to Mandala constructs:
 
-| Rosetta Entity         | Mandala Construct                  | Where in Code                          |
-|------------------------|------------------------------------|----------------------------------------|
-| `SHAPE.OCTA`           | `OctahedralState` (8 states 0-7)   | `mandala_computer.py:OctahedralState`  |
-| `CONST.PHI`            | `PHI = (1 + sqrt(5)) / 2`         | All three `.py` modules                |
-| `CAP.SEED_EXPANSION`   | `bloom_mandala()` method           | `mandala_computer.py:MandalaComputer`  |
-| `PROTO.MANDALA_COMPUTE`| Full relaxation pipeline           | `mandala_computer.py:relax_to_ground_state` |
+| Rosetta Entity         | Mandala Construct                  | Where in Code                              |
+|------------------------|------------------------------------|--------------------------------------------|
+| `SHAPE.OCTA`           | `MandalaCell` (8 states 0-7)      | `mandala_computer.py:MandalaCell`          |
+| `CONST.PHI`            | `PHI = (1 + sqrt(5)) / 2`         | All `.py` modules + `octahedral_arithmetic.py` |
+| `CAP.SEED_EXPANSION`   | `bloom_mandala()` method           | `mandala_computer.py`, `holographic_mandala.py` |
+| `PROTO.MANDALA_COMPUTE`| Full relaxation pipeline           | `mandala_computer.py:relax_to_ground_state`|
 
 ### Octahedral State Glyphs
 
@@ -132,7 +132,7 @@ This is how a problem flows through Mandala:
 
 | Problem | Rosetta Shape | Encoding | Glyph |
 |---------|--------------|----------|-------|
-| Factorization | OCTA (bipartite) | Two cells, 64D product space | ⇩ |
+| Factorization | OCTA (bipartite) | Multi-cell registers, base-8 positional | ⇩ |
 | SAT | OCTA (boolean) | Variables → states, clauses → energy | ⊨ |
 | TSP | OCTA (ring) | Cities on ring, winding energy | ↺ |
 | Graph Coloring | OCTA (network) | Nodes → cells, edges → couplings | ◈ |
@@ -152,9 +152,20 @@ python -c "from quantum_mandala import demo_quantum_factorization; demo_quantum_
 # Symbolic P=NP test
 python -c "from mandala_simulator import test_p_equals_np; test_p_equals_np()"
 
+# Glyph converter (interactive)
+python glyph_convert.py
+
+# Glyph converter (direct)
+python glyph_convert.py 143
+python glyph_convert.py 3/7
+python glyph_convert.py 11 '*' 13
+
 # All examples
 python examples/example-math.py
 python examples/example-quantum-integration.py
+
+# Run tests
+python tests/test_core.py
 ```
 
 ---
@@ -174,15 +185,18 @@ entity IDs across repositories.
 
 ---
 
-## Three Implementations, One Idea
+## Modules
 
-Be aware: there are **three separate Python modules**, each with different tradeoffs.
+Six Python modules, each with a distinct role:
 
-| Module | Class | Dependencies | Use When |
-|--------|-------|-------------|----------|
-| `mandala_computer.py` | `MandalaComputer` | numpy, scipy | Full classical simulation with real energy calculations |
-| `quantum_mandala.py` | `QuantumMandalaComputer` | numpy, scipy | Quantum annealing, Grover search, 8D Hilbert space |
-| `mandala_simulator.py` | `MandalaComputer` | stdlib only | Quick symbolic experiments, no heavy math |
+| Module | Class | Dependencies | Role |
+|--------|-------|-------------|------|
+| `mandala_computer.py` | `MandalaComputer` | numpy, scipy | Classical engine: annealing, tempering, landscape scan |
+| `quantum_mandala.py` | `QuantumMandalaComputer` | numpy, scipy | Quantum: annealing, Grover, QAOA, entangled evolution |
+| `holographic_mandala.py` | `HolographicMandala` | numpy, scipy | Holographic boundary + renormalization + entanglement |
+| `octahedral_arithmetic.py` | `OctahedralNumber` | stdlib only | Native glyph-space math (base-8, no decimal) |
+| `glyph_convert.py` | (functions) | stdlib only | Human bridge: decimal input -> glyph computation |
+| `mandala_simulator.py` | `MandalaComputer` | stdlib only | Lightweight symbolic demos (separate class, not the same) |
 
 **Warning:** `mandala_computer.py` and `mandala_simulator.py` both define a class
 called `MandalaComputer`. They are **completely different implementations**.

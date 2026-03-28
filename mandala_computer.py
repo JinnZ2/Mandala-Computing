@@ -20,6 +20,8 @@ import pathlib
 import copy
 import math
 
+# Optional: glyph-native arithmetic. If unavailable, factorization solutions
+# omit glyph representations but all computation still works.
 try:
     from octahedral_arithmetic import OctahedralNumber, states_to_number, factor_pair_glyphs
     HAS_GLYPH_MATH = True
@@ -68,21 +70,9 @@ FRET_CUTOFF = _atlas_constant("FRET_CUTOFF", 3.0 * PHI)
 OCTAHEDRAL_STATES = int(_atlas_constant("OCTAHEDRAL_STATES", 8))
 COUPLING_EXPONENT = int(_atlas_constant("COUPLING_EXPONENT", 6))
 
-# Octahedral symmetry group angles (degrees)
-OCTAHEDRAL_ANGLES = [0, 45, 90, 135, 180, 225, 270, 315]
-
-
 # ---------------------------------------------------------------------------
 # Data structures
 # ---------------------------------------------------------------------------
-
-@dataclass
-class OctahedralState:
-    """Single cell in octahedral configuration."""
-    angle: float
-    energy: float
-    coupling_neighbors: List[int]
-
 
 @dataclass
 class MandalaCell:
@@ -242,6 +232,8 @@ class MandalaComputer:
         """
         max_factor = int(math.isqrt(N)) + 1
         digits = 1
+        # Factor range is [2, 2 + base^digits - 1] = [2, base^digits + 1]
+        # so base^digits + 1 must be >= max_factor
         while (base ** digits) + 1 < max_factor:
             digits += 1
         return digits
@@ -315,6 +307,8 @@ class MandalaComputer:
         Nodes map to cells. Colors are octahedral states mod num_colors.
         Adjacent nodes sharing a color incur energy penalty.
         """
+        if not adjacency:
+            raise ValueError("Adjacency list cannot be empty")
         num_nodes = max(max(e) for e in adjacency) + 1
         print(f"\n   Encoding graph coloring: {num_nodes} nodes, {num_colors} colors, {len(adjacency)} edges")
         self.problem_type = ProblemType.GRAPH_COLORING
@@ -458,8 +452,9 @@ class MandalaComputer:
                 self._emit_sensor("convergence.rate", step, rate)
                 print(f"   Step {step:>6d}: E={E:.4f}  {self.glyph_trace(8)}")
 
-            if len(self.energy_history) > 10 * log_interval:
-                recent = self.energy_history[-10 * log_interval:]
+            window = min(10 * log_interval, len(self.energy_history))
+            if window >= 20:
+                recent = self.energy_history[-window:]
                 if np.var(recent) < convergence_threshold:
                     print(f"   Converged at step {step}")
                     break
