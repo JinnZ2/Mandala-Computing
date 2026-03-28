@@ -367,13 +367,12 @@ class QuantumMandalaComputer:
         d = 8
         dim_a = d  # first cell
         dim_b = d ** (num_cells - 1)  # rest
-        # Reshape state into bipartite form
-        psi = state.reshape(dim_b, dim_a)  # (dim_b, dim_a) due to little-endian ordering
-        # Reduced density matrix for subsystem A (first cell)
-        rho_a = psi.conj().T @ psi  # (dim_a, dim_a)
-        # Eigenvalues
+        psi = state.reshape(dim_b, dim_a)
+        rho_a = psi.conj().T @ psi
         eigvals = np.linalg.eigvalsh(rho_a)
         eigvals = eigvals[eigvals > 1e-15]
+        if len(eigvals) == 0:
+            return 0.0
         return float(-np.sum(eigvals * np.log2(eigvals)))
 
     # ------------------------------------------------------------------
@@ -583,17 +582,21 @@ class QuantumMandalaComputer:
         """Shannon entropy of cell's probability distribution (proxy for entanglement)."""
         probs = self.cells[cell_idx].get_probability_distribution()
         nz = probs[probs > 1e-15]
+        if len(nz) == 0:
+            return 0.0
         return float(-np.sum(nz * np.log2(nz)))
 
-    def glyph_trace(self, num_cells: int = None) -> str:
-        """Show dominant state of each cell as glyphs."""
-        cells = self.cells[:num_cells] if num_cells else self.cells
+    def glyph_trace(self, max_cells: int = 10) -> str:
+        """Show dominant state of each cell as glyphs (no spaces, consistent with classical)."""
+        cells = self.cells[:max_cells]
         parts = []
         for c in cells:
             dominant = int(np.argmax(c.get_probability_distribution()))
             g = _STATE_GLYPHS[dominant] if dominant < len(_STATE_GLYPHS) else str(dominant)
             parts.append(g)
-        return " ".join(parts)
+        if self.num_cells > max_cells:
+            parts.append("...")
+        return "".join(parts)
 
 
 # ============================================================================

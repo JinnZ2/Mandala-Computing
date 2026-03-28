@@ -66,7 +66,6 @@ via multiple exploration algorithms. Loads constants from JSON atlas at runtime.
 
 | class              | role                                              |
 |--------------------|---------------------------------------------------|
-| `OctahedralState`  | single cell in octahedral configuration (dataclass)|
 | `MandalaCell`      | computational cell with position, state, neighbors (dataclass) |
 | `SensorReading`    | telemetry reading with sensor_id, step, value     |
 | `ProblemType`      | enum: `FACTORIZATION`, `SAT`, `TSP`, `GRAPH_COLORING`, `OPTIMIZATION` |
@@ -95,11 +94,14 @@ via multiple exploration algorithms. Loads constants from JSON atlas at runtime.
 Factors are represented as positional numbers across multiple cells in base-8.
 The register size auto-scales with `sqrt(N)`:
 
-| digits/factor | factor range | max N      |
-|---------------|-------------|------------|
-| 1 cell        | [2..9]      | 81         |
-| 2 cells       | [2..65]     | ~4,200     |
-| 3 cells       | [2..513]    | ~263,000   |
+| digits/factor | factor range     | needs 2+ digits when N > |
+|---------------|-----------------|--------------------------|
+| 1 cell        | [2..9]          | 49  (sqrt > 8)           |
+| 2 cells       | [2..65]         | 4,096  (sqrt > 64)       |
+| 3 cells       | [2..513]        | 262,144  (sqrt > 512)    |
+
+Note: coupling energy is scaled by 0.1 for factorization to avoid
+interfering with multi-cell factor registers.
 
 ### quantum-mandala (`quantum_mandala.py`) v2.0
 
@@ -163,7 +165,20 @@ Lightweight symbolic simulator for quick experiments and demos. Contains a
 phi = (1 + sqrt(5)) / 2    # golden ratio, central to all energy scaling
 ```
 
-Defined as `PHI` in all three modules.
+Defined as `PHI` in all computation modules. `octahedral_arithmetic.py` provides
+`phi_weight()` which uses PHI as positional weight instead of base-8.
+
+### octahedral-arithmetic (`octahedral_arithmetic.py`)
+
+Native glyph-space math. Numbers are base-8 glyph sequences, not decimal.
+Arithmetic (add, multiply, divide) happens in glyph space without conversion.
+
+| class / function     | role                                              |
+|----------------------|---------------------------------------------------|
+| `OctahedralNumber`   | base-8 positional number with native arithmetic   |
+| `GlyphFraction`      | irreducible ratio of two glyph numbers            |
+| `factor_pair_glyphs` | factorize N entirely in glyph space               |
+| `states_to_number`   | convert mandala cell states to OctahedralNumber    |
 
 ### energy-model (classical)
 
@@ -236,14 +251,21 @@ if evolution is slow enough.
 
 ### factorization-hamiltonian
 
-For two-cell system (64-dimensional space):
-
+**Classical** (mandala_computer.py): quadratic penalty, unbounded range.
 ```
-H[i*8+j, i*8+j] = -1.0   if (2+i) * (2+j) == N
-                 = +1.0   otherwise
+E = (fa * fb - N)^2        # zero at solution, grows quadratically
 ```
+Factor candidates use multi-cell base-8 positional encoding.
+Coupling energy scaled by 0.1 to avoid register interference.
 
-Ground state eigenvalue encodes the factor pair.
+**Quantum** (quantum_mandala.py): smooth bounded potential, range (-1, +1).
+```
+H[idx, idx] = 1 - 2/(1 + (fa*fb - N)^2)   # -1 at solution, approaches +1
+```
+Uses stride mapping: `fa = 2 + i*stride` where `stride = ceil(sqrt(N)/8)`.
+Smoother gradient aids adiabatic evolution.
+
+Ground state eigenvalue encodes the factor pair in both cases.
 
 ### quantum-state-evolution
 
