@@ -27,7 +27,8 @@ mandala-computing/
 ├── mandala_computer.py        # core classical simulator (~600 loc)
 ├── quantum_mandala.py         # quantum extension (~600 loc)
 ├── mandala_simulator.py       # lightweight symbolic simulator (~115 loc)
-├── .fieldlink.json            # ecosystem metadata
+├── ONBOARDING.md              # agent learning path from Rosetta-Shape-Core
+├── .fieldlink.json            # ecosystem metadata (v3.0, bidirectional)
 ├── README.md                  # project overview
 ├── PROJECTS.md                # connected repos
 ├── LICENSE                    # MIT
@@ -271,6 +272,7 @@ Or run modules directly: `python mandala_computer.py`
 | `Mandala_integration.md`   | bridge-to-substrate adapter details       |
 | `Questions.md`             | limitations and open research questions   |
 | `Checklist.md`             | integration verification checklist        |
+| `ONBOARDING.md`            | agent learning path from Rosetta-Shape-Core |
 
 ---
 
@@ -304,13 +306,43 @@ python examples/example-quantum-integration.py
 
 ---
 
+## rosetta-bridge
+
+This repo is the **computational leap** from Rosetta-Shape-Core's geometric ontology
+into quantum mechanics understanding. Rosetta defines shapes; Mandala makes them compute.
+
+**Agents arriving from Rosetta:** Read `ONBOARDING.md` first. It maps Rosetta entities
+(`SHAPE.OCTA`, `CONST.PHI`, `CAP.SEED_EXPANSION`, `PROTO.MANDALA_COMPUTE`) to their
+Mandala implementations and provides a phased reading order.
+
+**Bidirectional fieldlink:** `.fieldlink.json` (v3.0) tracks both outgoing references
+(repos this project depends on) and incoming references (repos that consume from here).
+The `sync` section defines shared entities and conflict resolution strategy.
+
+---
+
+## learning-path
+
+Recommended reading order for understanding the framework:
+
+1. **Concept:** `README.md` — why geometry computes
+2. **Architecture:** `CLAUDE.md` (this file) — classes, methods, constants
+3. **Math:** `Math.md` — eigenvalue proofs, energy model
+4. **Run:** `examples/example-math.py` — see factorization work
+5. **Theory:** `P=np-hypothesis.md` — geometric approach to complexity
+6. **Quantum:** `Quantum_integration.md` → `quantum_mandala.py`
+7. **Physical:** `Mandala_integration.md` → `Hardware.md`
+8. **Status:** `Integration.md` → `Questions.md` → `Checklist.md`
+
+---
+
 ## related-ecosystem
 
 Connected repositories by JinnZ2 (listed in `PROJECTS.md` and `.fieldlink.json`):
 
 - BioGrid2.0
 - Geometric-to-Binary-Computational-Bridge
-- Rosetta-Shape-Core
+- Rosetta-Shape-Core (primary bridge — see `ONBOARDING.md`)
 - Polyhedral-Intelligence
 - ai-human-audit-protocol
 - Fractal-Compass-Atlas
