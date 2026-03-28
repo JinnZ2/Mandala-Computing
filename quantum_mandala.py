@@ -223,6 +223,146 @@ class QuantumMandalaComputer:
         return result
 
     # ------------------------------------------------------------------
+    # Multi-cell tensor product Hamiltonian
+    # ------------------------------------------------------------------
+
+    def _build_multicell_hamiltonian(self, num_cells: int, problem_type: str,
+                                     problem_data: Dict) -> np.ndarray:
+        """
+        Build Hamiltonian over tensor product of multiple 8-dim cells.
+
+        For num_cells cells, Hilbert space is 8^num_cells dimensional.
+        Includes local terms + nearest-neighbor coupling.
+
+        Practical limit: num_cells <= 3 (8^3 = 512 dim) for exact computation.
+        """
+        d = 8  # single-cell dimension
+        dim = d ** num_cells
+        H = np.zeros((dim, dim), dtype=complex)
+
+        # Local terms: encode problem on each cell
+        if problem_type == "factorization":
+            N = problem_data["N"]
+            # For 2+ cells, pair them as factor candidates
+            for cell_idx in range(0, num_cells - 1, 2):
+                for state_a in range(d):
+                    for state_b in range(d):
+                        fa = 2 + state_a
+                        fb = 2 + state_b
+                        penalty = (fa * fb - N) ** 2
+                        # Apply to all basis states where cell_idx has state_a
+                        # and cell_idx+1 has state_b
+                        for basis in range(dim):
+                            digits = self._basis_to_states(basis, num_cells, d)
+                            if digits[cell_idx] == state_a and digits[cell_idx + 1] == state_b:
+                                H[basis, basis] += penalty
+
+        # Inter-cell coupling: ZZ-like interaction on neighbors
+        for c in range(num_cells - 1):
+            for basis in range(dim):
+                digits = self._basis_to_states(basis, num_cells, d)
+                diff = abs(digits[c] - digits[c + 1])
+                coupling = self.entanglement_strength * math.sin(diff * math.pi / 4) ** 2
+                H[basis, basis] += coupling
+
+        # Off-diagonal: single-cell transitions (X-like mixing)
+        for c in range(num_cells):
+            for basis in range(dim):
+                digits = self._basis_to_states(basis, num_cells, d)
+                for new_s in range(d):
+                    if new_s != digits[c]:
+                        new_digits = list(digits)
+                        new_digits[c] = new_s
+                        new_basis = self._states_to_basis(new_digits, d)
+                        H[basis, new_basis] += -0.01  # small mixing
+
+        return H
+
+    @staticmethod
+    def _basis_to_states(basis: int, num_cells: int, d: int) -> List[int]:
+        """Convert basis index to per-cell state tuple."""
+        digits = []
+        for _ in range(num_cells):
+            digits.append(basis % d)
+            basis //= d
+        return digits
+
+    @staticmethod
+    def _states_to_basis(states: List[int], d: int) -> int:
+        """Convert per-cell states to basis index."""
+        idx = 0
+        for i, s in enumerate(states):
+            idx += s * (d ** i)
+        return idx
+
+    def entangled_annealing(self, problem_type: str, problem_data: Dict,
+                            num_cells: int = 2, num_steps: int = 100) -> Dict:
+        """
+        Quantum annealing over entangled multi-cell Hilbert space.
+
+        Evolves the full 8^num_cells dimensional state vector,
+        including inter-cell entanglement through coupling terms.
+        """
+        dim = 8 ** num_cells
+        print(f"\n   Entangled annealing: {num_cells} cells, dim={dim}, {num_steps} steps")
+
+        H_problem = self._build_multicell_hamiltonian(num_cells, problem_type, problem_data)
+        H_initial = -np.ones((dim, dim), dtype=complex) / dim
+        state = np.ones(dim, dtype=complex) / np.sqrt(dim)
+
+        for step in range(num_steps):
+            s = step / max(num_steps - 1, 1)
+            H = (1 - s) * H_initial + s * H_problem
+            dt = 0.1
+            U = self._matrix_exponential(-1j * H * dt)
+            state = U @ state
+            state /= np.linalg.norm(state)
+
+            if step % 20 == 0:
+                energy = float(np.real(state.conj() @ H_problem @ state))
+                fidelity = float(np.max(np.abs(state) ** 2))
+                # Compute entanglement entropy via reduced density matrix
+                ent_entropy = self._compute_entanglement_entropy(state, num_cells)
+                self._emit_sensor("energy.total", step, energy)
+                self._emit_sensor("quantum.fidelity", step, fidelity)
+                self._emit_sensor("quantum.entanglement", step, ent_entropy)
+                self.energy_history.append(energy)
+                print(f"   Step {step:>4d}: E={energy:.4f}  fidelity={fidelity:.4f}  S_ent={ent_entropy:.3f}")
+
+        probs = np.abs(state) ** 2
+        measured = np.random.choice(dim, p=probs)
+        digits = self._basis_to_states(measured, num_cells, 8)
+        final_energy = float(np.real(state.conj() @ H_problem @ state))
+
+        solution = self._extract_quantum_solution(measured, problem_type, problem_data)
+        solution["cell_states"] = digits
+        print(f"   Final: E={final_energy:.4f}, states={digits}")
+        return {
+            "measured_state": measured,
+            "cell_states": digits,
+            "final_energy": final_energy,
+            "state_vector": state,
+            "solution": solution,
+        }
+
+    def _compute_entanglement_entropy(self, state: np.ndarray, num_cells: int) -> float:
+        """
+        Compute entanglement entropy between first cell and the rest.
+        Traces out all cells except the first to get reduced density matrix.
+        """
+        d = 8
+        dim_a = d  # first cell
+        dim_b = d ** (num_cells - 1)  # rest
+        # Reshape state into bipartite form
+        psi = state.reshape(dim_b, dim_a)  # (dim_b, dim_a) due to little-endian ordering
+        # Reduced density matrix for subsystem A (first cell)
+        rho_a = psi.conj().T @ psi  # (dim_a, dim_a)
+        # Eigenvalues
+        eigvals = np.linalg.eigvalsh(rho_a)
+        eigvals = eigvals[eigvals > 1e-15]
+        return float(-np.sum(eigvals * np.log2(eigvals)))
+
+    # ------------------------------------------------------------------
     # Quantum annealing
     # ------------------------------------------------------------------
 
@@ -303,60 +443,100 @@ class QuantumMandalaComputer:
     # ------------------------------------------------------------------
 
     def qaoa(self, problem_type: str, problem_data: Dict,
-             num_layers: int = 3, num_samples: int = 50) -> Dict:
+             num_layers: int = 3, optimize: bool = True) -> Dict:
         """
         Quantum Approximate Optimization Algorithm.
-        Alternates problem and mixer unitaries with random parameter search.
+
+        Uses Nelder-Mead to optimize gamma/beta parameters (when optimize=True).
+        Falls back to random search if scipy.optimize is unavailable.
         """
-        print(f"\n   QAOA: {num_layers} layers, {num_samples} samples")
+        print(f"\n   QAOA: {num_layers} layers, optimize={optimize}")
         H_problem = self._build_hamiltonian(problem_type, problem_data)
         dim = H_problem.shape[0]
 
-        # Mixer: sum of single-qubit X operators
+        # Mixer: sum of X operators (single bit-flip transitions)
         H_mixer = np.zeros((dim, dim), dtype=complex)
         for i in range(dim):
             for j in range(dim):
                 if bin(i ^ j).count("1") == 1:
                     H_mixer[i, j] = 1.0
 
-        best_energy = float("inf")
-        best_state = None
-        best_params = None
+        # Precompute initial state
+        psi0 = np.ones(dim, dtype=complex) / np.sqrt(dim)
 
-        for sample in range(num_samples):
-            gammas = np.random.uniform(0, 2 * np.pi, num_layers)
-            betas = np.random.uniform(0, np.pi, num_layers)
-            state = np.ones(dim, dtype=complex) / np.sqrt(dim)
+        eval_count = [0]
 
+        def qaoa_energy(params):
+            """Evaluate QAOA circuit for given parameters."""
+            gammas = params[:num_layers]
+            betas = params[num_layers:]
+            state = psi0.copy()
             for layer in range(num_layers):
                 U_p = self._matrix_exponential(-1j * gammas[layer] * H_problem)
                 state = U_p @ state
                 U_m = self._matrix_exponential(-1j * betas[layer] * H_mixer)
                 state = U_m @ state
-
             state /= np.linalg.norm(state)
             energy = float(np.real(state.conj() @ H_problem @ state))
+            eval_count[0] += 1
+            if eval_count[0] % 20 == 0:
+                self._emit_sensor("energy.total", eval_count[0], energy)
+                self.energy_history.append(energy)
+            return energy
 
-            if energy < best_energy:
-                best_energy = energy
-                best_state = state.copy()
-                best_params = (gammas.copy(), betas.copy())
+        if optimize:
+            try:
+                from scipy.optimize import minimize
+                # Random initial point
+                x0 = np.concatenate([
+                    np.random.uniform(0, 2 * np.pi, num_layers),
+                    np.random.uniform(0, np.pi, num_layers),
+                ])
+                result = minimize(qaoa_energy, x0, method="Nelder-Mead",
+                                  options={"maxiter": 200, "xatol": 1e-3, "fatol": 1e-4})
+                best_params = result.x
+                best_energy = result.fun
+                print(f"   Nelder-Mead converged: E={best_energy:.6f} ({result.nfev} evals)")
+            except ImportError:
+                optimize = False  # fall through to random search
 
-            if sample % 10 == 0:
-                self._emit_sensor("energy.total", sample, best_energy)
-                self.energy_history.append(best_energy)
-                print(f"   Sample {sample:>3d}: best E={best_energy:.4f}")
+        if not optimize:
+            # Random search fallback
+            best_energy = float("inf")
+            best_params = None
+            for sample in range(50):
+                params = np.concatenate([
+                    np.random.uniform(0, 2 * np.pi, num_layers),
+                    np.random.uniform(0, np.pi, num_layers),
+                ])
+                e = qaoa_energy(params)
+                if e < best_energy:
+                    best_energy = e
+                    best_params = params
+                if sample % 10 == 0:
+                    print(f"   Sample {sample:>3d}: best E={best_energy:.4f}")
 
-        probs = np.abs(best_state) ** 2
+        # Evaluate best params to get state vector
+        gammas = best_params[:num_layers]
+        betas = best_params[num_layers:]
+        state = psi0.copy()
+        for layer in range(num_layers):
+            U_p = self._matrix_exponential(-1j * gammas[layer] * H_problem)
+            state = U_p @ state
+            U_m = self._matrix_exponential(-1j * betas[layer] * H_mixer)
+            state = U_m @ state
+        state /= np.linalg.norm(state)
+
+        probs = np.abs(state) ** 2
         measured = np.random.choice(dim, p=probs)
         solution = self._extract_quantum_solution(measured, problem_type, problem_data)
-        print(f"   QAOA best energy: {best_energy:.4f}")
+        print(f"   QAOA best energy: {best_energy:.6f}")
         return {
             "measured_state": measured,
             "final_energy": best_energy,
-            "state_vector": best_state,
+            "state_vector": state,
             "solution": solution,
-            "params": best_params,
+            "params": {"gammas": list(gammas), "betas": list(betas)},
         }
 
     # ------------------------------------------------------------------
@@ -450,18 +630,35 @@ def demo_quantum_superposition():
 
 
 def demo_qaoa():
-    """QAOA for quantum optimization."""
+    """QAOA with Nelder-Mead optimization."""
     print("\n" + "=" * 60)
-    print("QUANTUM DEMO: QAOA OPTIMIZATION")
+    print("QUANTUM DEMO: QAOA (NELDER-MEAD)")
     print("=" * 60)
     N = 15
     qc = QuantumMandalaComputer(golden_depth=2, sacred_geometry=8, entanglement_strength=0.1)
     qc.bloom_quantum_mandala()
-    result = qc.qaoa("factorization", {"N": N}, num_layers=3, num_samples=30)
+    result = qc.qaoa("factorization", {"N": N}, num_layers=4, optimize=True)
     sol = result["solution"]
     print(f"\n   N={N}, factors={sol['factors']}, correct={sol['correct']}")
     print(f"   Telemetry: {len(qc.telemetry)} readings")
-    print(f"   Glyph trace: {qc.glyph_trace()}")
+    return result
+
+
+def demo_entangled_annealing():
+    """Entangled multi-cell annealing with real entanglement entropy."""
+    print("\n" + "=" * 60)
+    print("QUANTUM DEMO: ENTANGLED MULTI-CELL ANNEALING")
+    print("=" * 60)
+    N = 15
+    qc = QuantumMandalaComputer(golden_depth=2, sacred_geometry=8, entanglement_strength=0.5)
+    result = qc.entangled_annealing("factorization", {"N": N}, num_cells=2, num_steps=100)
+    sol = result["solution"]
+    print(f"\n   N={N}, cell states={result['cell_states']}")
+    print(f"   Factors: {sol['factors']}, correct: {sol['correct']}")
+    # Show entanglement readings
+    ent_readings = [r for r in qc.telemetry if r["sensor_id"] == "quantum.entanglement"]
+    if ent_readings:
+        print(f"   Entanglement entropy: {ent_readings[0]['value']:.3f} -> {ent_readings[-1]['value']:.3f} bits")
     return result
 
 
@@ -475,6 +672,7 @@ if __name__ == "__main__":
     demo_grover_search()
     demo_quantum_superposition()
     demo_qaoa()
+    demo_entangled_annealing()
 
     print("\n" + "=" * 60)
     print("ALL QUANTUM DEMONSTRATIONS COMPLETE")

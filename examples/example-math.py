@@ -147,4 +147,31 @@ if __name__ == "__main__":
     energy_landscape(15, max_factor=8)
     demo_thermal_errors()
 
+    # --- Bridge to main engine ---
+    print("\n" + "=" * 60)
+    print("comparison: eigenvalue vs geometric relaxation")
+    print("=" * 60)
+    try:
+        import sys, os
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        from mandala_computer import MandalaComputer
+
+        for N in [15, 21, 35]:
+            # Eigenvalue method (exact)
+            dim = auto_dim(N)
+            ev_result = find_factors_via_eigenvalues(N, dim=dim)
+
+            # Geometric relaxation (simulated annealing)
+            mc = MandalaComputer(golden_depth=4, sacred_geometry=8)
+            mc.encode_factorization(N)
+            sa_result = mc.simulated_annealing(max_steps=3000, T_start=3.0, T_end=0.01)
+
+            ev_ok = "ok" if ev_result["verified"] else "MISS"
+            sa_ok = "ok" if sa_result["solution"]["verified"] else "MISS"
+            print(f"  N={N:>4}  eigenvalue: {ev_result['factor_a']}x{ev_result['factor_b']} [{ev_ok}]"
+                  f"  annealing: {sa_result['solution'].get('best_pair', '?')} [{sa_ok}]"
+                  f"  E={sa_result['final_energy']:.2f}")
+    except Exception as e:
+        print(f"  (engine comparison skipped: {e})")
+
     print("\ndone.")

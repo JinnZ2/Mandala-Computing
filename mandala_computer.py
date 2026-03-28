@@ -226,19 +226,21 @@ class MandalaComputer:
     # ------------------------------------------------------------------
 
     def encode_factorization(self, N: int):
-        """Encode factorization as bipartite tensor configuration."""
+        """
+        Encode factorization as bipartite tensor configuration.
+
+        Uses cell pairs as factor candidates (a, b) where a*b = N.
+        Energy = (a * b - N)^2 so ground state at E=0 encodes valid factors.
+        Cells at even indices encode factor-a, odd indices encode factor-b.
+        """
         print(f"\n   Encoding factorization of N={N}")
         self.problem_type = ProblemType.FACTORIZATION
-        self.problem_data = {"N": N}
+        self.problem_data = {"N": N, "max_factor": int(math.isqrt(N)) + self.sacred_geometry}
         self.bloom_mandala()
+        # Cell energies are computed dynamically via compute_total_energy
+        # Set base cell energy to zero — the bipartite tensor does the work
         for cell in self.cells:
-            cell.energy = self._factorization_cell_energy(cell, N)
-
-    def _factorization_cell_energy(self, cell: MandalaCell, N: int) -> float:
-        factor_candidate = 2 + cell.state + cell.depth * self.sacred_geometry
-        if factor_candidate > 1 and N % factor_candidate == 0:
-            return -1.0 * PHI
-        return 1.0
+            cell.energy = 0.0
 
     def encode_sat(self, clauses: List[List[int]]):
         """Encode SAT problem. States 0-3 = False, 4-7 = True."""
@@ -298,20 +300,32 @@ class MandalaComputer:
     # ------------------------------------------------------------------
 
     def compute_total_energy(self) -> float:
-        """E_total = sum(E_cell) + sum(E_coupling)."""
-        # Optimization override
+        """E_total = sum(E_cell) + sum(E_coupling) + problem-specific terms."""
+        # Optimization: delegate entirely to cost function
         if self.problem_type == ProblemType.OPTIMIZATION and self.problem_data:
             cost_fn = self.problem_data.get("cost_fn")
             if cost_fn:
-                states = [c.state for c in self.cells]
-                return cost_fn(states)
+                return cost_fn([c.state for c in self.cells])
 
         total = 0.0
+
         # Cell energies
         for cell in self.cells:
             total += cell.energy
 
-        # Graph coloring energy
+        # Factorization: bipartite tensor energy
+        # Pair cells (even=factor_a, odd=factor_b), energy = (a*b - N)^2
+        # Factor candidates use state only (depth-independent) for reachability
+        if self.problem_type == ProblemType.FACTORIZATION and self.problem_data:
+            N = self.problem_data["N"]
+            for pair_start in range(0, self.num_cells - 1, 2):
+                ca = self.cells[pair_start]
+                cb = self.cells[pair_start + 1]
+                fa = 2 + ca.state  # range [2..9]
+                fb = 2 + cb.state  # range [2..9]
+                total += (fa * fb - N) ** 2
+
+        # Graph coloring: penalty for same-color neighbors
         if self.problem_type == ProblemType.GRAPH_COLORING and self.problem_data:
             nc = self.problem_data["num_colors"]
             for n_i, n_j in self.problem_data["adjacency"]:
@@ -319,18 +333,17 @@ class MandalaComputer:
                     c_i = self.cells[n_i].state % nc
                     c_j = self.cells[n_j].state % nc
                     if c_i == c_j:
-                        total += 2.0  # penalty
+                        total += 2.0
                     else:
-                        total -= PHI  # reward
+                        total -= PHI
 
-        # Coupling energies
+        # Coupling energies (octahedral alignment)
         for i, ci in enumerate(self.cells):
             for j in ci.neighbors:
                 if j > i:
                     cj = self.cells[j]
                     state_diff = abs(ci.state - cj.state)
-                    coupling_energy = self.coupling_strength * math.sin(state_diff * math.pi / 4) ** 2
-                    total += coupling_energy
+                    total += self.coupling_strength * math.sin(state_diff * math.pi / 4) ** 2
 
         return total
 
@@ -349,7 +362,8 @@ class MandalaComputer:
         dE = E_new - E_old
         if dE < 0:
             return dE
-        p_accept = math.exp(-dE / max(self.temperature, 1e-15))
+        exp_arg = -dE / max(self.temperature, 1e-15)
+        p_accept = math.exp(min(exp_arg, 500))
         if np.random.random() < p_accept:
             return dE
         cell.state = old_state
@@ -497,7 +511,8 @@ class MandalaComputer:
             for r in range(num_replicas - 1):
                 dBeta = (1.0 / temps[r]) - (1.0 / temps[r + 1])
                 dE = energies[r] - energies[r + 1]
-                if dBeta * dE < 0 or np.random.random() < math.exp(dBeta * dE):
+                swap_arg = min(dBeta * dE, 500)  # clamp to avoid overflow
+                if swap_arg < 0 or np.random.random() < math.exp(swap_arg):
                     replicas[r], replicas[r + 1] = replicas[r + 1], replicas[r]
                     energies[r], energies[r + 1] = energies[r + 1], energies[r]
                     total_swaps += 1
@@ -581,13 +596,31 @@ class MandalaComputer:
 
     def _extract_factorization_solution(self) -> Dict:
         N = self.problem_data["N"]
-        factors = []
-        for cell in self.cells:
-            f = 2 + cell.state + cell.depth * self.sacred_geometry
-            if f > 1 and N % f == 0:
-                factors.append(f)
-        factors = sorted(set(factors))
-        return {"factors": factors, "N": N, "verified": all(N % f == 0 for f in factors) if factors else False}
+        best_pair = None
+        best_residual = float("inf")
+        all_factors = set()
+        for pair_start in range(0, self.num_cells - 1, 2):
+            ca = self.cells[pair_start]
+            cb = self.cells[pair_start + 1]
+            fa = 2 + ca.state
+            fb = 2 + cb.state
+            residual = (fa * fb - N) ** 2
+            if residual < best_residual:
+                best_residual = residual
+                best_pair = (fa, fb)
+            if fa > 1 and N % fa == 0:
+                all_factors.add(fa)
+            if fb > 1 and N % fb == 0:
+                all_factors.add(fb)
+        factors = sorted(all_factors)
+        correct = best_pair is not None and best_pair[0] * best_pair[1] == N
+        return {
+            "factors": factors,
+            "best_pair": best_pair,
+            "residual": best_residual,
+            "N": N,
+            "verified": correct,
+        }
 
     def _extract_sat_solution(self) -> Dict:
         assignment = {}
