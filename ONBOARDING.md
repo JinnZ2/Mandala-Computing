@@ -187,16 +187,39 @@ entity IDs across repositories.
 
 ## Modules
 
-Six Python modules, each with a distinct role:
+Six Python modules organized into three dependency layers:
 
-| Module | Class | Dependencies | Role |
-|--------|-------|-------------|------|
-| `mandala_computer.py` | `MandalaComputer` | numpy, scipy | Classical engine: annealing, tempering, landscape scan |
-| `quantum_mandala.py` | `QuantumMandalaComputer` | numpy, scipy | Quantum: annealing, Grover, QAOA, entangled evolution |
-| `holographic_mandala.py` | `HolographicMandala` | numpy, scipy | Holographic boundary + renormalization + entanglement |
-| `octahedral_arithmetic.py` | `OctahedralNumber` | stdlib only | Native glyph-space math (base-8, no decimal) |
-| `glyph_convert.py` | (functions) | stdlib only | Human bridge: decimal input -> glyph computation |
-| `mandala_simulator.py` | `MandalaComputer` | stdlib only | Lightweight symbolic demos (separate class, not the same) |
+### Representation layer (stdlib only — no external dependencies)
+
+| Module | Class | Role |
+|--------|-------|------|
+| `octahedral_arithmetic.py` | `OctahedralNumber`, `GlyphFraction` | Native glyph-space math: base-8 arithmetic, primes, fractions — no decimal bottleneck |
+| `glyph_convert.py` | (functions) | Human bridge: accepts decimal, computes in glyphs, displays both |
+| `mandala_simulator.py` | `MandalaComputer` | Lightweight symbolic demos (separate class, not the main engine) |
+
+This layer defines **what numbers and operations mean** in octahedral space.
+It's portable, has zero dependencies, and carries no human-imposed numeric assumptions.
+
+### Classical solving layer (numpy)
+
+| Module | Class | Role |
+|--------|-------|------|
+| `mandala_computer.py` | `MandalaComputer` | Core engine: simulated annealing, parallel tempering, landscape scan, sensor telemetry |
+| `holographic_mandala.py` | `HolographicMandala` | Extends classical with holographic boundary encoding, renormalization sweeps, adaptive entanglement |
+
+numpy is used for random sampling and fast array operations during search.
+The actual energy formulas and factor encoding are pure integer math —
+the classical layer *could* run on stdlib alone but numpy makes it practical.
+
+### Quantum solving layer (numpy + scipy)
+
+| Module | Class | Role |
+|--------|-------|------|
+| `quantum_mandala.py` | `QuantumMandalaComputer` | Quantum annealing, Grover search, QAOA (Nelder-Mead), entangled multi-cell evolution |
+
+scipy is **required** here — matrix exponentials (`expm`), eigenvalue decomposition
+(`eigh`), and optimizer (`minimize`) operate on complex Hilbert spaces.
+This is fundamentally linear algebra, not something to reimplement.
 
 **Warning:** `mandala_computer.py` and `mandala_simulator.py` both define a class
 called `MandalaComputer`. They are **completely different implementations**.
