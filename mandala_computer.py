@@ -374,6 +374,22 @@ class MandalaComputer:
                 fb = self._cells_to_factor(fb_indices)
                 total += (fa * fb - N) ** 2
 
+        # SAT: energy penalty per unsatisfied clause
+        # Cell i represents variable i+1. States 0-3 = False, 4-7 = True.
+        if self.problem_type == ProblemType.SAT and self.problem_data:
+            clauses = self.problem_data["clauses"]
+            for clause in clauses:
+                satisfied = False
+                for literal in clause:
+                    var_idx = abs(literal) - 1  # 0-indexed
+                    if var_idx < self.num_cells:
+                        val = self.cells[var_idx].state >= 4  # True if state 4-7
+                        if (literal > 0 and val) or (literal < 0 and not val):
+                            satisfied = True
+                            break
+                if not satisfied:
+                    total += 2.0  # penalty per unsatisfied clause
+
         # Graph coloring: penalty for same-color neighbors
         if self.problem_type == ProblemType.GRAPH_COLORING and self.problem_data:
             nc = self.problem_data["num_colors"]

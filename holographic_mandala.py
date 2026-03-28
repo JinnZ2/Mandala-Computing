@@ -282,15 +282,24 @@ class HolographicMandala(MandalaComputer):
         """
         Extended energy with holographic and entanglement terms.
 
+        For factorization: holographic energy REPLACES the parent's bipartite
+        energy (which just sums over all cell pairs). The holographic version
+        is richer — it applies different constraints at each ring scale.
+        Other problem types: holographic adds on top of base.
+
         E = E_base + E_holographic + E_entanglement
         """
-        # Base energy from parent (cell + coupling + problem-specific)
-        E_base = super().compute_total_energy()
+        # For factorization, compute base energy WITHOUT the factorization term
+        # by temporarily switching problem type, then add holographic factorization
+        if self.problem_type == ProblemType.FACTORIZATION and self.rings:
+            saved_type = self.problem_type
+            self.problem_type = None  # suppress parent's factorization energy
+            E_base = super().compute_total_energy()
+            self.problem_type = saved_type
+        else:
+            E_base = super().compute_total_energy()
 
-        # Holographic boundary energy: outer ring cells should satisfy the problem
         E_holo = self._holographic_energy()
-
-        # Cross-depth entanglement energy: correlated cells should be consistent
         E_ent = self._entanglement_energy()
 
         return E_base + self.holographic_weight * E_holo + E_ent
