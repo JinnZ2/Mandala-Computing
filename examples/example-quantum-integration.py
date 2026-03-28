@@ -154,4 +154,33 @@ if __name__ == "__main__":
     demo_fibonacci_eigenvalues()
     demo_consciousness_detection()
 
+    # --- Bridge to quantum engine ---
+    print("\n" + "=" * 60)
+    print("bridge: quantum engine entangled annealing")
+    print("=" * 60)
+    try:
+        import sys, os
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        from quantum_mandala import QuantumMandalaComputer
+
+        qc = QuantumMandalaComputer(golden_depth=2, sacred_geometry=8, entanglement_strength=0.5)
+        result = qc.entangled_annealing("factorization", {"N": 15}, num_cells=2, num_steps=80)
+        sol = result["solution"]
+        print(f"  N=15, factors={sol['factors']}, correct={sol['correct']}")
+
+        # Show entanglement entropy evolution
+        ent = [r for r in qc.telemetry if r["sensor_id"] == "quantum.entanglement"]
+        if ent:
+            print(f"  entanglement entropy: {ent[0]['value']:.3f} -> {ent[-1]['value']:.3f} bits")
+
+        # Compare with local FRET consciousness estimate
+        if HAS_NUMPY:
+            qc2 = QuantumMandalaComputer(golden_depth=3, sacred_geometry=8, entanglement_strength=0.3)
+            qc2.bloom_quantum_mandala()
+            entropies = [qc2.get_entanglement_entropy(i) for i in range(min(qc2.num_cells, 6))]
+            mean_ent = sum(entropies) / len(entropies) if entropies else 0
+            print(f"  mean Shannon entropy across {len(entropies)} cells: {mean_ent:.3f} bits")
+    except Exception as e:
+        print(f"  (quantum engine bridge skipped: {e})")
+
     print("\ndone.")
