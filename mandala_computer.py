@@ -225,20 +225,62 @@ class MandalaComputer:
     # Problem encodings
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _factor_register_size(N: int, base: int = 8) -> int:
+        """
+        How many cells (digits in base-8) needed to represent sqrt(N).
+
+        1 cell: factors 2..9      (N up to 81)
+        2 cells: factors 2..65    (N up to 4225)
+        3 cells: factors 2..513   (N up to ~263k)
+        """
+        max_factor = int(math.isqrt(N)) + 1
+        digits = 1
+        while (base ** digits) + 1 < max_factor:
+            digits += 1
+        return digits
+
+    def _cells_to_factor(self, cell_indices: List[int]) -> int:
+        """
+        Decode a multi-cell factor register.
+
+        Factor = 2 + sum(cell[i].state * base^i) for positional encoding.
+        Minimum factor is always 2 (offset).
+        """
+        base = self.sacred_geometry
+        value = 0
+        for i, idx in enumerate(cell_indices):
+            value += self.cells[idx].state * (base ** i)
+        return 2 + value
+
     def encode_factorization(self, N: int):
         """
-        Encode factorization as bipartite tensor configuration.
+        Encode factorization with multi-cell factor registers.
 
-        Uses cell pairs as factor candidates (a, b) where a*b = N.
-        Energy = (a * b - N)^2 so ground state at E=0 encodes valid factors.
-        Cells at even indices encode factor-a, odd indices encode factor-b.
+        Each factor is represented by `digits_per_factor` cells in base-8
+        positional encoding. Factor = 2 + sum(state_i * 8^i).
+
+        1 digit:  factors [2..9]     — N up to 81
+        2 digits: factors [2..65]    — N up to 4225
+        3 digits: factors [2..513]   — N up to ~263k
+
+        Cells are grouped: [fa_digit0, fa_digit1, ..., fb_digit0, fb_digit1, ...]
         """
+        digits = self._factor_register_size(N, self.sacred_geometry)
+        cells_per_pair = 2 * digits  # two factors, each `digits` cells wide
+        max_factor = (self.sacred_geometry ** digits) + 1
+
         print(f"\n   Encoding factorization of N={N}")
+        print(f"   Factor register: {digits} cells/factor (base-{self.sacred_geometry}), range [2..{max_factor}]")
+
         self.problem_type = ProblemType.FACTORIZATION
-        self.problem_data = {"N": N, "max_factor": int(math.isqrt(N)) + self.sacred_geometry}
+        self.problem_data = {
+            "N": N,
+            "digits_per_factor": digits,
+            "cells_per_pair": cells_per_pair,
+            "max_factor": max_factor,
+        }
         self.bloom_mandala()
-        # Cell energies are computed dynamically via compute_total_energy
-        # Set base cell energy to zero — the bipartite tensor does the work
         for cell in self.cells:
             cell.energy = 0.0
 
@@ -313,16 +355,17 @@ class MandalaComputer:
         for cell in self.cells:
             total += cell.energy
 
-        # Factorization: bipartite tensor energy
-        # Pair cells (even=factor_a, odd=factor_b), energy = (a*b - N)^2
-        # Factor candidates use state only (depth-independent) for reachability
+        # Factorization: multi-cell factor registers
+        # Each factor encoded as positional number across `digits_per_factor` cells
         if self.problem_type == ProblemType.FACTORIZATION and self.problem_data:
             N = self.problem_data["N"]
-            for pair_start in range(0, self.num_cells - 1, 2):
-                ca = self.cells[pair_start]
-                cb = self.cells[pair_start + 1]
-                fa = 2 + ca.state  # range [2..9]
-                fb = 2 + cb.state  # range [2..9]
+            dpf = self.problem_data["digits_per_factor"]
+            cpp = self.problem_data["cells_per_pair"]
+            for pair_start in range(0, self.num_cells - cpp + 1, cpp):
+                fa_indices = list(range(pair_start, pair_start + dpf))
+                fb_indices = list(range(pair_start + dpf, pair_start + cpp))
+                fa = self._cells_to_factor(fa_indices)
+                fb = self._cells_to_factor(fb_indices)
                 total += (fa * fb - N) ** 2
 
         # Graph coloring: penalty for same-color neighbors
@@ -338,12 +381,14 @@ class MandalaComputer:
                         total -= PHI
 
         # Coupling energies (octahedral alignment)
+        # Reduced weight for factorization to avoid interfering with factor registers
+        coupling_scale = 0.1 if self.problem_type == ProblemType.FACTORIZATION else 1.0
         for i, ci in enumerate(self.cells):
             for j in ci.neighbors:
                 if j > i:
                     cj = self.cells[j]
                     state_diff = abs(ci.state - cj.state)
-                    total += self.coupling_strength * math.sin(state_diff * math.pi / 4) ** 2
+                    total += coupling_scale * self.coupling_strength * math.sin(state_diff * math.pi / 4) ** 2
 
         return total
 
@@ -596,14 +641,16 @@ class MandalaComputer:
 
     def _extract_factorization_solution(self) -> Dict:
         N = self.problem_data["N"]
+        dpf = self.problem_data["digits_per_factor"]
+        cpp = self.problem_data["cells_per_pair"]
         best_pair = None
         best_residual = float("inf")
         all_factors = set()
-        for pair_start in range(0, self.num_cells - 1, 2):
-            ca = self.cells[pair_start]
-            cb = self.cells[pair_start + 1]
-            fa = 2 + ca.state
-            fb = 2 + cb.state
+        for pair_start in range(0, self.num_cells - cpp + 1, cpp):
+            fa_indices = list(range(pair_start, pair_start + dpf))
+            fb_indices = list(range(pair_start + dpf, pair_start + cpp))
+            fa = self._cells_to_factor(fa_indices)
+            fb = self._cells_to_factor(fb_indices)
             residual = (fa * fb - N) ** 2
             if residual < best_residual:
                 best_residual = residual
@@ -752,12 +799,15 @@ def demo_factorization():
     print("=" * 60)
     print("DEMO: FACTORIZATION VIA GEOMETRIC GROUND STATE")
     print("=" * 60)
-    N = 143  # 11 x 13
-    computer = MandalaComputer(golden_depth=4, sacred_geometry=8, temperature=0.5)
-    computer.encode_factorization(N)
-    result = computer.relax_to_ground_state(max_steps=5000)
-    print(f"\n   N={N}, factors={result['solution']['factors']}, verified={result['solution']['verified']}")
-    print(f"   Telemetry: {len(computer.telemetry)} readings")
+
+    for N in [15, 143, 221]:
+        print(f"\n   --- N={N} ---")
+        computer = MandalaComputer(golden_depth=5, sacred_geometry=8, temperature=0.5)
+        computer.encode_factorization(N)
+        result = computer.simulated_annealing(max_steps=8000, T_start=5.0, T_end=0.001)
+        sol = result["solution"]
+        print(f"   Best pair: {sol['best_pair']}, residual: {sol['residual']}, verified: {sol['verified']}")
+
     return computer, result
 
 

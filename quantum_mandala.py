@@ -190,18 +190,32 @@ class QuantumMandalaComputer:
 
     def _build_factorization_hamiltonian(self, data: Dict) -> np.ndarray:
         """
-        Hamiltonian for factorization.
+        Hamiltonian for factorization with expanded factor mapping.
+
         Two-cell system: 8x8 = 64-dimensional space.
-        Energy -1 for correct factor pairs, +1 otherwise.
+        Factor mapping scales based on N:
+          - N <= 81: fa = 2+i, fb = 2+j (range [2..9])
+          - N > 81:  fa = 2 + i*stride, fb = 2 + j*stride
+            where stride = ceil(sqrt(N)/8) to cover the factor range
+
+        Energy = -(1 / (1 + (fa*fb - N)^2)) so ground state is sharpest
+        at exact factorization, with smooth gradient toward it.
         """
         N = data["N"]
         dim = 64
+        max_factor = int(math.isqrt(N)) + 1
+        # Stride: how much each state increment represents
+        stride = max(1, math.ceil(max_factor / 8))
+
         H = np.zeros((dim, dim), dtype=complex)
         for i in range(8):
             for j in range(8):
-                fa, fb = 2 + i, 2 + j
+                fa = 2 + i * stride
+                fb = 2 + j * stride
                 idx = i * 8 + j
-                H[idx, idx] = -1.0 if fa * fb == N else 1.0
+                residual = (fa * fb - N) ** 2
+                # Smooth energy: -1 at solution, approaches +1 far away
+                H[idx, idx] = 1.0 - 2.0 / (1.0 + residual)
         return H
 
     def _build_optimization_hamiltonian(self, data: Dict) -> np.ndarray:
@@ -547,10 +561,14 @@ class QuantumMandalaComputer:
                                   problem_type: str, problem_data: Dict) -> Dict:
         if problem_type == "factorization":
             N = problem_data["N"]
+            max_factor = int(math.isqrt(N)) + 1
+            stride = max(1, math.ceil(max_factor / 8))
             i = measured_state // 8
             j = measured_state % 8
-            fa, fb = 2 + i, 2 + j
-            return {"factors": [fa, fb], "product": fa * fb, "correct": fa * fb == N}
+            fa = 2 + i * stride
+            fb = 2 + j * stride
+            return {"factors": [fa, fb], "product": fa * fb, "correct": fa * fb == N,
+                    "stride": stride}
         return {"state": measured_state}
 
     # ------------------------------------------------------------------

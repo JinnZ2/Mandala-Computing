@@ -307,32 +307,32 @@ class HolographicMandala(MandalaComputer):
 
         energy = 0.0
 
-        # Factorization: hierarchical prime constraints
+        # Factorization: hierarchical prime constraints (multi-cell registers)
         if self.problem_type == ProblemType.FACTORIZATION and self.problem_data:
             N = self.problem_data["N"]
+            dpf = self.problem_data.get("digits_per_factor", 1)
+            cpp = self.problem_data.get("cells_per_pair", 2)
 
             for ring in self.rings:
                 if not ring.projected_problem:
                     continue
                 scale = ring.projected_problem.get("_scale", 1.0)
-                cells = [self.cells[i] for i in ring.cell_indices]
+                indices = ring.cell_indices
 
-                for ci in range(0, len(cells) - 1, 2):
-                    fa = 2 + cells[ci].state
-                    fb = 2 + cells[ci + 1].state
+                for start in range(0, len(indices) - cpp + 1, cpp):
+                    fa_idx = indices[start:start + dpf]
+                    fb_idx = indices[start + dpf:start + cpp]
+                    fa = self._cells_to_factor(fa_idx)
+                    fb = self._cells_to_factor(fb_idx)
                     product = fa * fb
 
                     if scale >= 1.0:
-                        # Boundary: exact factorization
                         energy += (product - N) ** 2
                     else:
-                        # Interior: check prime residue consistency
-                        # If N mod p == r, then (fa*fb) mod p should also == r
                         residues = ring.projected_problem.get("_residues", {})
                         for p, r in residues.items():
                             if product % p != r:
-                                energy += p  # penalty proportional to prime
-                        # Also soft modular check
+                                energy += p
                         mod_base = ring.projected_problem.get("_modular_base", 8)
                         energy += ((product - N) % mod_base) ** 2 * 0.5
 

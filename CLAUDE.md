@@ -24,14 +24,17 @@ Flat layout — all source and documentation at the root. No subdirectories, no 
 
 ```
 mandala-computing/
-├── mandala_computer.py        # core classical simulator (~600 loc)
-├── quantum_mandala.py         # quantum extension (~600 loc)
+├── mandala_computer.py        # core classical simulator v2.0 (~850 loc)
+├── quantum_mandala.py         # quantum extension v2.0 (~500 loc)
+├── holographic_mandala.py     # holographic + renormalization + entanglement (~950 loc)
 ├── mandala_simulator.py       # lightweight symbolic simulator (~115 loc)
 ├── ONBOARDING.md              # agent learning path from Rosetta-Shape-Core
 ├── .fieldlink.json            # ecosystem metadata (v3.0, bidirectional)
+├── .gitignore                 # excludes __pycache__/, *.pyc
 ├── README.md                  # project overview
 ├── PROJECTS.md                # connected repos
 ├── LICENSE                    # MIT
+├── examples/benchmark.py      # classical vs quantum benchmark
 └── [12 other .md files]       # theory, hardware, integration, proofs
 ```
 
@@ -54,10 +57,10 @@ No `requirements.txt` exists. Dependencies are not pinned.
 
 ## key-modules
 
-### mandala-computer (`mandala_computer.py`)
+### mandala-computer (`mandala_computer.py`) v2.0
 
 Core classical engine. Encodes problems into geometric configurations and solves
-via Metropolis-Hastings relaxation.
+via multiple exploration algorithms. Loads constants from JSON atlas at runtime.
 
 **classes:**
 
@@ -65,22 +68,40 @@ via Metropolis-Hastings relaxation.
 |--------------------|---------------------------------------------------|
 | `OctahedralState`  | single cell in octahedral configuration (dataclass)|
 | `MandalaCell`      | computational cell with position, state, neighbors (dataclass) |
+| `SensorReading`    | telemetry reading with sensor_id, step, value     |
 | `ProblemType`      | enum: `FACTORIZATION`, `SAT`, `TSP`, `GRAPH_COLORING`, `OPTIMIZATION` |
 | `MandalaComputer`  | main computation engine                           |
 
 **key methods on `MandalaComputer`:**
 
-| method                     | purpose                                         |
-|----------------------------|------------------------------------------------|
-| `bloom_mandala()`          | expand symbol core into nested fractal rings    |
-| `encode_factorization(N)`  | bipartite tensor encoding for integer factoring |
-| `encode_sat(clauses)`      | boolean satisfiability encoding                 |
-| `encode_tsp(cities)`       | traveling salesman ring topology                |
-| `relax_step()`             | single Metropolis-Hastings step                 |
-| `relax_to_ground_state()`  | iterative minimization to solution              |
-| `compute_total_energy()`   | sum of cell + coupling energies                 |
+| method                       | purpose                                             |
+|------------------------------|-----------------------------------------------------|
+| `bloom_mandala()`            | expand symbol core into nested fractal rings        |
+| `encode_factorization(N)`    | multi-cell bipartite tensor encoding (auto-scales)  |
+| `encode_sat(clauses)`        | boolean satisfiability encoding                     |
+| `encode_tsp(cities)`         | traveling salesman ring topology                    |
+| `encode_graph_coloring()`    | graph coloring with adjacency constraints           |
+| `encode_optimization(fn, n)` | generic cost function minimization                  |
+| `relax_to_ground_state()`    | Metropolis-Hastings iterative minimization          |
+| `simulated_annealing()`      | annealing with cooling schedule (exp/linear/boltz)  |
+| `parallel_tempering()`       | multi-replica exchange at different temperatures    |
+| `landscape_scan()`           | random sampling of energy landscape                 |
+| `get_state_distribution()`   | histogram of cell states 0-7                        |
+| `get_energy_breakdown()`     | per-component energy (cell, coupling)               |
+| `glyph_trace()`              | Unicode glyph visualization of cell states          |
 
-### quantum-mandala (`quantum_mandala.py`)
+**factorization encoding (expanded octahedral):**
+
+Factors are represented as positional numbers across multiple cells in base-8.
+The register size auto-scales with `sqrt(N)`:
+
+| digits/factor | factor range | max N      |
+|---------------|-------------|------------|
+| 1 cell        | [2..9]      | 81         |
+| 2 cells       | [2..65]     | ~4,200     |
+| 3 cells       | [2..513]    | ~263,000   |
+
+### quantum-mandala (`quantum_mandala.py`) v2.0
 
 Quantum extension using 8-dimensional Hilbert space (qubit-octits).
 
@@ -96,11 +117,36 @@ Quantum extension using 8-dimensional Hilbert space (qubit-octits).
 | method                          | purpose                                   |
 |---------------------------------|-------------------------------------------|
 | `bloom_quantum_mandala()`       | create quantum superposition structure    |
-| `quantum_annealing()`           | adiabatic optimization                    |
+| `quantum_annealing()`           | adiabatic optimization with telemetry     |
 | `grover_search()`               | quantum search algorithm                  |
-| `_build_hamiltonian()`          | problem-specific energy operator          |
-| `_build_octahedral_rotation()`  | 8x8 unitary rotation gates               |
-| `_extract_quantum_solution()`   | measure and decode solution               |
+| `qaoa()`                        | QAOA with Nelder-Mead optimizer           |
+| `entangled_annealing()`         | multi-cell tensor product evolution       |
+| `get_entanglement_entropy()`    | Shannon entropy of cell probability       |
+| `glyph_trace()`                 | dominant states as Unicode glyphs         |
+
+### holographic-mandala (`holographic_mandala.py`)
+
+Unified framework: holographic boundary encoding + self-symmetry renormalization
++ cross-depth entanglement. Extends `MandalaComputer`.
+
+**classes:**
+
+| class               | role                                               |
+|---------------------|----------------------------------------------------|
+| `HolographicRing`   | single concentric ring with projected problem      |
+| `EntanglementLink`  | cross-depth correlation with adaptive Berry phase  |
+| `HolographicMandala`| unified solver (extends MandalaComputer)           |
+
+**key methods on `HolographicMandala`:**
+
+| method                    | purpose                                            |
+|---------------------------|----------------------------------------------------|
+| `encode_holographic()`    | boundary encoding with inward projection           |
+| `renormalization_solve()` | coarse-to-fine bidirectional sweeps                |
+| `holographic_solve()`     | full pipeline: encode + renormalize + extract      |
+| `hybrid_quantum_solve()`  | classical seeding + quantum entangled refinement   |
+| `get_holographic_profile()`| energy and state distribution per ring            |
+| `get_entanglement_map()`  | link strengths, phases, correlation status         |
 
 ### mandala-simulator (`mandala_simulator.py`)
 
