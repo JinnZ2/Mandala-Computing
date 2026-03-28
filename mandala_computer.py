@@ -20,6 +20,12 @@ import pathlib
 import copy
 import math
 
+try:
+    from octahedral_arithmetic import OctahedralNumber, states_to_number, factor_pair_glyphs
+    HAS_GLYPH_MATH = True
+except ImportError:
+    HAS_GLYPH_MATH = False
+
 # ---------------------------------------------------------------------------
 # JSON Layer: load constants and glyphs from atlas/shapes.json and glyphs/
 # ---------------------------------------------------------------------------
@@ -661,13 +667,22 @@ class MandalaComputer:
                 all_factors.add(fb)
         factors = sorted(all_factors)
         correct = best_pair is not None and best_pair[0] * best_pair[1] == N
-        return {
+        result = {
             "factors": factors,
             "best_pair": best_pair,
             "residual": best_residual,
             "N": N,
             "verified": correct,
         }
+        # Enrich with glyph-native representation
+        if HAS_GLYPH_MATH and best_pair:
+            ga = OctahedralNumber.from_decimal(best_pair[0])
+            gb = OctahedralNumber.from_decimal(best_pair[1])
+            gN = OctahedralNumber.from_decimal(N)
+            result["glyph_pair"] = (ga.to_glyphs(), gb.to_glyphs())
+            result["glyph_N"] = gN.to_glyphs()
+            result["glyph_product"] = (ga * gb).to_glyphs()
+        return result
 
     def _extract_sat_solution(self) -> Dict:
         assignment = {}
@@ -806,7 +821,10 @@ def demo_factorization():
         computer.encode_factorization(N)
         result = computer.simulated_annealing(max_steps=8000, T_start=5.0, T_end=0.001)
         sol = result["solution"]
-        print(f"   Best pair: {sol['best_pair']}, residual: {sol['residual']}, verified: {sol['verified']}")
+        glyph_info = ""
+        if "glyph_pair" in sol:
+            glyph_info = f"  glyph: {sol['glyph_pair'][0]} * {sol['glyph_pair'][1]} = {sol['glyph_N']}"
+        print(f"   Best pair: {sol['best_pair']}, verified: {sol['verified']}{glyph_info}")
 
     return computer, result
 
