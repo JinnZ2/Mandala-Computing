@@ -304,6 +304,88 @@ def test_entanglement_links_adapt():
 
 
 # ---------------------------------------------------------------------------
+# Constraint Agent tests
+# ---------------------------------------------------------------------------
+
+from constraint_agent import ConstraintAgent
+
+
+def test_agent_lifecycle():
+    """Full lifecycle: bloom -> explore -> compress -> restore."""
+    agent = ConstraintAgent(seed_id="SHAPE.OCTA", home_families=["test"])
+    agent.set_resource_budget(compute=200, depth_limit=2)
+    agent.bloom(depth=2)
+    assert len(agent.nodes) > 1
+    node_count = len(agent.nodes)
+
+    discoveries = agent.explore()
+    assert len(agent.discoveries) > 0
+
+    agent.compress()
+    assert len(agent.nodes) == 1  # seed only
+    assert agent.compressed_map is not None
+
+    agent.restore()
+    assert len(agent.nodes) == node_count  # full map back
+
+
+def test_agent_resource_limits():
+    """Low budget should stop expansion before high budget."""
+    low = ConstraintAgent(seed_id="SHAPE.TETRA")
+    low.set_resource_budget(compute=20, depth_limit=5)
+    low.bloom(depth=5)
+
+    high = ConstraintAgent(seed_id="SHAPE.TETRA")
+    high.set_resource_budget(compute=5000, depth_limit=5)
+    high.bloom(depth=5)
+
+    assert low.current_depth < high.current_depth
+    assert len(low.nodes) < len(high.nodes)
+
+
+def test_agent_exact_fractions():
+    """Discoveries should be stored as exact GlyphFractions."""
+    agent = ConstraintAgent(seed_id="SHAPE.OCTA")
+    agent.set_resource_budget(compute=300, depth_limit=2)
+    agent.bloom(depth=2)
+    agent.explore()
+
+    factor_disc = [d for d in agent.discoveries if d.discovery_type == "factor"]
+    assert len(factor_disc) > 0
+    # Every factor relationship should be irreducible
+    for d in factor_disc:
+        assert d.relationship.is_irreducible()
+
+
+def test_agent_lossless_compress():
+    """Compress/restore should preserve discovery count exactly."""
+    agent = ConstraintAgent(seed_id="SHAPE.TETRA")
+    agent.set_resource_budget(compute=100, depth_limit=2)
+    agent.bloom(depth=2)
+    agent.explore()
+    pre = len(agent.discoveries)
+    agent.compress()
+    agent.restore()
+    post = len(agent.discoveries)
+    assert pre == post
+
+
+def test_agent_different_geometries():
+    """Different seed geometries should produce different node counts."""
+    tetra = ConstraintAgent(seed_id="SHAPE.TETRA")
+    tetra.set_resource_budget(compute=200, depth_limit=2)
+    tetra.bloom(depth=2)
+
+    octa = ConstraintAgent(seed_id="SHAPE.OCTA")
+    octa.set_resource_budget(compute=200, depth_limit=2)
+    octa.bloom(depth=2)
+
+    assert tetra.base_states == 4
+    assert octa.base_states == 8
+    assert len(tetra.nodes) < len(octa.nodes)
+
+
+# ---------------------------------------------------------------------------
 # Run all tests
 # ---------------------------------------------------------------------------
 
