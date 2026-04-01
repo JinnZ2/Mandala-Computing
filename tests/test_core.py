@@ -160,6 +160,27 @@ def test_sat_satisfiable():
     assert "satisfies" in result["solution"]
 
 
+def test_tsp_energy():
+    """TSP energy should penalize long tours and repeated cities."""
+    np.random.seed(42)
+    cities = np.array([[0, 0], [1, 0], [1, 1], [0, 1]], dtype=float)
+    mc = MandalaComputer(golden_depth=3, sacred_geometry=8)
+    mc.encode_tsp(cities)
+    # Good tour: visits each city once (states 0,1,2,3)
+    for i, c in enumerate(mc.cells[:4]):
+        c.state = i
+    for c in mc.cells[4:]:
+        c.state = 0  # rest default
+    E_good = mc.compute_total_energy()
+
+    # Bad tour: all same city (heavy repetition penalty)
+    for c in mc.cells:
+        c.state = 0
+    E_bad = mc.compute_total_energy()
+
+    assert E_good < E_bad  # good tour should have lower energy
+
+
 def test_graph_coloring_triangle():
     """Triangle with 3 colors should be solvable."""
     np.random.seed(42)
@@ -368,6 +389,24 @@ def test_agent_lossless_compress():
     agent.restore()
     post = len(agent.discoveries)
     assert pre == post
+
+
+def test_agent_persistence():
+    """Save and load agent across sessions."""
+    import tempfile, os
+    agent = ConstraintAgent(seed_id="SHAPE.TETRA", home_families=["test"])
+    agent.set_resource_budget(compute=100, depth_limit=2)
+    agent.bloom(depth=2)
+    agent.explore()
+    pre_nodes = len(agent.nodes)
+    pre_disc = len(agent.discoveries)
+
+    path = os.path.join(tempfile.gettempdir(), "test_agent.json")
+    agent.save(path)
+
+    loaded = ConstraintAgent.load(path)
+    assert len(loaded.nodes) == pre_nodes
+    os.unlink(path)
 
 
 def test_agent_different_geometries():

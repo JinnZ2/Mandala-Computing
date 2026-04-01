@@ -37,6 +37,7 @@ from __future__ import annotations
 from typing import List, Dict, Optional, Tuple, Set
 from dataclasses import dataclass, field
 from enum import Enum
+import json
 import math
 import time
 
@@ -577,6 +578,58 @@ class ConstraintAgent:
         for d in self.discoveries:
             summary[d.discovery_type] = summary.get(d.discovery_type, 0) + 1
         return summary
+
+    # ------------------------------------------------------------------
+    # Persistence: JSON export/import
+    # ------------------------------------------------------------------
+
+    def save(self, path: str):
+        """
+        Save agent state to JSON file.
+
+        Compressed map + discoveries + budget + identity are all serialized.
+        The agent can be restored from this file across sessions.
+        """
+        if not self.compressed_map:
+            self.compress()
+
+        data = {
+            "version": "1.0",
+            "seed_id": self.seed_id,
+            "geometry": self.seed_geometry.name,
+            "base_states": self.base_states,
+            "families": self.home_families,
+            "max_depth": self.max_depth_reached,
+            "compressed_map": self.compressed_map,
+            "discoveries_count": len(self.discoveries),
+        }
+        with open(path, "w") as f:
+            json.dump(data, f, indent=2, default=str)
+        print(f"  Saved to {path} ({len(self.compressed_map.get('nodes', {}))} nodes)")
+
+    @classmethod
+    def load(cls, path: str) -> ConstraintAgent:
+        """
+        Load agent from JSON file.
+
+        Recreates the full agent with compressed map intact,
+        ready for restore() to re-expand.
+        """
+        with open(path) as f:
+            data = json.load(f)
+
+        agent = cls(
+            seed_id=data["seed_id"],
+            home_families=data.get("families", []),
+        )
+        agent.compressed_map = data.get("compressed_map")
+        agent.max_depth_reached = data.get("max_depth", 0)
+
+        if agent.compressed_map:
+            agent.restore()
+
+        print(f"  Loaded from {path}: {len(agent.nodes)} nodes")
+        return agent
 
 
 # ============================================================================

@@ -100,4 +100,18 @@ if __name__ == "__main__":
     print(f"  convergence score = {score:.4f}")
     print(f"  symbolic P=NP: {'yes' if score > 1000 else 'no'}")
 
+    # --- Bridge to real engine ---
+    print("\n" + "=" * 60)
+    print("bridge: geometric relaxation actually factors numbers")
+    print("=" * 60)
+    try:
+        import sys, os
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        from mandala_simulator import MandalaSimulator
+        sim = MandalaSimulator()
+        for N in [15, 77, 143]:
+            sim.factor(N)
+    except Exception as e:
+        print(f"  (bridge skipped: {e})")
+
     print("\ndone.")

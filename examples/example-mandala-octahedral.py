@@ -224,4 +224,29 @@ if __name__ == "__main__":
         neighbor_rings = [cells[n].ring for n in c.neighbors]
         print(f"  cell {c.index}: neighbors={c.neighbors}, neighbor rings={neighbor_rings}")
 
+    # --- Bridge to real engine ---
+    print("\n" + "=" * 60)
+    print("bridge: real mandala engine structure comparison")
+    print("=" * 60)
+    try:
+        import sys, os
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        from mandala_computer import MandalaComputer
+
+        mc = MandalaComputer(golden_depth=depth, sacred_geometry=8)
+        mc.bloom_mandala()
+        print(f"  Engine: {mc.num_cells} cells, {mc._count_couplings()} couplings")
+        print(f"  This script: {len(cells)} cells")
+        print(f"  Match: {'yes' if mc.num_cells == len(cells) else 'no'}")
+        print(f"  Glyph trace: {mc.glyph_trace(12)}")
+
+        # Compare energy
+        for c_eng, c_map in zip(mc.cells, cells):
+            c_eng.state = c_map.state
+        E_engine = mc.compute_total_energy()
+        print(f"  Engine energy (alternating): {E_engine:.4f}")
+        print(f"  Mapped energy (alternating): {e_alternating:.4f}")
+    except Exception as e:
+        print(f"  (bridge skipped: {e})")
+
     print("\ndone.")
