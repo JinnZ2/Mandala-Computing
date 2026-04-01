@@ -252,35 +252,47 @@ class SovereignEnergy:
                        resiliences: List[float], entropy: float = 0.5,
                        stress_history: List[float] = None) -> float:
         """
-        Average pairwise resonance for a group of glyph states.
+        Pack resonance using harmonic-mean resilience.
 
-        If stress_history is provided, resilience is adapted:
-        elements that have survived high entropy get stronger (antifragility).
+        Physics says: the pack's effective resilience is its weakest link,
+        not its strongest member. This is the harmonic mean — dominated by
+        the smallest values. One fragile member drags the whole pack down
+        more than one strong member lifts it up.
 
-        adaptive_resilience = base_resilience * (1 + mean_past_stress * 0.5)
+        Crystal lattice: strength = weakest bond, not strongest atom.
+        Coupled oscillators: coherence requires uniform coupling.
+        Percolation: network survives based on fraction of intact links.
+        Cable: tensile strength = weakest strand.
 
-        A system that has lived through entropy=0.8 repeatedly is MORE
-        sovereign than one that has only known calm. History strengthens.
+        Antifragile adaptation still applies: stress history strengthens
+        each member's base resilience before the harmonic mean is taken.
+        A pack that survived together is uniformly stronger.
         """
         n = len(states)
         if n < 2:
             return 0.0
 
-        # Antifragile resilience: stress history strengthens
+        # Antifragile adaptation: stress history strengthens each member
         adapted = list(resiliences)
         if stress_history:
             mean_past = sum(stress_history) / len(stress_history)
             for i in range(n):
-                # Past stress makes you stronger, up to 2x base resilience
-                adapted[i] = min(adapted[i] * (1 + mean_past * 0.5), 2.0 * adapted[i])
+                adapted[i] = min(adapted[i] * (1 + mean_past * 0.5), 2.0 * resiliences[i])
 
+        # Harmonic mean of resiliences = pack's effective resilience
+        # HM = n / sum(1/r_i) — dominated by the smallest r_i
+        inv_sum = sum(1.0 / max(r, 1e-15) for r in adapted)
+        pack_resilience = n / inv_sum if inv_sum > 0 else 0.0
+
+        # All members operate at pack resilience — the lattice is only
+        # as strong as its weakest bond
         total = 0.0
         count = 0
         for i in range(n):
             for j in range(n):
                 if i != j:
                     total += SovereignEnergy.transition_frequency(
-                        states[i], energies[i], adapted[i],
+                        states[i], energies[i], pack_resilience,
                         states[j], energies[j], entropy,
                     )
                     count += 1
