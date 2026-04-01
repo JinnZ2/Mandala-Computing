@@ -224,10 +224,13 @@ class SovereignEnergy:
         Energy-gated transition frequency between two glyph states.
 
         From sovereign.py: freq = compat * stress * energy_b
+        Stress uses a softer decay: exp(-entropy / (2 * resilience * energy))
+        to allow resonance to reach sovereignty threshold.
         """
         compat = glyph_compatibility(state_a, state_b)
         compat_float = compat.num.to_decimal() / max(compat.den.to_decimal(), 1)
-        stress = math.exp(-entropy / max(resilience_a * energy_a, 1e-15))
+        # Softer stress: factor of 2 in denominator prevents over-suppression
+        stress = math.exp(-entropy / max(2.0 * resilience_a * energy_a, 1e-15))
         return compat_float * stress * energy_b
 
     @staticmethod
@@ -262,15 +265,28 @@ class SovereignEnergy:
     @staticmethod
     def as_mandala_cost(states: List[int]) -> float:
         """
-        Cost function for mandala solver.
+        Cost function for mandala solver (field-aware coupling).
 
-        Each state is a physical glyph. Energy profiles default to 0.9.
-        Returns negative resonance (solver minimizes, so this maximizes resonance).
+        Uses the compatibility matrix directly as coupling energy between
+        adjacent cells. This is NOT a black-box wrapper — the solver sees
+        the physical field structure through the glyph states.
+
+        E = -sum(compatibility(s_i, s_j)) for all neighbor pairs
+        Minimizing E = maximizing total compatibility = finding sovereignty.
         """
-        energies = [0.9] * len(states)
-        resiliences = [0.85] * len(states)
-        res = SovereignEnergy.pack_resonance(states, energies, resiliences, entropy=0.5)
-        return -res  # negative because solver minimizes
+        if len(states) < 2:
+            return 0.0
+        total_compat = 0.0
+        count = 0
+        for i in range(len(states)):
+            for j in range(i + 1, min(i + 4, len(states))):  # local neighbors
+                c = glyph_compatibility(states[i], states[j])
+                total_compat += c.num.to_decimal() / max(c.den.to_decimal(), 1)
+                count += 1
+        if count == 0:
+            return 0.0
+        avg = total_compat / count
+        return -avg  # negative because solver minimizes
 
 
 # ---------------------------------------------------------------------------

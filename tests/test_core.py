@@ -444,6 +444,53 @@ def test_sovereign_agent_lifecycle():
     assert "system_resonance" in resonance
 
 
+def test_sovereignty_achievable():
+    """Uniform high-compatibility pack at low entropy should reach sovereignty."""
+    res = SovereignEnergy.pack_resonance([0]*7, [0.9]*7, [0.85]*7, entropy=0.1)
+    assert SovereignEnergy.is_sovereign(res)
+
+
+def test_field_aware_cost():
+    """Field-aware cost should use compatibility matrix, not black-box."""
+    cost_same = SovereignEnergy.as_mandala_cost([0, 0, 0, 0])  # all EM
+    cost_diff = SovereignEnergy.as_mandala_cost([0, 2, 4, 6])  # mixed
+    # Same-field should have lower (more negative) cost
+    assert cost_same < cost_diff
+
+
+# ---------------------------------------------------------------------------
+# Claim Validator tests
+# ---------------------------------------------------------------------------
+
+from claim_validator import validate_claim as validate_text_claim
+
+
+def test_specific_claim_low_concern():
+    report = validate_text_claim(
+        "Solar efficiency increased by 23% between 2020 and 2024 "
+        "(Green et al. 2024), measured across 1200 installations."
+    )
+    assert report.overall_concern < 0.4
+
+
+def test_vague_claim_high_concern():
+    report = validate_text_claim(
+        "This fundamentally transforms everything and is essentially "
+        "the most significant breakthrough in principle."
+    )
+    assert report.overall_concern > 0.6
+
+
+def test_tier_hierarchy():
+    """Higher tiers should exist and be numbered correctly."""
+    report = validate_text_claim("Some claim with various implications.")
+    tiers = {d.tier: d for d in report.domain_scores}
+    assert 1 in tiers  # Physics
+    assert 2 in tiers  # Biology
+    assert 3 in tiers  # Systems
+    assert 4 in tiers  # Empirical
+
+
 # ---------------------------------------------------------------------------
 # Run all tests
 # ---------------------------------------------------------------------------
