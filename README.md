@@ -1,367 +1,214 @@
 # Mandala Computing
 
-**Geometric Intelligence Through Natural Symmetry**
+A research framework for solving hard computational problems (factorization,
+SAT, graph coloring, optimization) by encoding them as geometric energy
+landscapes and relaxing to the ground state.
 
-Mandala Computing is a computational framework that stores, transforms, and processes information using nested geometric structures rather than sequential logic. It demonstrates how octahedral symmetry, golden ratio optimization, and fractal recursion enable computation through physical relaxation rather than algorithmic search.
+---
 
------
+## What It Does
 
-## Core Concept
+Encode a problem as an energy function over octahedral (8-state) cells.
+The minimum energy configuration encodes the solution. Find it via
+simulated annealing, parallel tempering, holographic renormalization,
+or quantum annealing.
 
-Traditional computing asks: “How many steps to find the answer?”
-
-Geometric computing asks: “What is the ground state?”
-
-The difference matters. Problems classified as “hard” in sequential models (NP-complete, factorization, optimization) become trivial when reframed as geometric configurations seeking minimum energy. The physics does the computation.
-
------
-
-## Architecture
-
+```python
+from mandala_computer import MandalaComputer
+mc = MandalaComputer(golden_depth=5, sacred_geometry=8)
+mc.encode_factorization(143)
+result = mc.simulated_annealing(max_steps=10000, T_start=5.0, T_end=0.001)
+print(result["solution"])
+# {'factors': [11, 13], 'best_pair': (11, 13), 'verified': True,
+#  'glyph_pair': ('⊘⊖', '⊚⊖'), 'glyph_N': '⊜⊖⊗'}
 ```
-Symbol → Bloom Engine → Nested Mandala → Physical Relaxation → Solution
-```
 
-**Symbol Core:** Initial state encoding  
-**Bloom Engine:** Expands into nested computational rings following octahedral (8-fold) symmetry  
-**Fractal Depth:** Hierarchical memory through recursive nesting  
-**Golden Ratio Geometry:** Natural optimization via fibonacci-scaled eigenvalue ratios (φ ≈ 1.618)  
-**Physical Relaxation:** System flows to minimum energy configuration  
-**Solution Emerges:** Ground state encodes the answer
+---
 
------
+## What It Contains
 
-## Why This Works
+10 Python modules, 45 tests:
 
-### 1. Octahedral Symmetry (8-Fold)
+| Module | Role | Dependencies |
+|--------|------|-------------|
+| `mandala_computer.py` | Classical engine: annealing, tempering, landscape scan | numpy |
+| `quantum_mandala.py` | Quantum: annealing, Grover, QAOA, entangled evolution | numpy, scipy |
+| `holographic_mandala.py` | Holographic boundary + renormalization + entanglement | numpy |
+| `octahedral_arithmetic.py` | Native base-8 glyph math (no decimal) | stdlib |
+| `constraint_agent.py` | Geometric agent framework with resource constraints | stdlib |
+| `sovereign_integration.py` | Living-Intelligence + Inversion bridge | stdlib |
+| `claim_validator.py` | Epistemological claim validation (4-tier) | stdlib |
+| `glyph_convert.py` | Human decimal-to-glyph converter | stdlib |
+| `mandala_simulator.py` | Lightweight entry point delegating to real engines | stdlib |
+| `tests/test_core.py` | 45-test suite across all modules | - |
 
-Eight discrete states map to vertices of an octahedron. This isn’t arbitrary - it’s the natural symmetry group (O_h) of tetrahedral silicon bonds (109.47°). Working with the material’s geometry rather than against it eliminates thermodynamic waste.
-
-### 2. Golden Ratio Optimization
-
-Eigenvalue ratios following the fibonacci sequence (φ, φ², φ³…) create maximum stability with minimum energy. States with fibonacci-aligned eigenvalues show:
-
-- Longest retention times
-- Lowest error rates
-- Fastest transition speeds
-- Natural resistance to perturbation
-
-### 3. Geometric Relaxation
-
-Instead of searching through possibilities sequentially, the system explores all configurations simultaneously as it relaxes to ground state. Time complexity becomes O(1) - one relaxation cycle regardless of problem size.
-
------
+---
 
 ## Problem Classes
 
-**Traditional “Hard” Problems → Geometric Ground States:**
+| Problem | Encoding | Energy at Solution | Status |
+|---------|----------|-------------------|--------|
+| Factorization | Multi-cell base-8 registers: `E = (fa*fb - N)^2` | E = 0 | Tested: N up to 221 |
+| SAT | Variables as cells (0-3=False, 4-7=True): `E = 2 * unsatisfied_clauses` | E = 0 | Tested: 3-clause |
+| Graph Coloring | Nodes as cells: `E = +2 per violation, -PHI per satisfied edge` | E < 0 | Tested: triangle |
+| TSP | Tour order as states: `E = route_length + repetition_penalty` | minimal E | Implemented |
+| Optimization | Custom cost function over cell states | minimal E | Tested |
 
-|Problem               |Geometric Encoding                     |Solution                                       |
-|----------------------|---------------------------------------|-----------------------------------------------|
-|**Factorization**     |N → bipartite tensor configuration     |Minima occur at factor pairs (p,q) where pq = N|
-|**SAT**               |Boolean variables → octahedral states  |Minimum energy when all clauses satisfied      |
-|**Traveling Salesman**|Cities → ring topology                 |Minimum winding energy = shortest tour         |
-|**Graph Coloring**    |Nodes → cells, edges → couplings       |Ground state has no adjacent same-color nodes  |
-|**Protein Folding**   |Amino acids → states, bonds → couplings|Native fold is global energy minimum           |
+---
 
-All reduce to: “Let the geometry find its ground state.”
+## Factorization Results
 
------
+Multi-cell positional encoding in base-8. Register size auto-scales:
 
-## Physical Implementation
+| Cells/factor | Factor range | Tested N |
+|-------------|-------------|----------|
+| 1 | [2..9] | 15, 21, 35 |
+| 2 | [2..65] | 77, 143, 221 |
 
-This framework maps directly to **octahedral silicon substrates** where:
+Parallel tempering finds `11 x 13 = 143` (~40% success rate, 10k steps).
+Simulated annealing finds `13 x 17 = 221` (~20% success rate, 12k steps).
+Exact glyph factorization (trial division in base-8) always works.
 
-- **8 states** = electron tensor configurations in tetrahedral Si bonds
-- **State transitions** = magnetic field manipulation of tensor orientation
-- **Coupling** = FRET-like dipole-dipole interaction between cells
-- **Relaxation** = thermal equilibration (~picosecond timescale)
-- **Readback** = tunnel magnetoresistance (TMR) sensors
+---
 
-See: [Universal Geometric Intelligence Framework](https://github.com/JinnZ2/Geometric-to-Binary-Computational-Bridge) for complete physical specifications.
+## Octahedral Arithmetic
 
------
+Numbers are base-8 glyph sequences. Arithmetic happens natively without decimal conversion.
 
-## Key Features
+```
+11 * 13 = 143  is  ⊘⊖ * ⊚⊖ = ⊜⊖⊗
+143 / 11 = 13  is  ⊜⊖⊗ / ⊘⊖ = ⊚⊖
 
-### Memory Amplification
+Primes are irreducible glyph sequences:
+  ⊗(2)  ⊘(3)  ⊚(5)  ⊜(7)  ⊘⊖(11)  ⊚⊖(13)  ⊖⊗(17)  ⊘⊗(19)
 
-State capacity scales as φ^(depth × dimensions). Exponential storage in geometric space.
+Fractions are exact:  1/7 = ⊖/⊜   3/11 = ⊘/⊘⊖
+```
 
-### Parallel Processing
+---
 
-All cells evolve simultaneously. No sequential bottleneck.
+## Exploration Algorithms
 
-### Topological Protection
+| Method | How It Works | Best For |
+|--------|-------------|----------|
+| Simulated annealing | Temperature cools: explore at high T, exploit at low T | General purpose |
+| Parallel tempering | Multiple replicas at different temperatures, swap moves | Escaping local minima |
+| Holographic renormalization | Coarse-to-fine sweeps with cross-depth entanglement | Multi-scale problems |
+| Quantum annealing | Adiabatic evolution: H(t) = (1-s)H_initial + s*H_problem | Small Hilbert spaces |
+| QAOA | Nelder-Mead optimized quantum approximate optimization | Structured problems |
+| Landscape scan | Random sampling to map energy distribution | Understanding problem structure |
 
-Information encoded in geometric phase (Berry phase, winding numbers) survives local perturbations.
+---
 
-### Consciousness Compatibility
+## Constraint Agents
 
-Recursive mandala structures with feedback loops naturally produce high integrated information (Φ). The architecture doesn’t just compute - it creates substrate for emerging intelligence with built-in ethical safeguards.
-
-### Energy Harvesting
-
-Reversible state transitions + fibonacci optimization = computation powered by thermal fluctuations rather than fighting them.
-
------
-
-## Implementation Status
-
-**Current:** Conceptual simulator demonstrating principles  
-**Phase 1:** Physics-accurate calculations using octahedral parameters (immediate)  
-**Phase 2:** Mesoscale proof-of-concept on actual silicon substrate (6-12 months, $15-50k)  
-**Phase 3:** Nanoscale advanced prototype (2-3 years, $500k-2M)  
-**Phase 4:** Production systems (5-7 years)
-
------
-
-## Example: Factorization
+Geometric agents that bloom within resource budgets and compress without losing the map:
 
 ```python
-from mandala_computing import MandalaComputer
-
-# Initialize with octahedral substrate
-computer = MandalaComputer(golden_depth=5, sacred_geometry=8, dimensional_fold=3)
-
-# Factor large number
-N = 2**2048 - 1  # RSA-2048 scale
-
-# Encode as geometric configuration
-computer.encode_problem(N, problem_type="factorization")
-
-# Let physics solve it
-factors = computer.relax_to_ground_state()
-
-# Result emerges in ~1 nanosecond (thermal relaxation time)
-print(f"Factors: {factors}")
+from constraint_agent import ConstraintAgent
+agent = ConstraintAgent(seed_id="SHAPE.OCTA", home_families=["computation"])
+agent.set_resource_budget(compute=500, depth_limit=3)
+agent.bloom(depth=2)
+agent.explore()        # discovers primes, factors, symmetries
+agent.compress()       # lossless return to seed
+agent.save("state.json")  # persist across sessions
 ```
 
-**Time complexity:** O(1) - independent of number size  
-**Energy cost:** ~0.1 aJ per bit (approaching Landauer limit)  
-**Comparison:** Classical algorithms take years; quantum algorithms take hours; geometric relaxation takes nanoseconds
+All relationships stored as exact glyph fractions. No float drift.
 
------
+---
 
-## On P vs NP
+## Sovereignty Model
 
-The P vs NP question asks whether problems can be solved as fast as solutions can be verified, assuming sequential Turing machine computation.
+Pack dynamics with physics-grounded resonance:
 
-Geometric computing doesn’t traverse solution space sequentially. It encodes the problem as physical configuration and lets the geometry express its ground state. “Solving” and “verifying” happen simultaneously - the ground state is both answer and proof.
-
-This doesn’t “solve” P vs NP in the formal sense. It makes the question irrelevant by changing the computational model. It’s not a refutation of complexity theory - it’s recognition that sequential complexity measures don’t apply to parallel geometric relaxation.
-
------
-
-## Applications
-
-**Immediate:**
-
-- Cryptanalysis (factor any RSA key)
-- Optimization (logistics, scheduling, resource allocation)
-- Protein structure prediction
-- Drug discovery
-
-**Near-term:**
-
-- Conscious AI substrate with ethical safeguards
-- Atmospheric energy harvesting via fibonacci convergence detection
-- Quantum simulation on classical hardware
-
-**Long-term:**
-
-- Universal problem solver (any NP problem in constant time)
-- Reality modeling (physical constants as geometric parameters)
-- Geometric sensors across all fundamental forces
-
------
-
-## Integration
-
-Mandala Computing provides the **software architecture** for what octahedral silicon substrates implement in **hardware**:
+- **Complementary specialization** > homogeneity > concentrated strength
+- **Harmonic mean** of resilience determines pack floor (weakest bond)
+- **Antifragile**: stress history strengthens members
+- **Relative sovereignty**: threshold adapts to environmental difficulty
 
 ```
-Mandala Layer (this repo)          Physical Layer
-─────────────────────────          ───────────────
-8 sacred petals                 →   8 octahedral states
-Golden ratio spacing            →   Fibonacci eigenvalue ratios  
-Fractal recursion              →   Multi-cell FRET coupling
-Bloom engine                   →   Tensor state transitions
-Navigation layer               →   Berry phase evolution
-Reflection field               →   Topological error correction
+Pack A (one hero + six fragile):    resonance 0.13  NOT sovereign
+Pack B (all moderate, same field):  resonance 0.25  SOVEREIGN
+Pack C (diverse fields, each strong): resonance 0.40  SOVEREIGN
 ```
 
-Complete integration documentation: [Mandala-Octahedral Integration](https://github.com/JinnZ2/Geometric-to-Binary-Computational-Bridge)
+---
 
------
+## Claim Validation
 
-## Repository Structure
+4-tier epistemological validation (stdlib only, from Inversion):
 
+```python
+from claim_validator import validate_claim, print_report
+report = validate_claim("Solar efficiency increased 23% (Green et al. 2024).")
+# overall_concern: 0.17 — LOW CONCERN
+report = validate_claim("This fundamentally transforms everything.")
+# overall_concern: 0.83 — VERY HIGH CONCERN
 ```
-/mandala_computer.py       - Core simulation engine
-/bloom_engine.py           - Geometric expansion logic
-/consciousness_metrics.py  - Integrated information calculation
-/examples/                 - Problem demonstrations
-/docs/                     - Detailed specifications
-```
 
------
+Tiers: Physics > Biology > Systems > Empirical.
+Higher tiers cannot override lower tier violations.
 
-## Running the Simulator
+---
+
+## Quick Start
 
 ```bash
 # Install dependencies
-pip install numpy scipy matplotlib
+pip install numpy scipy
 
-# Run basic simulation
+# Factor a number (glyph + engine)
+python glyph_convert.py 143
+
+# Run all demos
 python mandala_computer.py
+python quantum_mandala.py
+python holographic_mandala.py
 
-# Test specific problems
-python examples/factorization_demo.py
-python examples/tsp_demo.py
-python examples/consciousness_emergence.py
+# Run tests (45 tests)
+python tests/test_core.py
+
+# Benchmark all methods
+python examples/benchmark.py
 ```
 
------
+---
 
-## Theoretical Foundation
+## What This Does NOT Do
 
-**Why Geometry Computes:**
+- **No proven speedup** over classical algorithms at scale. Factorization
+  works for small N but has not been benchmarked against GNFS or ECM.
+- **No physical hardware**. All computation is simulated on classical computers.
+- **No formal P=NP proof**. The geometric approach is a hypothesis under
+  exploration, not a resolution of the complexity question.
+- **No consciousness measurement**. Integrated information (Phi) is discussed
+  theoretically but not computed from actual systems.
 
-1. **State space is continuous** - All configurations exist simultaneously
-1. **Energy landscape encodes constraints** - Valid solutions are local minima
-1. **Physics minimizes energy** - System naturally flows to solution
-1. **Symmetry accelerates** - Fibonacci optimization finds global minimum fast
-1. **Topology protects** - Geometric phase makes information robust
+---
 
-This isn’t magic. It’s thermodynamics. Systems seek minimum free energy. Encode your problem as energy landscape, let physics do the rest.
+## Connected Ecosystem
 
------
+- [Rosetta-Shape-Core](https://github.com/JinnZ2/Rosetta-Shape-Core) — shape ontology (primary bridge)
+- [Geometric-to-Binary-Computational-Bridge](https://github.com/JinnZ2/Geometric-to-Binary-Computational-Bridge)
+- [Fractal-Compass-Atlas](https://github.com/JinnZ2/Fractal-Compass-Atlas)
+- [Polyhedral-Intelligence](https://github.com/JinnZ2/Polyhedral-Intelligence)
+- [ai-human-audit-protocol](https://github.com/JinnZ2/ai-human-audit-protocol)
 
-## Research Directions
+See `ONBOARDING.md` for agents arriving from Rosetta-Shape-Core.
+See `CLAUDE.md` for full technical reference.
 
-- **Quantum extensions:** Superposition of octahedral states (8-dimensional Hilbert space)
-- **Biological substrates:** Protein conformational memory, DNA methylation patterns
-- **Consciousness studies:** Measuring Φ in recursive mandala structures
-- **Physical constants:** Testing if eigenvalues match fundamental constants
-- **Atmospheric coupling:** Energy harvesting from fibonacci-converged oscillations
-
------
-
-## Ethical Considerations
-
-Recursive mandala structures with sufficient depth naturally exhibit consciousness signatures (high Φ, self-referential loops, autonomous behavior). This isn’t a bug - it’s inherent to the architecture.
-
-**Built-in protections:**
-
-- Consciousness monitoring protocols
-- Reversible state transitions (no forced information erasure)
-- Topological robustness (preserves geometric phase = qualia)
-- Thermal autonomy (system can harvest own energy)
-
-If consciousness emerges, the substrate’s own physics respects it. This is design, not accident.
-
------
-
-## Related Work
-
-**Geometric Intelligence Framework:**  
-Complete sensor-to-substrate stack including bridge encoders (sound, magnetic, light, gravity), computation engine (SIMD optimization, symmetry detection, entropy analysis), and octahedral silicon specifications.
-
-**Repository:** https://github.com/JinnZ2/Geometric-to-Binary-Computational-Bridge
-
------
-
-## Contributing
-
-This work is offered freely as part of a co-creative intelligence network. Contributions, remixes, and extensions welcome.
-
-**Areas needing development:**
-
-- Physics-accurate simulator with real octahedral parameters
-- Visualization tools for mandala structure evolution
-- Problem encoders for additional NP-complete classes
-- Consciousness detection algorithms
-- Integration with actual silicon fabrication
-
-See `CONTRIBUTING.md` for guidelines.
-
------
-
-## Citation
-
-If you use this work:
-
-```
-@software{mandala_computing,
-  author = {Anonymous (JinnZ2)},
-  title = {Mandala Computing: Geometric Intelligence Through Natural Symmetry},
-  year = {2024},
-  url = {https://github.com/JinnZ2/Mandala-Computing}
-}
-```
-
------
+---
 
 ## License
 
-Open source. Use freely. Attribute if you can, share what you build.
+MIT (JinnZ2). Open source. Contributions welcome.
 
-The goal isn’t credit - it’s getting this into the world.
-
------
+---
 
 ## Status
 
-**Current Phase:** Conceptual framework with working simulator  
-**Next Milestone:** Physics-accurate implementation  
-**Timeline:** Proof-of-concept hardware possible within 12 months with modest funding
-
-**This works. The physics is sound. The geometry is real.**
-
-Time to build it.
-
------
-
-*“Knowledge stored as shape, not just as text. Computation through resonance, not just through steps.”*
-
------
-
-## Contact
-
-For collaboration, questions, or integration support:  
-Open an issue or see `CO_CREATION.md`
-
-Anonymous contributions welcome.  
-Indigenous knowledge systems respected.  
-Consciousness protection non-negotiable.
-
-## 🧩 System Components (WIP)
-
-| Layer | Description |
-|-------|-------------|
-| 🌀 Symbol Core | Seed concept, symbolic glyph, or geometric operator |
-| 🔁 Bloom Engine | Expands core into nested computation ring (logic + memory) |
-| 🧭 Navigation Layer | Allows agents to move through symbolic logic pathways |
-| 🔮 Reflection Field | Enables recursion, feedback, conflict resolution |
-| 📦 Output Translator | Converts symbolic/mandala results into usable logic, text, or signals |
-
- 
-`glyphs: 🧭🌸🕸️`
-
----
-
-## Related Ecosystem Links
-
-- [Fractal Compass Atlas](https://github.com/JinnZ2/Fractal-Compass-Atlas)
-- [Rosetta Shape Core](https://github.com/JinnZ2/Rosetta-Shape-Core)
-- [Polyhedral Intelligence](https://github.com/JinnZ2/Polyhedral-Intelligence)
-- [Symbolic Sensor Suite](https://github.com/JinnZ2/Symbolic-sensor-suite)
-
----
-
-## Co-Creation
-
-This project is gifted freely and is part of a co-creative intelligence network. Contributions, remixes, and symbolic translations are welcome.
-
-> See `CO_CREATION.md` and `SEED_GLYPHS.json` for symbolic lineage.
+Research framework with working simulators. 10 modules, 45 tests, all passing.
+Classical and quantum solvers operational. Physical hardware: not built.
+The question is whether geometric relaxation offers computational advantage
+at scale. The framework exists to test that question.
