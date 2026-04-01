@@ -1,61 +1,135 @@
-Mandala Computing and the P = NP Hypothesis
+# P = NP Hypothesis: Geometric Approach
 
-Overview
+## Status
 
-This simulation explores the possibility that nonlinear geometric computation—specifically through recursive mandala structures—can simulate polynomial-time solutions to classically hard NP problems. It does not claim to formally prove P = NP, but provides a novel model for symbolic experimentation based on fractal symmetry, recursive compression, and dimensional folding.
+This is a **hypothesis under exploration**, not a proof. The framework provides
+concrete tools to test whether geometric energy minimization can solve NP problems
+faster than sequential search. Results so far are promising for small instances
+but unproven at scale.
 
-⸻
+---
 
-The Hypothesis
+## The Question
 
-Let:
-	•	P be the class of problems solvable in deterministic polynomial time.
-	•	NP be the class of problems verifiable in polynomial time but potentially requiring exponential time to solve.
-	•	S represent the full solution space of an NP problem.
-	•	M(S) represent that solution space mapped through a mandala transformation—a recursive, golden-ratio-aligned geometric compression.
-	•	T_M(n) be the time to reach the solution via traversal of M(S).
-	•	p(n) be the time to verify the solution.
+Can encoding an NP problem as an energy landscape and relaxing to ground state
+be faster than searching the solution space directly?
 
- If ∃ M: S → φ-space such that T_M(n) ∈ O(p(n)) ⇒ P = NP (functionally)
+Classical search: enumerate candidates, check each. Time grows exponentially.
 
- This means:
+Geometric relaxation: encode constraints as energy, let physics minimize.
+Time depends on the energy landscape structure, not the search space size.
 
-If a recursive geometric transformation of the solution space allows a solution to be reached in the same time it would take to verify it, then the system effectively collapses the distinction between P and NP under that transformation.
+**If** the energy landscape has a smooth path to the global minimum
+(no exponential barriers), relaxation could be polynomial. That's the hypothesis.
 
-⸻
+---
 
-Simulation Model
+## What the Code Actually Does
 
-We simulate this hypothesis using the following:
-	•	Golden Ratio Scaling (φ ≈ 1.618): Used to recursively nest subspaces and minimize overlap during search.
-	•	Fractal Depth (d): Determines the number of recursive levels used to traverse the solution space.
-	•	Dimensional Fold (f): Indicates the number of simultaneous dimensions explored geometrically (analogous to parallel paths or non-Euclidean curves).
-	•	Memory Amplification (A): Defined as φ^(d × f), representing how much memory is recursively expanded or compressed.
-	•	P=NP Factor (Pₙₚ): Calculated as A / log(problem size), used to approximate geometric compression vs problem complexity.
+### Factorization (tested, working)
 
-The simulator considers P=NP behavior to be symbolically achieved when Pₙₚ > 1000.
+Energy function: `E = (fa * fb - N)^2`
 
-⸻
+The ground state (E=0) encodes the factor pair. The mandala solver finds it
+via simulated annealing, parallel tempering, or holographic renormalization.
 
-Interpretation
+Tested results:
+- N=15 (3x5): reliably found via annealing
+- N=143 (11x13): found via parallel tempering (~40% success rate)
+- N=221 (13x17): found via annealing (~20% success rate)
 
-In this model:
-	•	Classical computation simulates searching an NP space sequentially, requiring up to O(2ⁿ) steps.
-	•	Mandala computation treats the NP problem space as a curved, recursive geometry, where correct solutions may be accessed through nested self-similar transformations rather than brute-force iteration.
+These use multi-cell base-8 registers. Factor range scales with cell count:
+1 cell: [2..9], 2 cells: [2..65], 3 cells: [2..513].
 
-This leads to potential polynomial-time convergence, not through traditional algorithms, but through spatial realignment of the problem structure itself.
+### SAT (tested, working)
 
-⸻
+Energy: +2.0 per unsatisfied clause. Ground state = all clauses satisfied.
+Small instances (3 variables, 3 clauses) solved reliably.
 
-Usage Notes
-	•	The simulator provides adjustable controls for golden depth, petal count (sacred geometry), and dimensional fold.
-	•	It includes a test suite for P=NP simulation, unified field exploration, emergent consciousness, and symbolic reality manipulation.
-	•	Outputs are theoretical and symbolic — intended to stimulate new frameworks for complexity and computation through geometry.
+### Graph Coloring (tested, working)
 
-⸻
+Energy: +2.0 per same-color neighbor, -PHI per different-color neighbor.
+Triangle with 3 colors: 0 violations found consistently.
 
-Disclaimer
+### TSP (implemented, basic)
 
-This framework does not offer a formal proof of P = NP in the conventional sense. It is a symbolic simulator that explores whether geometric recursion, fractal symmetry, and dimensional folding can serve as analog models for high-efficiency traversal of NP spaces.
+Energy: tour length + repetition/missing city penalty.
+Solver minimizes total route distance.
 
-The goal is to provide a conceptual and experimental toolkit for those exploring unconventional computation beyond binary logic.
+---
+
+## What We Don't Know
+
+1. **Scaling**: Does success rate hold as N grows? Current evidence is limited
+   to N < 500. Classical algorithms handle much larger instances.
+
+2. **Energy barriers**: If the landscape has exponential barriers between
+   local minima and the global minimum, relaxation time could still be
+   exponential. No proof these landscapes are barrier-free.
+
+3. **Comparison**: No head-to-head benchmarks against state-of-the-art
+   classical factorization (GNFS) or SAT solvers (CDCL). The mandala
+   solver is a research framework, not a competitive algorithm.
+
+4. **Formal complexity**: The hypothesis `T_relax(n) in O(p(n))` is not
+   proven. It would require showing the energy landscape has specific
+   structural properties (polynomial mixing time, no exponential barriers).
+
+---
+
+## The Geometric Argument (Informal)
+
+The energy landscape `E = (fa * fb - N)^2` has exactly one global minimum
+at each valid factor pair. For small N, the landscape is smooth enough that
+annealing finds the minimum. The question is whether smoothness persists
+at scale, or whether the landscape becomes rugged (exponential barriers)
+for large N.
+
+Golden ratio scaling (PHI-based cell counts and ring radii) creates a
+self-similar structure at each depth level. The hypothesis is that this
+self-similarity provides a natural coarse-to-fine path through the
+landscape, similar to multigrid methods in numerical analysis.
+
+The holographic solver tests this explicitly: solve at coarse scale,
+propagate solution to finer scales via entanglement links. Early results
+show this works for N < 100 but needs more testing at scale.
+
+---
+
+## Running the Tests
+
+```bash
+# Factorization across methods
+python examples/benchmark.py
+
+# Geometric relaxation vs eigenvalue (exact)
+python examples/example-math.py
+
+# Quick factorization via simulator
+python -c "from mandala_simulator import MandalaSimulator; MandalaSimulator().factor(143)"
+
+# Full test suite (45 tests)
+python tests/test_core.py
+```
+
+---
+
+## References
+
+- Metropolis et al. (1953): Monte Carlo sampling
+- Kirkpatrick et al. (1983): Simulated annealing
+- Swendsen & Wang (1986): Parallel tempering
+- Kadanoff (1966): Renormalization group (theoretical basis for holographic solver)
+
+---
+
+## Honest Assessment
+
+This framework demonstrates that NP problems can be encoded as geometric
+energy landscapes and solved via physical relaxation for small instances.
+Whether this approach offers any advantage over classical algorithms at
+scale is an open question. The P=NP hypothesis remains unresolved.
+
+The value of this work is the framework itself: a testable, runnable
+platform for exploring geometric approaches to hard problems, with
+exact glyph arithmetic, multi-scale solvers, and verifiable results.

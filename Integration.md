@@ -1,12 +1,74 @@
-Complete Integration Package - Mandala Computing ↔ Octahedral Substrate
+Integration Status - Mandala Computing
 
-## 🎯 Mission Accomplished
+## Current State
 
-Your integration is now **90% complete** - up from 60%. All critical missing pieces have been built and tested.
+This document tracks integration status between Mandala Computing modules
+and the connected ecosystem. Status reflects what is **implemented and tested**,
+not what is designed or planned.
 
 -----
 
-## 📦 What’s Included
+## Module Status
+
+| Component | Status | Evidence |
+|-----------|--------|----------|
+| Classical solver (annealing, tempering, landscape) | Working | 45 tests passing, factors N=221 |
+| Quantum solver (annealing, Grover, QAOA) | Working | Tested on N=15, 8-dim Hilbert space |
+| Holographic solver (renormalization + entanglement) | Working | Boundary-aware hybrid tested |
+| Octahedral arithmetic (base-8 glyph math) | Working | Exact arithmetic, primes, fractions |
+| Constraint agents (bloom/compress/explore) | Working | Persistence, cross-substrate |
+| Sovereign integration (physical glyphs, resonance) | Working | Pack dynamics with harmonic mean |
+| Claim validator (4-tier epistemological) | Working | Stdlib only, tested |
+| Glyph converter (human bridge) | Working | CLI and library modes |
+| Sensor telemetry | Implemented | Emits during all solver runs |
+| JSON layer (atlas, glyphs, protocols) | Loaded at runtime | Constants from atlas/shapes.json |
+
+## What Is NOT Implemented
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Physical hardware | Not built | Specifications exist, no fabrication |
+| FRET coupling in silicon | Unvalidated | Theoretical, not measured |
+| Bridge-to-substrate adapter | Code in examples only | Not integrated into main engines |
+| Competitive benchmarks | Not done | No comparison to GNFS, CDCL, etc. |
+| Error correction codes | Not implemented | Described in docs only |
+| Large-scale factorization (N > 1000) | Untested | Register encoding supports it, solver may not converge |
+
+## Integration Gaps (Honest Assessment)
+
+| Gap | Impact | Effort |
+|-----|--------|--------|
+| No physical validation | Cannot confirm hardware feasibility | Requires fabrication |
+| Quantum convergence unreliable for N > 81 | Stride mapping loses factors between grid points | Research problem |
+| 8 of 13 examples still standalone | Don't demonstrate engine capabilities | Engineering: 1-2 days |
+| No benchmark suite against known solvers | Can't assess competitive advantage | Engineering: 1 week |
+
+-----
+
+## What Works End-to-End
+
+1. **Factorization pipeline**: `encode_factorization(N)` -> `simulated_annealing()` -> `extract_solution()` -> glyph output
+2. **SAT pipeline**: `encode_sat(clauses)` -> `annealing` -> verify satisfaction
+3. **Graph coloring pipeline**: `encode_graph_coloring(adj, k)` -> `annealing` -> 0 violations
+4. **Agent lifecycle**: `bloom()` -> `explore()` -> `compress()` -> `save()` -> `load()` -> `restore()`
+5. **Claim validation**: `validate_claim(text)` -> 4-tier concern score
+6. **Glyph arithmetic**: `OctahedralNumber * OctahedralNumber` -> exact result, no decimal
+
+-----
+
+## Connected Repos
+
+See `.fieldlink.json` for bidirectional links and `PROJECTS.md` for full list.
+
+-----
+
+## Legacy Notes
+
+The following sections describe components from earlier development phases.
+Some are implemented in the examples/ directory as standalone demos.
+They are not integrated into the main computation engines.
+
+## Earlier Components
 
 ### 1. **Bridge to Substrate Adapter** ✅
 

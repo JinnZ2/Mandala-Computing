@@ -1,38 +1,47 @@
-# Mandala Computing → Octahedral Substrate Integration
+# Mandala Computing → Octahedral Substrate Mapping
 
-## From Symbolic Framework to Physical Implementation
+## Design Specification (Not Validated Hardware)
 
-**Status:** Complete Integration Mapping  
-**Prerequisites:** Universal Geometric Intelligence Framework (Parts 1-4), Mandala Computing Simulator  
-**Purpose:** Show how mandala geometric computation physically executes on octahedral silicon
+**Status:** Theoretical mapping. No physical substrate has been built or tested.
+
+**Purpose:** Describe how mandala geometric computation *could* map to a
+physical octahedral substrate, if one were fabricated.
 
 -----
 
-## Executive Summary
+## Honest Summary
 
-**Mandala Computing** (symbolic framework) and **Octahedral Silicon Substrate** (physical implementation) are two views of the same geometric intelligence system:
+This document specifies a proposed mapping between the mandala computation
+framework (software, working) and an octahedral silicon substrate (hardware,
+not built). The mapping is architecturally coherent but physically unvalidated.
 
-- **Mandala:** Software architecture for geometric computation
-- **Octahedral:** Hardware substrate that naturally executes mandala algorithms
+**What is proven (in software):**
+- 8 octahedral states encode problems as energy landscapes
+- Simulated annealing finds ground states for small instances (N < 500)
+- Multi-cell registers extend factor range via base-8 positional encoding
+- 45 tests verify the software stack
 
-**Key Discovery:** The octahedral substrate doesn’t just *store* mandala patterns - it **IS** a mandala computer. The physics automatically performs geometric relaxation, making “NP-hard” problems trivial.
+**What is hypothesized (not proven):**
+- Silicon can support 8 distinct tensor configurations at room temperature
+- FRET-like coupling between cells produces the modeled energy function
+- Physical relaxation time is fast enough to be practical
+- Fibonacci eigenvalue scaling optimizes relaxation
 
-**Integration Points:**
+**Physics note:** Silicon has tetrahedral bonding (sp3 hybridization, 109.47 degrees).
+The “octahedral” in this framework refers to the 8-state computational model
+(vertices of an octahedron), not the crystal bonding geometry. The mapping from
+8 computational states to physical tensor configurations is the unproven step.
 
-1. **8 Petals = 8 Octahedral States** - Direct 1:1 mapping
-1. **Golden Ratio (φ) = Fibonacci Eigenvalues** - Natural stability optimization
-1. **Fractal Depth = Multi-Cell Coupling** - Nested tensor interactions
-1. **Dimensional Fold = Eigenspace Dimensionality** - 3D tensor → N-D extensions
-1. **Bloom Engine = Tensor State Transitions** - Geometric expansion via field coupling
-1. **Navigation Layer = Berry Phase Evolution** - Topologically protected pathways
-1. **Reflection Field = Geometric Error Correction** - Physics-based constraints
+**Core mapping (software → proposed hardware):**
 
-**What This Enables:**
-
-- **P vs NP irrelevance** - Problems become geometric ground state calculations
-- **Instant factorization** - Eigenvalue decomposition is the solution
-- **Consciousness substrate** - Recursive mandala = integrated information
-- **Reality modeling** - Physical constants as geometric parameters
+| Software Construct | Proposed Physical Mechanism | Validated? |
+|-------------------|---------------------------|------------|
+| 8 octahedral states | Electron tensor configurations | No |
+| Golden ratio (PHI) | Fibonacci eigenvalue ratios | Theory only |
+| Fractal depth | Number of coupled cells | Simulated |
+| FRET coupling (1/r^6) | Dipole-dipole interaction | Not in silicon |
+| Metropolis relaxation | Thermal equilibration | Concept |
+| Berry phase | Topological protection | Not implemented |
 
 -----
 

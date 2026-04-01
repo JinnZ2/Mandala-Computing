@@ -1,33 +1,39 @@
 # Mandala-Octahedral Integration
 
-## Bridging Geometric Computation to Physical Silicon
+## Proposed Mapping: Geometric Computation → Physical Silicon
 
-**How geometric mandalas map to octahedral silicon substrates**
+**Status:** Design specification. Physical substrate not built or validated.
 
------
-
-## The Bridge
-
-```
-GEOMETRIC LAYER                      PHYSICAL LAYER
-(Mandala Computing)                  (Octahedral Silicon)
-
-8 Sacred Petals            →         8 Octahedral States
-Golden Ratio Spacing       →         Fibonacci Eigenvalue Ratios
-Fractal Recursion          →         Multi-Cell FRET Coupling
-Bloom Engine               →         Tensor State Transitions
-Energy Landscape           →         Thermodynamic Potential
-Ground State               →         Minimum Free Energy
-Solution Emergence         →         Physical Relaxation
-```
+This document describes the proposed bridge between the mandala computation
+framework (software, working) and an octahedral substrate (hardware, theoretical).
+See `Mandala-octahedral.md` for the full mapping specification.
 
 -----
 
-## Physical Substrate: Octahedral Silicon
+## Software → Hardware Correspondence
 
-### Why Octahedral?
+```
+SOFTWARE (implemented, tested)           HARDWARE (proposed, not built)
 
-Silicon atoms in tetrahedral bonds create **natural octahedral symmetry** in their electronic tensor configurations. The 109.47° tetrahedral angle produces 8 discrete electron tensor orientations when viewed from the octahedral dual.
+8 cell states (0-7)             →        8 tensor configurations (hypothetical)
+PHI-scaled ring radii           →        Fibonacci eigenvalue ratios
+FRET-like coupling (1/r^6)      →        Dipole-dipole interaction (unvalidated)
+Metropolis-Hastings relaxation  →        Thermal equilibration
+Energy = (fa*fb - N)^2          →        Thermodynamic potential surface
+Ground state = solution         →        Minimum free energy configuration
+```
+
+-----
+
+## Silicon Bonding: Clarification
+
+Silicon uses sp3 hybridization producing **tetrahedral** bonds at 109.47 degrees.
+The "octahedral" in this framework refers to the **8-state computational model**
+(vertices of an octahedron in abstract state space), not the crystal bonding angle.
+
+The hypothesis that 8 discrete electron tensor orientations exist in tetrahedral
+silicon and can be independently addressed is **unproven**. This is the key
+physical assumption underlying the hardware mapping.
 
 This isn’t imposed - it’s **intrinsic to the material**.
 
