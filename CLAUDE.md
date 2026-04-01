@@ -27,6 +27,11 @@ mandala-computing/
 ├── mandala_computer.py        # core classical simulator v2.0 (~850 loc)
 ├── quantum_mandala.py         # quantum extension v2.0 (~500 loc)
 ├── holographic_mandala.py     # holographic + renormalization + entanglement (~950 loc)
+├── octahedral_arithmetic.py   # native glyph-space math, base-8 (~600 loc)
+├── constraint_agent.py        # geometric agent framework (~500 loc)
+├── sovereign_integration.py   # Living-Intelligence + Inversion bridge (~600 loc)
+├── claim_validator.py         # epistemological claim validation (~350 loc)
+├── glyph_convert.py           # human decimal-to-glyph converter (~300 loc)
 ├── mandala_simulator.py       # lightweight symbolic simulator (~115 loc)
 ├── ONBOARDING.md              # agent learning path from Rosetta-Shape-Core
 ├── .fieldlink.json            # ecosystem metadata (v3.0, bidirectional)
@@ -35,6 +40,7 @@ mandala-computing/
 ├── PROJECTS.md                # connected repos
 ├── LICENSE                    # MIT
 ├── examples/benchmark.py      # classical vs quantum benchmark
+├── tests/test_core.py         # 42-test suite
 └── [12 other .md files]       # theory, hardware, integration, proofs
 ```
 
@@ -306,7 +312,8 @@ large systems.
 
 ## build-test-run
 
-No formal build system, test framework, CI/CD, or linting is configured.
+Test suite: `python tests/test_core.py` (42 tests across all modules).
+No formal build system, CI/CD, or linting is configured.
 
 ### run-demos
 

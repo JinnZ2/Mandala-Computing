@@ -444,6 +444,78 @@ def test_sovereign_agent_lifecycle():
     assert "system_resonance" in resonance
 
 
+def test_sovereignty_achievable():
+    """Sovereignty is relative to environment — even high entropy can be sovereign."""
+    # Low entropy: easy sovereignty
+    res_calm = SovereignEnergy.pack_resonance([0]*7, [0.9]*7, [0.85]*7, entropy=0.1)
+    assert SovereignEnergy.is_sovereign(res_calm, entropy=0.1)
+
+    # High entropy with stress history (antifragile): still sovereign
+    history = [0.7, 0.8, 0.9, 0.6]
+    res_storm = SovereignEnergy.pack_resonance(
+        [0]*7, [0.9]*7, [0.85]*7, entropy=0.9, stress_history=history
+    )
+    assert SovereignEnergy.is_sovereign(res_storm, entropy=0.9)
+
+
+def test_distributed_resilience_beats_concentrated():
+    """Specialized > homogeneous > hero (complementary specialization)."""
+    # Hero: one strong + six fragile, all same field
+    res_hero = SovereignEnergy.pack_resonance(
+        [0]*7, [0.9]*7, [0.95, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2], entropy=0.5
+    )
+    # Homogeneous: all moderate, all same field (monoculture)
+    res_homo = SovereignEnergy.pack_resonance(
+        [0]*7, [0.9]*7, [0.5]*7, entropy=0.5
+    )
+    # Specialized: different fields, each strong (alloy)
+    res_spec = SovereignEnergy.pack_resonance(
+        [0,1,2,3,4,5,6], [0.9]*7, [0.85]*7, entropy=0.5
+    )
+    assert res_spec > res_homo > res_hero
+
+
+def test_field_aware_cost():
+    """Field-aware cost should use compatibility matrix, not black-box."""
+    cost_same = SovereignEnergy.as_mandala_cost([0, 0, 0, 0])  # all EM
+    cost_diff = SovereignEnergy.as_mandala_cost([0, 2, 4, 6])  # mixed
+    # Same-field should have lower (more negative) cost
+    assert cost_same < cost_diff
+
+
+# ---------------------------------------------------------------------------
+# Claim Validator tests
+# ---------------------------------------------------------------------------
+
+from claim_validator import validate_claim as validate_text_claim
+
+
+def test_specific_claim_low_concern():
+    report = validate_text_claim(
+        "Solar efficiency increased by 23% between 2020 and 2024 "
+        "(Green et al. 2024), measured across 1200 installations."
+    )
+    assert report.overall_concern < 0.4
+
+
+def test_vague_claim_high_concern():
+    report = validate_text_claim(
+        "This fundamentally transforms everything and is essentially "
+        "the most significant breakthrough in principle."
+    )
+    assert report.overall_concern > 0.6
+
+
+def test_tier_hierarchy():
+    """Higher tiers should exist and be numbered correctly."""
+    report = validate_text_claim("Some claim with various implications.")
+    tiers = {d.tier: d for d in report.domain_scores}
+    assert 1 in tiers  # Physics
+    assert 2 in tiers  # Biology
+    assert 3 in tiers  # Systems
+    assert 4 in tiers  # Empirical
+
+
 # ---------------------------------------------------------------------------
 # Run all tests
 # ---------------------------------------------------------------------------

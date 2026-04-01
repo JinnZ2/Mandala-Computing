@@ -224,53 +224,174 @@ class SovereignEnergy:
         Energy-gated transition frequency between two glyph states.
 
         From sovereign.py: freq = compat * stress * energy_b
+
+        Stress models how the element responds to environmental entropy.
+        High resilience means the element *thrives* under stress, not
+        just survives. The sigmoid ensures stress response is bounded
+        and rewards resilience nonlinearly:
+
+          stress = resilience^2 / (resilience^2 + entropy^2)
+
+        At resilience=0.85, entropy=0.5: stress = 0.74 (functional)
+        At resilience=0.85, entropy=0.9: stress = 0.47 (strained but alive)
+        At resilience=0.3,  entropy=0.9: stress = 0.10 (collapsing)
+
+        Sovereignty doesn't require calm. It requires resilience.
         """
         compat = glyph_compatibility(state_a, state_b)
         compat_float = compat.num.to_decimal() / max(compat.den.to_decimal(), 1)
-        stress = math.exp(-entropy / max(resilience_a * energy_a, 1e-15))
+        # Sigmoid stress: resilience^2 / (resilience^2 + entropy^2)
+        # Rewards high resilience under any entropy level
+        r2 = resilience_a ** 2
+        e2 = entropy ** 2
+        stress = r2 / (r2 + e2 + 1e-15)
         return compat_float * stress * energy_b
 
     @staticmethod
     def pack_resonance(states: List[int], energies: List[float],
-                       resiliences: List[float], entropy: float = 0.5) -> float:
+                       resiliences: List[float], entropy: float = 0.5,
+                       stress_history: List[float] = None) -> float:
         """
-        Average pairwise resonance for a group of glyph states.
+        Pack resonance with complementary specialization.
 
-        This is the energy function: E = -resonance.
-        Minimizing E means maximizing coherence.
+        Three principles from physics and biology:
+
+        1. FLOOR (harmonic mean): No member can be so weak that the pack
+           breaks. The weakest bond still determines minimum coherence.
+           Crystal: dislocation propagates. Network: weakest link fails.
+
+        2. SPECIALIZATION (role coverage): Different members excelling at
+           different things is stronger than everyone being the same.
+           Alloys > pure metals. Wolf pack > clones. Ecosystem > monoculture.
+           Homogenization leads to decay; complementary distribution thrives.
+
+        3. COMPLEMENTARY COUPLING: The value of specialization depends on
+           how those specializations interact. EM + Mechanical (compat 0.9)
+           is a stronger bond than Chemical + Radiative (compat 0.4).
+           The compatibility matrix weights which combinations synergize.
+
+        Pack resonance = base_resonance * specialization_bonus
+
+        Where specialization_bonus rewards:
+          - Diversity of physical fields represented (role coverage)
+          - Each member's resilience in their specific role
+          - Compatibility between the roles that are covered
         """
         n = len(states)
         if n < 2:
             return 0.0
+
+        # Antifragile adaptation: stress history strengthens each member
+        adapted = list(resiliences)
+        if stress_history:
+            mean_past = sum(stress_history) / len(stress_history)
+            for i in range(n):
+                adapted[i] = min(adapted[i] * (1 + mean_past * 0.5), 2.0 * resiliences[i])
+
+        # Floor: harmonic mean ensures no catastrophically weak link
+        inv_sum = sum(1.0 / max(r, 1e-15) for r in adapted)
+        floor_resilience = n / inv_sum if inv_sum > 0 else 0.0
+
+        # Role coverage: which physical fields are represented and how strongly?
+        # Each member contributes their resilience to their field's coverage
+        field_coverage = {}  # field_state -> max resilience in that field
+        for i in range(n):
+            field = states[i] % 8
+            current_best = field_coverage.get(field, 0.0)
+            field_coverage[field] = max(current_best, adapted[i])
+
+        # Specialization bonus:
+        # - More distinct fields = more coverage (up to 8)
+        # - Each field weighted by its best member's resilience
+        # - Complementary pairs (high compatibility) amplify each other
+        n_fields = len(field_coverage)
+        coverage_fraction = n_fields / 8  # what fraction of field space is covered
+
+        # Complementary amplification: average compatibility between covered fields
+        complement_sum = 0.0
+        complement_count = 0
+        covered_fields = list(field_coverage.keys())
+        for i, fa in enumerate(covered_fields):
+            for fb in covered_fields[i + 1:]:
+                c = glyph_compatibility(fa, fb)
+                c_val = c.num.to_decimal() / max(c.den.to_decimal(), 1)
+                # Weight by both fields' coverage strength
+                weight = field_coverage[fa] * field_coverage[fb]
+                complement_sum += c_val * weight
+                complement_count += 1
+
+        complement_avg = complement_sum / max(complement_count, 1)
+
+        # Specialization bonus: coverage * complementarity
+        # Ranges from ~0.5 (one field, no complement) to ~1.5 (diverse, high complement)
+        specialization = 0.5 + coverage_fraction * 0.5 + complement_avg * 0.5
+
+        # Base resonance uses each member's OWN adapted resilience for their
+        # pairwise interactions, but floored by the harmonic mean
         total = 0.0
         count = 0
         for i in range(n):
             for j in range(n):
                 if i != j:
+                    # Each member uses max(own_resilience, floor) — the pack
+                    # lifts weak members but doesn't drag down strong ones
+                    eff_res_i = max(adapted[i], floor_resilience)
                     total += SovereignEnergy.transition_frequency(
-                        states[i], energies[i], resiliences[i],
+                        states[i], energies[i], eff_res_i,
                         states[j], energies[j], entropy,
                     )
                     count += 1
-        return total / max(count, 1)
+        base_resonance = total / max(count, 1)
+
+        return base_resonance * specialization
 
     @staticmethod
-    def is_sovereign(resonance: float, threshold: float = 0.8) -> bool:
-        """Has the system achieved sovereignty?"""
-        return resonance > threshold
+    def is_sovereign(resonance: float, entropy: float = 0.5,
+                     base_threshold: float = 0.3) -> bool:
+        """
+        Has the system achieved sovereignty?
+
+        Sovereignty is relative to environmental difficulty.
+        A system maintaining 0.5 resonance at entropy=0.9 is more
+        sovereign than one at 0.8 in calm conditions.
+
+        Effective threshold = base_threshold / (1 + entropy)
+
+        At entropy=0.0: need resonance > 0.30
+        At entropy=0.5: need resonance > 0.20
+        At entropy=0.9: need resonance > 0.16
+
+        The harder the environment, the less resonance is needed —
+        because maintaining ANY coherence under chaos IS sovereignty.
+        """
+        effective_threshold = base_threshold / (1 + entropy)
+        return resonance > effective_threshold
 
     @staticmethod
     def as_mandala_cost(states: List[int]) -> float:
         """
-        Cost function for mandala solver.
+        Cost function for mandala solver (field-aware coupling).
 
-        Each state is a physical glyph. Energy profiles default to 0.9.
-        Returns negative resonance (solver minimizes, so this maximizes resonance).
+        Uses the compatibility matrix directly as coupling energy between
+        adjacent cells. This is NOT a black-box wrapper — the solver sees
+        the physical field structure through the glyph states.
+
+        E = -sum(compatibility(s_i, s_j)) for all neighbor pairs
+        Minimizing E = maximizing total compatibility = finding sovereignty.
         """
-        energies = [0.9] * len(states)
-        resiliences = [0.85] * len(states)
-        res = SovereignEnergy.pack_resonance(states, energies, resiliences, entropy=0.5)
-        return -res  # negative because solver minimizes
+        if len(states) < 2:
+            return 0.0
+        total_compat = 0.0
+        count = 0
+        for i in range(len(states)):
+            for j in range(i + 1, min(i + 4, len(states))):  # local neighbors
+                c = glyph_compatibility(states[i], states[j])
+                total_compat += c.num.to_decimal() / max(c.den.to_decimal(), 1)
+                count += 1
+        if count == 0:
+            return 0.0
+        avg = total_compat / count
+        return -avg  # negative because solver minimizes
 
 
 # ---------------------------------------------------------------------------
@@ -373,7 +494,7 @@ class SovereignAgent(ConstraintAgent):
             entropy = 0.5 * (1 + math.sin(depth * math.pi / max(self.max_depth_reached, 1)))
 
             resonance = SovereignEnergy.pack_resonance(states, energies, resiliences, entropy)
-            sovereign = SovereignEnergy.is_sovereign(resonance)
+            sovereign = SovereignEnergy.is_sovereign(resonance, entropy)
             self.sovereignty_history.append(resonance)
 
             pack_results.append({
@@ -391,7 +512,7 @@ class SovereignAgent(ConstraintAgent):
         overall = SovereignEnergy.pack_resonance(
             all_states, [0.9] * len(all_states), [0.85] * len(all_states), 0.5
         )
-        system_sovereign = SovereignEnergy.is_sovereign(overall)
+        system_sovereign = SovereignEnergy.is_sovereign(overall, entropy=0.5)
 
         print(f"\n    System resonance: {overall:.4f}")
         print(f"    System sovereign: {system_sovereign}")
@@ -433,7 +554,7 @@ class SovereignAgent(ConstraintAgent):
 
         optimal_states = result["solution"]["states"]
         resonance = -result["solution"]["cost"]  # negate back
-        sovereign = SovereignEnergy.is_sovereign(resonance)
+        sovereign = SovereignEnergy.is_sovereign(resonance, entropy=0.5)
 
         # Interpret as physical fields
         field_config = [PhysicalGlyph.from_state(s) for s in optimal_states]
