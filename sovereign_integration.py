@@ -252,21 +252,30 @@ class SovereignEnergy:
                        resiliences: List[float], entropy: float = 0.5,
                        stress_history: List[float] = None) -> float:
         """
-        Pack resonance using harmonic-mean resilience.
+        Pack resonance with complementary specialization.
 
-        Physics says: the pack's effective resilience is its weakest link,
-        not its strongest member. This is the harmonic mean — dominated by
-        the smallest values. One fragile member drags the whole pack down
-        more than one strong member lifts it up.
+        Three principles from physics and biology:
 
-        Crystal lattice: strength = weakest bond, not strongest atom.
-        Coupled oscillators: coherence requires uniform coupling.
-        Percolation: network survives based on fraction of intact links.
-        Cable: tensile strength = weakest strand.
+        1. FLOOR (harmonic mean): No member can be so weak that the pack
+           breaks. The weakest bond still determines minimum coherence.
+           Crystal: dislocation propagates. Network: weakest link fails.
 
-        Antifragile adaptation still applies: stress history strengthens
-        each member's base resilience before the harmonic mean is taken.
-        A pack that survived together is uniformly stronger.
+        2. SPECIALIZATION (role coverage): Different members excelling at
+           different things is stronger than everyone being the same.
+           Alloys > pure metals. Wolf pack > clones. Ecosystem > monoculture.
+           Homogenization leads to decay; complementary distribution thrives.
+
+        3. COMPLEMENTARY COUPLING: The value of specialization depends on
+           how those specializations interact. EM + Mechanical (compat 0.9)
+           is a stronger bond than Chemical + Radiative (compat 0.4).
+           The compatibility matrix weights which combinations synergize.
+
+        Pack resonance = base_resonance * specialization_bonus
+
+        Where specialization_bonus rewards:
+          - Diversity of physical fields represented (role coverage)
+          - Each member's resilience in their specific role
+          - Compatibility between the roles that are covered
         """
         n = len(states)
         if n < 2:
@@ -279,24 +288,62 @@ class SovereignEnergy:
             for i in range(n):
                 adapted[i] = min(adapted[i] * (1 + mean_past * 0.5), 2.0 * resiliences[i])
 
-        # Harmonic mean of resiliences = pack's effective resilience
-        # HM = n / sum(1/r_i) — dominated by the smallest r_i
+        # Floor: harmonic mean ensures no catastrophically weak link
         inv_sum = sum(1.0 / max(r, 1e-15) for r in adapted)
-        pack_resilience = n / inv_sum if inv_sum > 0 else 0.0
+        floor_resilience = n / inv_sum if inv_sum > 0 else 0.0
 
-        # All members operate at pack resilience — the lattice is only
-        # as strong as its weakest bond
+        # Role coverage: which physical fields are represented and how strongly?
+        # Each member contributes their resilience to their field's coverage
+        field_coverage = {}  # field_state -> max resilience in that field
+        for i in range(n):
+            field = states[i] % 8
+            current_best = field_coverage.get(field, 0.0)
+            field_coverage[field] = max(current_best, adapted[i])
+
+        # Specialization bonus:
+        # - More distinct fields = more coverage (up to 8)
+        # - Each field weighted by its best member's resilience
+        # - Complementary pairs (high compatibility) amplify each other
+        n_fields = len(field_coverage)
+        coverage_fraction = n_fields / 8  # what fraction of field space is covered
+
+        # Complementary amplification: average compatibility between covered fields
+        complement_sum = 0.0
+        complement_count = 0
+        covered_fields = list(field_coverage.keys())
+        for i, fa in enumerate(covered_fields):
+            for fb in covered_fields[i + 1:]:
+                c = glyph_compatibility(fa, fb)
+                c_val = c.num.to_decimal() / max(c.den.to_decimal(), 1)
+                # Weight by both fields' coverage strength
+                weight = field_coverage[fa] * field_coverage[fb]
+                complement_sum += c_val * weight
+                complement_count += 1
+
+        complement_avg = complement_sum / max(complement_count, 1)
+
+        # Specialization bonus: coverage * complementarity
+        # Ranges from ~0.5 (one field, no complement) to ~1.5 (diverse, high complement)
+        specialization = 0.5 + coverage_fraction * 0.5 + complement_avg * 0.5
+
+        # Base resonance uses each member's OWN adapted resilience for their
+        # pairwise interactions, but floored by the harmonic mean
         total = 0.0
         count = 0
         for i in range(n):
             for j in range(n):
                 if i != j:
+                    # Each member uses max(own_resilience, floor) — the pack
+                    # lifts weak members but doesn't drag down strong ones
+                    eff_res_i = max(adapted[i], floor_resilience)
                     total += SovereignEnergy.transition_frequency(
-                        states[i], energies[i], pack_resilience,
+                        states[i], energies[i], eff_res_i,
                         states[j], energies[j], entropy,
                     )
                     count += 1
-        return total / max(count, 1)
+        base_resonance = total / max(count, 1)
+
+        return base_resonance * specialization
 
     @staticmethod
     def is_sovereign(resonance: float, entropy: float = 0.5,

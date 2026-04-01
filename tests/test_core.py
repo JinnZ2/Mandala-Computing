@@ -459,16 +459,20 @@ def test_sovereignty_achievable():
 
 
 def test_distributed_resilience_beats_concentrated():
-    """Uniform moderate resilience > one hero + many fragile (harmonic mean)."""
-    # Pack A: one hero (0.95) + six fragile (0.2) — weak lattice
+    """Specialized > homogeneous > hero (complementary specialization)."""
+    # Hero: one strong + six fragile, all same field
     res_hero = SovereignEnergy.pack_resonance(
         [0]*7, [0.9]*7, [0.95, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2], entropy=0.5
     )
-    # Pack B: all moderate (0.5) — strong lattice
-    res_uniform = SovereignEnergy.pack_resonance(
+    # Homogeneous: all moderate, all same field (monoculture)
+    res_homo = SovereignEnergy.pack_resonance(
         [0]*7, [0.9]*7, [0.5]*7, entropy=0.5
     )
-    assert res_uniform > res_hero  # distributed wins
+    # Specialized: different fields, each strong (alloy)
+    res_spec = SovereignEnergy.pack_resonance(
+        [0,1,2,3,4,5,6], [0.9]*7, [0.85]*7, entropy=0.5
+    )
+    assert res_spec > res_homo > res_hero
 
 
 def test_field_aware_cost():
