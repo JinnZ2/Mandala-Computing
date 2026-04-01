@@ -277,4 +277,26 @@ if __name__ == "__main__":
     for k, v in cs.items():
         print(f"  {k}: {v}")
 
+    # --- Bridge to real engine ---
+    print("\n" + "=" * 60)
+    print("bridge: compare physical substrate to real mandala engine")
+    print("=" * 60)
+    try:
+        import sys, os
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        from mandala_computer import MandalaComputer
+
+        # Same factorization via real engine
+        for N in [15, 21, 35]:
+            eng = MandalaComputer(golden_depth=4, sacred_geometry=8)
+            eng.encode_factorization(N)
+            r = eng.simulated_annealing(max_steps=5000, T_start=3.0, T_end=0.01)
+            sol = r["solution"]
+            glyph = ""
+            if "glyph_pair" in sol:
+                glyph = f"  glyph: {sol['glyph_pair'][0]} * {sol['glyph_pair'][1]}"
+            print(f"  N={N}: pair={sol.get('best_pair')} verified={sol.get('verified')}{glyph}")
+    except Exception as e:
+        print(f"  (bridge skipped: {e})")
+
     print("\ndone.")

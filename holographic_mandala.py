@@ -182,9 +182,13 @@ class HolographicMandala(MandalaComputer):
         Encode problem holographically: full problem on boundary (outermost ring),
         compressed projections on inner rings.
         """
-        self.problem_type = problem_type_enum
-        self.problem_data = problem_data
-        self.bloom_mandala()
+        # Use parent's encoder to set up problem_data with all required fields
+        if problem_type_enum == ProblemType.FACTORIZATION:
+            self.encode_factorization(problem_data["N"])
+        else:
+            self.problem_type = problem_type_enum
+            self.problem_data = problem_data
+            self.bloom_mandala()
 
         # Outermost ring gets full problem encoding
         outer = self.rings[-1]
@@ -734,13 +738,30 @@ class HolographicMandala(MandalaComputer):
                              quantum_steps: int = 80,
                              max_steps_per_scale: int = 1500) -> Dict:
         """
-        Hybrid holographic-quantum solver.
+        Boundary-aware hybrid holographic-quantum solver.
 
-        Phase 1: Classical holographic renormalization finds approximate solution.
-        Phase 2: Best cell pair states seed quantum entangled annealing for refinement.
+        The quantum stride creates a grid of reachable states. Between
+        grid points are factors that are classically reachable but
+        quantum-unreachable. This gap IS the semi-permeable boundary
+        between order (discrete quantum states) and chaos (continuous
+        factor space) — the edge where emergence happens.
 
-        The classical phase narrows the search space; the quantum phase
-        exploits superposition to find the exact ground state within that space.
+        Phase 1 (QUANTUM — ORDER):
+          Quantum annealing finds which BASIN the answer lives in.
+          The stride grid defines basins.
+
+        Phase 2 (BOUNDARY — EDGE OF CHAOS):
+          Translates quantum basin into classical search window.
+          The semi-permeable membrane: quantum information flows out
+          as a constraint, classical resolution flows in.
+
+        Phase 3 (CLASSICAL — RESOLUTION):
+          Classical annealing within the boundary window,
+          seeded by the quantum basin center.
+
+        Crystal growth at the solid-liquid interface.
+        Cell membranes mediating inside and outside.
+        This solver computes at the quantum-classical boundary.
         """
         if not HAS_QUANTUM:
             print("   Quantum engine not available, falling back to classical")
@@ -748,76 +769,118 @@ class HolographicMandala(MandalaComputer):
                                           num_sweeps=classical_sweeps + 1)
 
         print("=" * 60)
-        print("HYBRID HOLOGRAPHIC-QUANTUM SOLVE")
+        print("BOUNDARY-AWARE HYBRID SOLVE")
+        print("  Quantum basin -> Boundary membrane -> Classical resolution")
         print("=" * 60)
 
-        # Phase 1: Classical holographic renormalization
-        print("\n   Phase 1: Classical holographic seeding...")
-        self.encode_holographic(problem_type_enum, problem_data)
-        classical_result = self.renormalization_solve(
-            max_steps_per_scale=max_steps_per_scale,
-            num_sweeps=classical_sweeps,
-        )
-        classical_sol = classical_result["solution"]
-        print(f"   Classical seed: pair={classical_sol.get('best_pair')}, "
-              f"verified={classical_sol.get('verified')}")
+        N = problem_data.get("N", 15)
+        max_factor = int(math.isqrt(N)) + 1
+        stride = max(1, math.ceil(max_factor / 8))
 
-        # Phase 2: Quantum refinement using entangled annealing
-        print(f"\n   Phase 2: Quantum entangled refinement ({quantum_steps} steps)...")
+        print(f"\n   N={N}, stride={stride}")
+        print(f"   Quantum grid: {[2 + i * stride for i in range(8)]}")
+        print(f"   Boundary gaps: width={stride} between grid points")
+
+        # Phase 1: Quantum — find the basin
+        print(f"\n   Phase 1 (ORDER): Quantum annealing finds basin...")
         qc = QuantumMandalaComputer(
             golden_depth=2,
             sacred_geometry=self.sacred_geometry,
             entanglement_strength=0.5,
         )
-
-        quantum_result = qc.entangled_annealing(
-            problem_type_enum.value,
-            problem_data,
-            num_cells=2,
-            num_steps=quantum_steps,
+        quantum_result = qc.quantum_annealing(
+            problem_type_enum.value, problem_data, num_steps=quantum_steps,
         )
-
-        # Compare and pick best
         q_sol = quantum_result["solution"]
-        q_correct = q_sol.get("correct", False)
-        c_correct = classical_sol.get("verified", False)
+        q_factors = q_sol.get("factors", [2, 2])
+        q_stride = q_sol.get("stride", stride)
 
-        if q_correct:
-            best = "quantum"
-            best_sol = q_sol
+        print(f"   Quantum basin center: {q_factors[0]} x {q_factors[1]}")
+
+        # Phase 2: Boundary — the semi-permeable membrane
+        print(f"\n   Phase 2 (BOUNDARY): Semi-permeable membrane...")
+        boundary_a = (max(2, q_factors[0] - q_stride), q_factors[0] + q_stride)
+        boundary_b = (max(2, q_factors[1] - q_stride), q_factors[1] + q_stride)
+        window_size = (boundary_a[1] - boundary_a[0] + 1) * (boundary_b[1] - boundary_b[0] + 1)
+        full_space = max_factor ** 2
+        print(f"   Factor A window: [{boundary_a[0]}..{boundary_a[1]}]")
+        print(f"   Factor B window: [{boundary_b[0]}..{boundary_b[1]}]")
+        print(f"   Search compression: {full_space} -> {window_size} ({full_space / max(window_size, 1):.1f}x)")
+
+        # Check if exact answer is in the boundary window
+        boundary_hits = []
+        for fa in range(boundary_a[0], boundary_a[1] + 1):
+            for fb in range(boundary_b[0], boundary_b[1] + 1):
+                if fa * fb == N and fa > 1 and fb > 1:
+                    boundary_hits.append((fa, fb))
+
+        if boundary_hits:
+            print(f"   BOUNDARY CONTAINS SOLUTION: {boundary_hits}")
+
+        # Phase 3: Classical — resolve within boundary
+        print(f"\n   Phase 3 (RESOLUTION): Classical annealing in boundary...")
+        self.encode_holographic(problem_type_enum, problem_data)
+
+        # Seed cells with quantum-informed initial states
+        dpf = self.problem_data.get("digits_per_factor", 1)
+        cpp = self.problem_data.get("cells_per_pair", 2)
+        for ring in self.rings:
+            for start in range(0, len(ring.cell_indices) - cpp + 1, cpp):
+                fa_target = max(0, q_factors[0] - 2)
+                for d in range(dpf):
+                    idx = ring.cell_indices[start + d]
+                    self.cells[idx].state = (fa_target // (8 ** d)) % 8
+                fb_target = max(0, q_factors[1] - 2)
+                for d in range(dpf):
+                    idx = ring.cell_indices[start + dpf + d]
+                    self.cells[idx].state = (fb_target // (8 ** d)) % 8
+
+        classical_result = self.renormalization_solve(
+            max_steps_per_scale=max_steps_per_scale,
+            num_sweeps=classical_sweeps,
+        )
+        c_sol = classical_result["solution"]
+
+        # Pick best across all three phases
+        q_correct = q_sol.get("correct", False)
+        c_correct = c_sol.get("verified", False)
+
+        if boundary_hits and not q_correct and not c_correct:
+            best = "boundary"
+            best_sol = {
+                "factors": list(boundary_hits[0]),
+                "best_pair": boundary_hits[0],
+                "N": N, "verified": True, "residual": 0,
+            }
         elif c_correct:
             best = "classical"
-            best_sol = classical_sol
+            best_sol = c_sol
+        elif q_correct:
+            best = "quantum"
+            best_sol = q_sol
         else:
-            # Pick lower energy
-            if quantum_result["final_energy"] < classical_result["final_energy"]:
-                best = "quantum"
-                best_sol = q_sol
-            else:
-                best = "classical"
-                best_sol = classical_sol
+            best = "classical" if classical_result["final_energy"] <= quantum_result["final_energy"] else "quantum"
+            best_sol = c_sol if best == "classical" else q_sol
 
-        # Entanglement entropy from quantum phase
-        ent_readings = [r for r in qc.telemetry if r["sensor_id"] == "quantum.entanglement"]
-
-        print(f"\n   Best method: {best}")
-        print(f"   Classical: pair={classical_sol.get('best_pair')}, verified={c_correct}")
-        print(f"   Quantum: factors={q_sol.get('factors')}, correct={q_correct}")
-        if ent_readings:
-            print(f"   Entanglement: {ent_readings[0]['value']:.3f} -> {ent_readings[-1]['value']:.3f} bits")
-
-        # Entanglement adaptation summary
-        adapted = [(l.strength, l.initial_strength) for l in self.entanglement_links
-                    if abs(l.strength - l.initial_strength) > 0.01]
-        if adapted:
-            print(f"   Adapted links: {len(adapted)}/{len(self.entanglement_links)}")
+        print(f"\n   Resolution:")
+        print(f"   Quantum (order):    {q_factors} correct={q_correct}")
+        print(f"   Boundary (edge):    {boundary_hits if boundary_hits else 'no exact hit'}")
+        print(f"   Classical (detail): {c_sol.get('best_pair')} verified={c_correct}")
+        print(f"   Winner: {best}")
 
         return {
             "best_method": best,
             "solution": best_sol,
-            "classical_result": classical_result,
             "quantum_result": quantum_result,
-            "final_energy": min(classical_result["final_energy"], quantum_result["final_energy"]),
+            "classical_result": classical_result,
+            "boundary": {
+                "window_a": boundary_a,
+                "window_b": boundary_b,
+                "hits": boundary_hits,
+                "search_compression": full_space / max(window_size, 1),
+            },
+            "final_energy": min(classical_result["final_energy"],
+                                quantum_result["final_energy"]),
         }
 
 

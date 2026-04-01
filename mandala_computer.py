@@ -294,10 +294,17 @@ class MandalaComputer:
         self.bloom_mandala()
 
     def encode_tsp(self, cities: np.ndarray):
-        """Encode TSP as ring topology."""
+        """
+        Encode TSP as ring topology with winding energy.
+
+        Each cell represents a position in the tour. Cell state = which city
+        to visit at that position. Energy penalizes:
+          - Long edges (distance between consecutive cities in tour)
+          - Repeated cities (same state in multiple cells)
+        """
         print(f"\n   Encoding TSP with {len(cities)} cities")
         self.problem_type = ProblemType.TSP
-        self.problem_data = {"cities": cities}
+        self.problem_data = {"cities": cities, "num_cities": len(cities)}
         self.bloom_mandala()
 
     def encode_graph_coloring(self, adjacency: List[List[int]], num_colors: int):
@@ -395,6 +402,26 @@ class MandalaComputer:
                         total += 2.0
                     else:
                         total -= PHI
+
+        # TSP: route energy (tour length + repetition penalty)
+        if self.problem_type == ProblemType.TSP and self.problem_data:
+            cities = self.problem_data["cities"]
+            nc = self.problem_data["num_cities"]
+            # Tour length: sum of distances between consecutive cities
+            for i in range(self.num_cells):
+                j = (i + 1) % self.num_cells
+                city_a = self.cells[i].state % nc
+                city_b = self.cells[j].state % nc
+                total += np.linalg.norm(cities[city_a] - cities[city_b])
+            # Repetition penalty: each city should appear at most once
+            used = [0] * nc
+            for c in self.cells:
+                used[c.state % nc] += 1
+            for count in used:
+                if count > 1:
+                    total += 5.0 * (count - 1)  # penalty per repeat
+                elif count == 0:
+                    total += 3.0  # penalty for missing city
 
         # Coupling energies (octahedral alignment)
         # Reduced weight for factorization to avoid interfering with factor registers
