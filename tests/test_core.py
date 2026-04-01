@@ -386,6 +386,65 @@ def test_agent_different_geometries():
 
 
 # ---------------------------------------------------------------------------
+# Sovereign Integration tests
+# ---------------------------------------------------------------------------
+
+from sovereign_integration import (
+    PhysicalGlyph, SovereignEnergy, FieldConstraints, FieldState,
+    glyph_compatibility, SovereignAgent,
+)
+
+
+def test_physical_glyph_mapping():
+    assert PhysicalGlyph.from_state(0).field_name == "electromagnetic"
+    assert PhysicalGlyph.from_state(3).field_name == "thermal"
+    assert PhysicalGlyph.from_state(7).field_name == "kinetic"
+    assert PhysicalGlyph.from_energy_type("harmonic") == PhysicalGlyph.EM
+    assert PhysicalGlyph.from_energy_type("chemical") == PhysicalGlyph.CHEMICAL
+
+
+def test_glyph_compatibility_exact():
+    compat = glyph_compatibility(0, 0)  # EM-EM = harmonic-harmonic = 1.0
+    assert compat.num.to_decimal() == 1
+    assert compat.den.to_decimal() == 1
+
+
+def test_field_constraints_healthy():
+    healthy = FieldState(soil_trend=0.1, water_retention=0.7, coupling_strength=0.8)
+    assert FieldConstraints.health_score(healthy) >= 0.75
+    drift = FieldConstraints.detect_drift(healthy)
+    assert not drift["soil_positive"]  # not drifting
+
+
+def test_field_constraints_degraded():
+    degraded = FieldState(soil_trend=-0.2, water_retention=0.3, disturbance=0.7)
+    assert FieldConstraints.health_score(degraded) < 0.5
+    thermal = FieldConstraints.thermal_limit(degraded)
+    assert thermal["critical"]
+
+
+def test_resonance_energy():
+    # All-same states should have high resonance (self-compatibility = 1.0)
+    states = [0, 0, 0, 0]
+    res = SovereignEnergy.pack_resonance(states, [0.9]*4, [0.85]*4, 0.5)
+    assert res > 0.2
+
+    # Cost function should return negative resonance
+    cost = SovereignEnergy.as_mandala_cost(states)
+    assert cost < 0
+
+
+def test_sovereign_agent_lifecycle():
+    agent = SovereignAgent(seed_id="SHAPE.OCTA", energy_type="harmonic")
+    agent.set_resource_budget(compute=100, depth_limit=2)
+    agent.bloom(depth=1)
+    validation = agent.validate()
+    assert "health" in validation
+    resonance = agent.find_resonance()
+    assert "system_resonance" in resonance
+
+
+# ---------------------------------------------------------------------------
 # Run all tests
 # ---------------------------------------------------------------------------
 
