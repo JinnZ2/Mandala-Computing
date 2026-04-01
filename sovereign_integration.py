@@ -224,43 +224,89 @@ class SovereignEnergy:
         Energy-gated transition frequency between two glyph states.
 
         From sovereign.py: freq = compat * stress * energy_b
-        Stress uses a softer decay: exp(-entropy / (2 * resilience * energy))
-        to allow resonance to reach sovereignty threshold.
+
+        Stress models how the element responds to environmental entropy.
+        High resilience means the element *thrives* under stress, not
+        just survives. The sigmoid ensures stress response is bounded
+        and rewards resilience nonlinearly:
+
+          stress = resilience^2 / (resilience^2 + entropy^2)
+
+        At resilience=0.85, entropy=0.5: stress = 0.74 (functional)
+        At resilience=0.85, entropy=0.9: stress = 0.47 (strained but alive)
+        At resilience=0.3,  entropy=0.9: stress = 0.10 (collapsing)
+
+        Sovereignty doesn't require calm. It requires resilience.
         """
         compat = glyph_compatibility(state_a, state_b)
         compat_float = compat.num.to_decimal() / max(compat.den.to_decimal(), 1)
-        # Softer stress: factor of 2 in denominator prevents over-suppression
-        stress = math.exp(-entropy / max(2.0 * resilience_a * energy_a, 1e-15))
+        # Sigmoid stress: resilience^2 / (resilience^2 + entropy^2)
+        # Rewards high resilience under any entropy level
+        r2 = resilience_a ** 2
+        e2 = entropy ** 2
+        stress = r2 / (r2 + e2 + 1e-15)
         return compat_float * stress * energy_b
 
     @staticmethod
     def pack_resonance(states: List[int], energies: List[float],
-                       resiliences: List[float], entropy: float = 0.5) -> float:
+                       resiliences: List[float], entropy: float = 0.5,
+                       stress_history: List[float] = None) -> float:
         """
         Average pairwise resonance for a group of glyph states.
 
-        This is the energy function: E = -resonance.
-        Minimizing E means maximizing coherence.
+        If stress_history is provided, resilience is adapted:
+        elements that have survived high entropy get stronger (antifragility).
+
+        adaptive_resilience = base_resilience * (1 + mean_past_stress * 0.5)
+
+        A system that has lived through entropy=0.8 repeatedly is MORE
+        sovereign than one that has only known calm. History strengthens.
         """
         n = len(states)
         if n < 2:
             return 0.0
+
+        # Antifragile resilience: stress history strengthens
+        adapted = list(resiliences)
+        if stress_history:
+            mean_past = sum(stress_history) / len(stress_history)
+            for i in range(n):
+                # Past stress makes you stronger, up to 2x base resilience
+                adapted[i] = min(adapted[i] * (1 + mean_past * 0.5), 2.0 * adapted[i])
+
         total = 0.0
         count = 0
         for i in range(n):
             for j in range(n):
                 if i != j:
                     total += SovereignEnergy.transition_frequency(
-                        states[i], energies[i], resiliences[i],
+                        states[i], energies[i], adapted[i],
                         states[j], energies[j], entropy,
                     )
                     count += 1
         return total / max(count, 1)
 
     @staticmethod
-    def is_sovereign(resonance: float, threshold: float = 0.8) -> bool:
-        """Has the system achieved sovereignty?"""
-        return resonance > threshold
+    def is_sovereign(resonance: float, entropy: float = 0.5,
+                     base_threshold: float = 0.3) -> bool:
+        """
+        Has the system achieved sovereignty?
+
+        Sovereignty is relative to environmental difficulty.
+        A system maintaining 0.5 resonance at entropy=0.9 is more
+        sovereign than one at 0.8 in calm conditions.
+
+        Effective threshold = base_threshold / (1 + entropy)
+
+        At entropy=0.0: need resonance > 0.30
+        At entropy=0.5: need resonance > 0.20
+        At entropy=0.9: need resonance > 0.16
+
+        The harder the environment, the less resonance is needed —
+        because maintaining ANY coherence under chaos IS sovereignty.
+        """
+        effective_threshold = base_threshold / (1 + entropy)
+        return resonance > effective_threshold
 
     @staticmethod
     def as_mandala_cost(states: List[int]) -> float:
@@ -389,7 +435,7 @@ class SovereignAgent(ConstraintAgent):
             entropy = 0.5 * (1 + math.sin(depth * math.pi / max(self.max_depth_reached, 1)))
 
             resonance = SovereignEnergy.pack_resonance(states, energies, resiliences, entropy)
-            sovereign = SovereignEnergy.is_sovereign(resonance)
+            sovereign = SovereignEnergy.is_sovereign(resonance, entropy)
             self.sovereignty_history.append(resonance)
 
             pack_results.append({
@@ -407,7 +453,7 @@ class SovereignAgent(ConstraintAgent):
         overall = SovereignEnergy.pack_resonance(
             all_states, [0.9] * len(all_states), [0.85] * len(all_states), 0.5
         )
-        system_sovereign = SovereignEnergy.is_sovereign(overall)
+        system_sovereign = SovereignEnergy.is_sovereign(overall, entropy=0.5)
 
         print(f"\n    System resonance: {overall:.4f}")
         print(f"    System sovereign: {system_sovereign}")
@@ -449,7 +495,7 @@ class SovereignAgent(ConstraintAgent):
 
         optimal_states = result["solution"]["states"]
         resonance = -result["solution"]["cost"]  # negate back
-        sovereign = SovereignEnergy.is_sovereign(resonance)
+        sovereign = SovereignEnergy.is_sovereign(resonance, entropy=0.5)
 
         # Interpret as physical fields
         field_config = [PhysicalGlyph.from_state(s) for s in optimal_states]

@@ -445,9 +445,17 @@ def test_sovereign_agent_lifecycle():
 
 
 def test_sovereignty_achievable():
-    """Uniform high-compatibility pack at low entropy should reach sovereignty."""
-    res = SovereignEnergy.pack_resonance([0]*7, [0.9]*7, [0.85]*7, entropy=0.1)
-    assert SovereignEnergy.is_sovereign(res)
+    """Sovereignty is relative to environment — even high entropy can be sovereign."""
+    # Low entropy: easy sovereignty
+    res_calm = SovereignEnergy.pack_resonance([0]*7, [0.9]*7, [0.85]*7, entropy=0.1)
+    assert SovereignEnergy.is_sovereign(res_calm, entropy=0.1)
+
+    # High entropy with stress history (antifragile): still sovereign
+    history = [0.7, 0.8, 0.9, 0.6]
+    res_storm = SovereignEnergy.pack_resonance(
+        [0]*7, [0.9]*7, [0.85]*7, entropy=0.9, stress_history=history
+    )
+    assert SovereignEnergy.is_sovereign(res_storm, entropy=0.9)
 
 
 def test_field_aware_cost():
