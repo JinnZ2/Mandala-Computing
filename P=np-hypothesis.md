@@ -123,6 +123,35 @@ python tests/test_core.py
 
 ---
 
+## Gap Analysis (from Geometric-to-Binary-Computational-Bridge)
+
+The following table audits each theoretical claim against established results.
+Source: `Mandala/theoretical_validator.py` in the GeoBin repo.
+
+| Claim | Status | Detail |
+|-------|--------|--------|
+| NP problems encodable as energy landscapes | **True** | Basis of simulated annealing, quantum annealing, Hopfield nets |
+| Relaxation finds approximate solutions | **True** | Standard simulated annealing result |
+| Relaxation finds exact global minimum in O(1) | **Not established** | Ground state of 2D Ising is NP-hard (Barahona 1982). Contradicts known hardness results |
+| Self-referential loops imply high Phi | **Not guaranteed** | High coupling != high Phi. Fully connected deterministic graph has Phi=0 |
+| Physical constants as geometric eigenvalues | **Open research** | Wyler, Verlinde provide precedent. Specific derivations are circular |
+
+## Factorization Landscape Audit
+
+From `experiments/factorization_landscape.py` in GeoBin:
+
+- Energy barriers in `E = (a*b - N)^2` grow as **O(N)** in integer space
+- The continuous trough is smooth but integer-space navigation is hard
+- **Annealing does not beat trial division** on this landscape as N grows
+- The question is whether geometric structure (multi-scale, holographic)
+  can navigate the landscape faster than blind annealing
+
+This is an honest negative result. It means naive annealing on the quadratic
+energy surface is not sufficient. The holographic renormalization approach
+is an attempt to add the missing structure (coarse-to-fine, boundary constraints).
+
+---
+
 ## Honest Assessment
 
 This framework demonstrates that NP problems can be encoded as geometric

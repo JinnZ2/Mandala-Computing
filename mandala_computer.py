@@ -201,6 +201,40 @@ class MandalaComputer:
                 if 0 < dist < FRET_CUTOFF:
                     ci.neighbors.append(j)
                     cj.neighbors.append(i)
+        self._build_simd_arrays()
+
+    def _build_simd_arrays(self):
+        """
+        Build numpy arrays for vectorized energy computation.
+
+        Converts cell states, positions, and neighbor lists into
+        dense arrays that numpy can process via SIMD.
+        """
+        n = self.num_cells
+        # State vector (updated on every flip)
+        self._states = np.array([c.state for c in self.cells], dtype=np.int32)
+        # Cell energies
+        self._cell_energies = np.array([c.energy for c in self.cells], dtype=np.float64)
+        # Neighbor pairs as (i, j) array for vectorized coupling
+        pairs = []
+        for i, ci in enumerate(self.cells):
+            for j in ci.neighbors:
+                if j > i:
+                    pairs.append((i, j))
+        if pairs:
+            self._neighbor_pairs = np.array(pairs, dtype=np.int32)
+        else:
+            self._neighbor_pairs = np.empty((0, 2), dtype=np.int32)
+
+    def _sync_states_to_array(self):
+        """Sync cell objects -> numpy array."""
+        for i, c in enumerate(self.cells):
+            self._states[i] = c.state
+
+    def _sync_states_from_array(self):
+        """Sync numpy array -> cell objects."""
+        for i, c in enumerate(self.cells):
+            c.state = int(self._states[i])
 
     def _count_couplings(self) -> int:
         return sum(len(c.neighbors) for c in self.cells) // 2
@@ -349,89 +383,84 @@ class MandalaComputer:
     # ------------------------------------------------------------------
 
     def compute_total_energy(self) -> float:
-        """E_total = sum(E_cell) + sum(E_coupling) + problem-specific terms."""
+        """
+        E_total = sum(E_cell) + sum(E_coupling) + problem-specific terms.
+
+        Uses numpy SIMD for coupling and factorization energy.
+        Coupling computation is fully vectorized — no Python loops over pairs.
+        """
         # Optimization: delegate entirely to cost function
         if self.problem_type == ProblemType.OPTIMIZATION and self.problem_data:
             cost_fn = self.problem_data.get("cost_fn")
             if cost_fn:
                 return cost_fn([c.state for c in self.cells])
 
-        total = 0.0
+        # Sync state array
+        self._sync_states_to_array()
+        states = self._states
 
-        # Cell energies
-        for cell in self.cells:
-            total += cell.energy
+        total = float(np.sum(self._cell_energies))
 
-        # Factorization: multi-cell factor registers
-        # Each factor encoded as positional number across `digits_per_factor` cells
+        # --- Vectorized coupling energy (SIMD) ---
+        if len(self._neighbor_pairs) > 0:
+            coupling_scale = 0.1 if self.problem_type == ProblemType.FACTORIZATION else 1.0
+            si = states[self._neighbor_pairs[:, 0]]
+            sj = states[self._neighbor_pairs[:, 1]]
+            diffs = np.abs(si - sj).astype(np.float64)
+            coupling_e = coupling_scale * self.coupling_strength * np.sin(diffs * math.pi / 4) ** 2
+            total += float(np.sum(coupling_e))
+
+        # --- Vectorized factorization energy ---
         if self.problem_type == ProblemType.FACTORIZATION and self.problem_data:
             N = self.problem_data["N"]
             dpf = self.problem_data["digits_per_factor"]
             cpp = self.problem_data["cells_per_pair"]
+            base_powers = np.array([self.sacred_geometry ** d for d in range(dpf)], dtype=np.int64)
             for pair_start in range(0, self.num_cells - cpp + 1, cpp):
-                fa_indices = list(range(pair_start, pair_start + dpf))
-                fb_indices = list(range(pair_start + dpf, pair_start + cpp))
-                fa = self._cells_to_factor(fa_indices)
-                fb = self._cells_to_factor(fb_indices)
+                fa = 2 + int(np.sum(states[pair_start:pair_start + dpf] * base_powers))
+                fb = 2 + int(np.sum(states[pair_start + dpf:pair_start + cpp] * base_powers))
                 total += (fa * fb - N) ** 2
 
-        # SAT: energy penalty per unsatisfied clause
-        # Cell i represents variable i+1. States 0-3 = False, 4-7 = True.
+        # SAT energy
         if self.problem_type == ProblemType.SAT and self.problem_data:
-            clauses = self.problem_data["clauses"]
-            for clause in clauses:
+            bool_vals = states >= 4  # vectorized: True if state 4-7
+            for clause in self.problem_data["clauses"]:
                 satisfied = False
                 for literal in clause:
-                    var_idx = abs(literal) - 1  # 0-indexed
-                    if var_idx < self.num_cells:
-                        val = self.cells[var_idx].state >= 4  # True if state 4-7
-                        if (literal > 0 and val) or (literal < 0 and not val):
+                    vi = abs(literal) - 1
+                    if vi < self.num_cells:
+                        if (literal > 0 and bool_vals[vi]) or (literal < 0 and not bool_vals[vi]):
                             satisfied = True
                             break
                 if not satisfied:
-                    total += 2.0  # penalty per unsatisfied clause
+                    total += 2.0
 
-        # Graph coloring: penalty for same-color neighbors
+        # Graph coloring energy (vectorized via adjacency array)
         if self.problem_type == ProblemType.GRAPH_COLORING and self.problem_data:
             nc = self.problem_data["num_colors"]
-            for n_i, n_j in self.problem_data["adjacency"]:
-                if n_i < self.num_cells and n_j < self.num_cells:
-                    c_i = self.cells[n_i].state % nc
-                    c_j = self.cells[n_j].state % nc
-                    if c_i == c_j:
-                        total += 2.0
-                    else:
-                        total -= PHI
+            adj = np.array(self.problem_data["adjacency"], dtype=np.int32)
+            mask = (adj[:, 0] < self.num_cells) & (adj[:, 1] < self.num_cells)
+            valid = adj[mask]
+            if len(valid) > 0:
+                ci = states[valid[:, 0]] % nc
+                cj = states[valid[:, 1]] % nc
+                same = (ci == cj)
+                total += float(np.sum(same) * 2.0 - np.sum(~same) * PHI)
 
-        # TSP: route energy (tour length + repetition penalty)
+        # TSP energy (vectorized tour length)
         if self.problem_type == ProblemType.TSP and self.problem_data:
             cities = self.problem_data["cities"]
             nc = self.problem_data["num_cities"]
-            # Tour length: sum of distances between consecutive cities
-            for i in range(self.num_cells):
-                j = (i + 1) % self.num_cells
-                city_a = self.cells[i].state % nc
-                city_b = self.cells[j].state % nc
-                total += np.linalg.norm(cities[city_a] - cities[city_b])
-            # Repetition penalty: each city should appear at most once
-            used = [0] * nc
-            for c in self.cells:
-                used[c.state % nc] += 1
-            for count in used:
-                if count > 1:
-                    total += 5.0 * (count - 1)  # penalty per repeat
-                elif count == 0:
-                    total += 3.0  # penalty for missing city
-
-        # Coupling energies (octahedral alignment)
-        # Reduced weight for factorization to avoid interfering with factor registers
-        coupling_scale = 0.1 if self.problem_type == ProblemType.FACTORIZATION else 1.0
-        for i, ci in enumerate(self.cells):
-            for j in ci.neighbors:
-                if j > i:
-                    cj = self.cells[j]
-                    state_diff = abs(ci.state - cj.state)
-                    total += coupling_scale * self.coupling_strength * math.sin(state_diff * math.pi / 4) ** 2
+            tour = states % nc
+            # Tour distances: vectorized
+            tour_next = np.roll(tour, -1)
+            city_a = cities[tour]
+            city_b = cities[tour_next]
+            total += float(np.sum(np.linalg.norm(city_a - city_b, axis=1)))
+            # Repetition penalty
+            counts = np.bincount(tour, minlength=nc)
+            total += float(np.sum(np.maximum(counts - 1, 0) * 5.0))
+            total += float(np.sum((counts == 0).astype(float) * 3.0))
 
         return total
 
@@ -440,7 +469,13 @@ class MandalaComputer:
     # ------------------------------------------------------------------
 
     def relax_step(self) -> float:
-        """Single Metropolis-Hastings step. Returns energy change."""
+        """
+        Single Metropolis-Hastings step. Returns energy change.
+
+        For problems without custom energy (factorization, SAT, graph coloring, TSP),
+        computes full energy diff. The vectorized compute_total_energy makes this
+        fast even for large cell counts.
+        """
         cell_idx = np.random.randint(0, self.num_cells)
         cell = self.cells[cell_idx]
         E_old = self.compute_total_energy()
@@ -631,6 +666,154 @@ class MandalaComputer:
             "solution": self.solution,
             "swaps": total_swaps,
             "temperatures": temps,
+        }
+
+    # ------------------------------------------------------------------
+    # Exploration: sovereign tempering (pack-aware parallel tempering)
+    # ------------------------------------------------------------------
+
+    def sovereign_tempering(self, num_replicas: int = 6,
+                            T_min: float = 0.05, T_max: float = 10.0,
+                            steps_per_swap: int = 100,
+                            max_steps: int = 10000) -> Dict:
+        """
+        Parallel tempering where replicas are a sovereign pack.
+
+        Each replica is a specialist at a different temperature.
+        Pack dynamics determine collective behavior:
+
+        - Harmonic mean of convergence rates = pack floor
+          (one stuck replica drags the whole ensemble)
+        - Antifragile: replicas that survive swap rejections get stronger
+          (their states persist, meaning they found robust configurations)
+        - Complementary specialization: high-T replicas explore (scouts),
+          low-T replicas exploit (settlers), medium-T bridge the gap
+        - Sovereignty: when the harmonic mean of convergence rates exceeds
+          threshold, the pack has found coherence — stop early
+
+        The solver itself becomes sovereign.
+        """
+        print(f"\n   Sovereign tempering: {num_replicas} replicas as pack")
+        start = time.time()
+
+        temps = [T_min * (T_max / T_min) ** (i / max(num_replicas - 1, 1))
+                 for i in range(num_replicas)]
+
+        original_states = [c.state for c in self.cells]
+        replicas = []
+        for _ in range(num_replicas):
+            replicas.append([np.random.randint(0, self.sacred_geometry)
+                             for _ in range(self.num_cells)])
+        replicas[0] = list(original_states)
+
+        energies = [0.0] * num_replicas
+        for r in range(num_replicas):
+            for k, c in enumerate(self.cells):
+                c.state = replicas[r][k]
+            energies[r] = self.compute_total_energy()
+
+        best_energy = min(energies)
+        best_replica = energies.index(best_energy)
+        total_swaps = 0
+        num_rounds = max_steps // steps_per_swap
+
+        # Pack dynamics tracking
+        resiliences = [0.5] * num_replicas  # each replica's resilience
+        stress_history = []                  # shared stress history
+        convergence_rates = [0.0] * num_replicas
+        prev_energies = list(energies)
+
+        for round_i in range(num_rounds):
+            # Relax each replica (each is a specialist at its temperature)
+            for r in range(num_replicas):
+                for k, c in enumerate(self.cells):
+                    c.state = replicas[r][k]
+                self.temperature = temps[r]
+                for _ in range(steps_per_swap):
+                    self.relax_step()
+                replicas[r] = [c.state for c in self.cells]
+                energies[r] = self.compute_total_energy()
+
+                # Track convergence rate per replica
+                if prev_energies[r] != 0:
+                    improvement = (prev_energies[r] - energies[r]) / max(abs(prev_energies[r]), 1e-15)
+                else:
+                    improvement = 0.0
+                convergence_rates[r] = abs(improvement)
+                prev_energies[r] = energies[r]
+
+            # Attempt swaps (with antifragile tracking)
+            round_stress = 0.0
+            for r in range(num_replicas - 1):
+                dBeta = (1.0 / temps[r]) - (1.0 / temps[r + 1])
+                dE = energies[r] - energies[r + 1]
+                swap_arg = min(dBeta * dE, 500)
+                if swap_arg < 0 or np.random.random() < math.exp(swap_arg):
+                    replicas[r], replicas[r + 1] = replicas[r + 1], replicas[r]
+                    energies[r], energies[r + 1] = energies[r + 1], energies[r]
+                    total_swaps += 1
+                else:
+                    # Rejected swap = stress event
+                    round_stress += 0.1
+                    # Replica that survived rejection gets more resilient
+                    resiliences[r] = min(resiliences[r] * 1.02, 1.0)
+
+            stress_history.append(round_stress)
+
+            # Antifragile adaptation: shared stress strengthens all
+            if len(stress_history) > 5:
+                mean_stress = sum(stress_history[-5:]) / 5
+                for r in range(num_replicas):
+                    resiliences[r] = min(resiliences[r] * (1 + mean_stress * 0.1), 1.0)
+
+            cur_best = min(energies)
+            if cur_best < best_energy:
+                best_energy = cur_best
+                best_replica = energies.index(cur_best)
+
+            self._emit_sensor("energy.total", round_i * steps_per_swap, best_energy)
+            self.energy_history.append(best_energy)
+
+            # Pack sovereignty check: harmonic mean of convergence rates
+            nonzero_rates = [max(cr, 1e-15) for cr in convergence_rates]
+            hm_rate = num_replicas / sum(1.0 / r for r in nonzero_rates)
+
+            if round_i % max(1, num_rounds // 10) == 0:
+                hm_res = num_replicas / sum(1.0 / max(r, 1e-15) for r in resiliences)
+                print(f"   Round {round_i}: E={best_energy:.4f}, swaps={total_swaps}, "
+                      f"HM_resilience={hm_res:.3f}, convergence={hm_rate:.6f}")
+
+            # Sovereignty: if all replicas have converged (harmonic mean of rates near 0
+            # AND best energy is stable), the pack is sovereign — stop early
+            if round_i > 5 and hm_rate < 1e-8:
+                recent_best = self.energy_history[-5:]
+                if len(recent_best) >= 5 and np.var(recent_best) < 1e-10:
+                    print(f"   Pack sovereignty achieved at round {round_i}")
+                    break
+
+        # Restore best replica
+        for k, c in enumerate(self.cells):
+            c.state = replicas[best_replica][k]
+        self.ground_state = [c.state for c in self.cells]
+        self.solution = self._extract_solution()
+        elapsed = time.time() - start
+
+        hm_res = num_replicas / sum(1.0 / max(r, 1e-15) for r in resiliences)
+        print(f"   Best energy: {best_energy:.4f}, swaps: {total_swaps}, "
+              f"HM_resilience: {hm_res:.3f} ({elapsed:.2f}s)")
+
+        return {
+            "ground_state": self.ground_state,
+            "final_energy": best_energy,
+            "steps": max_steps,
+            "time": elapsed,
+            "solution": self.solution,
+            "swaps": total_swaps,
+            "temperatures": temps,
+            "resiliences": resiliences,
+            "hm_resilience": hm_res,
+            "stress_history": stress_history,
+            "sovereign": hm_rate < 1e-8 if 'hm_rate' in dir() else False,
         }
 
     # ------------------------------------------------------------------
