@@ -669,6 +669,154 @@ class MandalaComputer:
         }
 
     # ------------------------------------------------------------------
+    # Exploration: sovereign tempering (pack-aware parallel tempering)
+    # ------------------------------------------------------------------
+
+    def sovereign_tempering(self, num_replicas: int = 6,
+                            T_min: float = 0.05, T_max: float = 10.0,
+                            steps_per_swap: int = 100,
+                            max_steps: int = 10000) -> Dict:
+        """
+        Parallel tempering where replicas are a sovereign pack.
+
+        Each replica is a specialist at a different temperature.
+        Pack dynamics determine collective behavior:
+
+        - Harmonic mean of convergence rates = pack floor
+          (one stuck replica drags the whole ensemble)
+        - Antifragile: replicas that survive swap rejections get stronger
+          (their states persist, meaning they found robust configurations)
+        - Complementary specialization: high-T replicas explore (scouts),
+          low-T replicas exploit (settlers), medium-T bridge the gap
+        - Sovereignty: when the harmonic mean of convergence rates exceeds
+          threshold, the pack has found coherence — stop early
+
+        The solver itself becomes sovereign.
+        """
+        print(f"\n   Sovereign tempering: {num_replicas} replicas as pack")
+        start = time.time()
+
+        temps = [T_min * (T_max / T_min) ** (i / max(num_replicas - 1, 1))
+                 for i in range(num_replicas)]
+
+        original_states = [c.state for c in self.cells]
+        replicas = []
+        for _ in range(num_replicas):
+            replicas.append([np.random.randint(0, self.sacred_geometry)
+                             for _ in range(self.num_cells)])
+        replicas[0] = list(original_states)
+
+        energies = [0.0] * num_replicas
+        for r in range(num_replicas):
+            for k, c in enumerate(self.cells):
+                c.state = replicas[r][k]
+            energies[r] = self.compute_total_energy()
+
+        best_energy = min(energies)
+        best_replica = energies.index(best_energy)
+        total_swaps = 0
+        num_rounds = max_steps // steps_per_swap
+
+        # Pack dynamics tracking
+        resiliences = [0.5] * num_replicas  # each replica's resilience
+        stress_history = []                  # shared stress history
+        convergence_rates = [0.0] * num_replicas
+        prev_energies = list(energies)
+
+        for round_i in range(num_rounds):
+            # Relax each replica (each is a specialist at its temperature)
+            for r in range(num_replicas):
+                for k, c in enumerate(self.cells):
+                    c.state = replicas[r][k]
+                self.temperature = temps[r]
+                for _ in range(steps_per_swap):
+                    self.relax_step()
+                replicas[r] = [c.state for c in self.cells]
+                energies[r] = self.compute_total_energy()
+
+                # Track convergence rate per replica
+                if prev_energies[r] != 0:
+                    improvement = (prev_energies[r] - energies[r]) / max(abs(prev_energies[r]), 1e-15)
+                else:
+                    improvement = 0.0
+                convergence_rates[r] = abs(improvement)
+                prev_energies[r] = energies[r]
+
+            # Attempt swaps (with antifragile tracking)
+            round_stress = 0.0
+            for r in range(num_replicas - 1):
+                dBeta = (1.0 / temps[r]) - (1.0 / temps[r + 1])
+                dE = energies[r] - energies[r + 1]
+                swap_arg = min(dBeta * dE, 500)
+                if swap_arg < 0 or np.random.random() < math.exp(swap_arg):
+                    replicas[r], replicas[r + 1] = replicas[r + 1], replicas[r]
+                    energies[r], energies[r + 1] = energies[r + 1], energies[r]
+                    total_swaps += 1
+                else:
+                    # Rejected swap = stress event
+                    round_stress += 0.1
+                    # Replica that survived rejection gets more resilient
+                    resiliences[r] = min(resiliences[r] * 1.02, 1.0)
+
+            stress_history.append(round_stress)
+
+            # Antifragile adaptation: shared stress strengthens all
+            if len(stress_history) > 5:
+                mean_stress = sum(stress_history[-5:]) / 5
+                for r in range(num_replicas):
+                    resiliences[r] = min(resiliences[r] * (1 + mean_stress * 0.1), 1.0)
+
+            cur_best = min(energies)
+            if cur_best < best_energy:
+                best_energy = cur_best
+                best_replica = energies.index(cur_best)
+
+            self._emit_sensor("energy.total", round_i * steps_per_swap, best_energy)
+            self.energy_history.append(best_energy)
+
+            # Pack sovereignty check: harmonic mean of convergence rates
+            nonzero_rates = [max(cr, 1e-15) for cr in convergence_rates]
+            hm_rate = num_replicas / sum(1.0 / r for r in nonzero_rates)
+
+            if round_i % max(1, num_rounds // 10) == 0:
+                hm_res = num_replicas / sum(1.0 / max(r, 1e-15) for r in resiliences)
+                print(f"   Round {round_i}: E={best_energy:.4f}, swaps={total_swaps}, "
+                      f"HM_resilience={hm_res:.3f}, convergence={hm_rate:.6f}")
+
+            # Sovereignty: if all replicas have converged (harmonic mean of rates near 0
+            # AND best energy is stable), the pack is sovereign — stop early
+            if round_i > 5 and hm_rate < 1e-8:
+                recent_best = self.energy_history[-5:]
+                if len(recent_best) >= 5 and np.var(recent_best) < 1e-10:
+                    print(f"   Pack sovereignty achieved at round {round_i}")
+                    break
+
+        # Restore best replica
+        for k, c in enumerate(self.cells):
+            c.state = replicas[best_replica][k]
+        self.ground_state = [c.state for c in self.cells]
+        self.solution = self._extract_solution()
+        elapsed = time.time() - start
+
+        hm_res = num_replicas / sum(1.0 / max(r, 1e-15) for r in resiliences)
+        print(f"   Best energy: {best_energy:.4f}, swaps: {total_swaps}, "
+              f"HM_resilience: {hm_res:.3f} ({elapsed:.2f}s)")
+
+        return {
+            "ground_state": self.ground_state,
+            "final_energy": best_energy,
+            "steps": max_steps,
+            "time": elapsed,
+            "solution": self.solution,
+            "swaps": total_swaps,
+            "temperatures": temps,
+            "resiliences": resiliences,
+            "hm_resilience": hm_res,
+            "stress_history": stress_history,
+            "sovereign": hm_rate < 1e-8 if 'hm_rate' in dir() else False,
+        }
+
+    # ------------------------------------------------------------------
     # Exploration: landscape scan
     # ------------------------------------------------------------------
 
