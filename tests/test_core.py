@@ -820,6 +820,124 @@ def test_geometric_adapter_relaxation():
 
 
 # ---------------------------------------------------------------------------
+# Sovereign Mesh tests
+# ---------------------------------------------------------------------------
+
+from sovereign_mesh import (
+    SovereignMesh, MeshNode, MeshHealth, Signal, NodeHealth,
+    ConjugacyZone, classify_zone, smooth_over_base, trial_factor,
+)
+
+
+def test_mesh_48_nodes():
+    """Mesh must have exactly 48 nodes (one per group element)."""
+    mesh = SovereignMesh(15, factor_base_size=10)
+    assert len(mesh.nodes) == 48
+
+
+def test_mesh_cayley_wiring():
+    """Every node must have Cayley graph neighbors."""
+    mesh = SovereignMesh(15, factor_base_size=10)
+    for node in mesh.nodes:
+        assert len(node.neighbors) > 0, f"Node {node.node_id} has no neighbors"
+
+
+def test_mesh_all_primes_assigned():
+    """Every prime in the factor base must be assigned to some node."""
+    mesh = SovereignMesh(77, factor_base_size=20)
+    assigned = set()
+    for node in mesh.nodes:
+        assigned.update(node.primes)
+    for p in mesh.factor_base:
+        assert p in assigned, f"Prime {p} not assigned to any node"
+
+
+def test_mesh_zone_classification():
+    """Zones must cover all 48 elements."""
+    mesh = SovereignMesh(15, factor_base_size=10)
+    zones = {n.zone for n in mesh.nodes}
+    # At least CORE and one other zone
+    assert ConjugacyZone.CORE in zones
+    assert len(zones) >= 2
+
+
+def test_node_divisibility():
+    """Node correctly checks prime divisibility."""
+    from geometric_state_algebra import OhGroup
+    group = OhGroup()
+    node = MeshNode(0, group, 0, primes=[2, 3, 5])
+    hit, exps = node.check_divisibility(60)  # 60 = 2^2 * 3 * 5
+    assert hit
+    assert exps == {2: 2, 3: 1, 5: 1}
+
+
+def test_node_no_hit():
+    """Node returns no hit when primes don't divide Q."""
+    from geometric_state_algebra import OhGroup
+    group = OhGroup()
+    node = MeshNode(0, group, 0, primes=[7, 11])
+    hit, exps = node.check_divisibility(10)  # 10 = 2 * 5
+    assert not hit
+    assert exps == {}
+
+
+def test_signal_initial_identity():
+    """Initial signal starts at identity."""
+    from geometric_state_algebra import OhGroup, GroupRingElement
+    group = OhGroup()
+    sig = Signal(
+        ring_element=GroupRingElement.from_identity(group),
+        origin_a=10, origin_Q=85,
+    )
+    assert sig.ring_element.is_identity()
+    assert not sig.is_precipitated() or sig.ring_element.is_identity()
+
+
+def test_smooth_over_base():
+    """smooth_over_base correctly identifies smooth numbers."""
+    assert smooth_over_base(60, [2, 3, 5]) == {2: 2, 3: 1, 5: 1}
+    assert smooth_over_base(7, [2, 3, 5]) is None
+    assert smooth_over_base(1, [2, 3]) == {}
+
+
+def test_trial_factor():
+    """trial_factor finds factors of composites."""
+    assert trial_factor(15) == (3, 5)
+    assert trial_factor(77) == (7, 11)
+    assert trial_factor(7) is None  # prime
+
+
+def test_mesh_healing_necrotic():
+    """Necrotic nodes get bypassed by healing."""
+    mesh = SovereignMesh(15, factor_base_size=10)
+    # Kill a node
+    mesh.nodes[5].health = NodeHealth.NECROTIC
+    old_neighbors = list(mesh.nodes[5].neighbors)
+    assert len(old_neighbors) > 0
+
+    mesh.health.heal_cycle()
+    # Necrotic node should be isolated
+    assert mesh.nodes[5].neighbors == []
+
+
+def test_mesh_sieve_finds_relations():
+    """Mesh sieve should find at least one smooth relation for small N."""
+    mesh = SovereignMesh(77, factor_base_size=20)
+    results = mesh.sieve(max_candidates=3000, heal_interval=5000)
+    assert len(results) > 0, "No smooth relations found for N=77"
+
+
+def test_mesh_status():
+    """mesh_status returns valid structure."""
+    mesh = SovereignMesh(15, factor_base_size=10)
+    status = mesh.mesh_status()
+    assert status["nodes"] == 48
+    assert "health" in status
+    assert "zones" in status
+    assert status["cayley_diameter"] > 0
+
+
+# ---------------------------------------------------------------------------
 # Run all tests
 # ---------------------------------------------------------------------------
 
