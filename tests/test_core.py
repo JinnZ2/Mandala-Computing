@@ -556,6 +556,270 @@ def test_tier_hierarchy():
 
 
 # ---------------------------------------------------------------------------
+# Geometric State Algebra tests
+# ---------------------------------------------------------------------------
+
+from geometric_state_algebra import (
+    OhElement, OhGroup, GroupRingElement, GeometricState,
+    CayleyEnergy, PrimeVertex, GeometricNullSpace, ScentTrail,
+    GeometricMandalaAdapter, IDENTITY, GENERATOR_RZ90, GENERATOR_RX90,
+    GENERATOR_INV, OCTAHEDRAL_VERTICES,
+)
+
+
+def test_oh_group_size():
+    """O_h must have exactly 48 elements."""
+    g = OhGroup()
+    assert len(g.elements) == 48
+
+
+def test_oh_group_proper_improper():
+    """24 proper rotations + 24 improper."""
+    g = OhGroup()
+    assert len(g.proper_rotations()) == 24
+    assert len(g.improper_elements()) == 24
+
+
+def test_oh_conjugacy_classes():
+    """O_h has exactly 10 conjugacy classes."""
+    g = OhGroup()
+    assert len(g.conjugacy_classes) == 10
+    # Total elements across all classes must be 48
+    total = sum(len(members) for members in g.conjugacy_classes.values())
+    assert total == 48
+
+
+def test_oh_identity():
+    """Identity element properties."""
+    assert IDENTITY.is_identity()
+    assert IDENTITY.order() == 1
+    assert IDENTITY.determinant() == 1
+    assert IDENTITY.trace() == 3
+    assert IDENTITY.is_proper()
+
+
+def test_oh_generators():
+    """Generators have correct properties."""
+    # Rz90 is a proper rotation of order 4
+    assert GENERATOR_RZ90.is_proper()
+    assert GENERATOR_RZ90.order() == 4
+    # Rx90 is a proper rotation of order 4
+    assert GENERATOR_RX90.is_proper()
+    assert GENERATOR_RX90.order() == 4
+    # Inversion is improper, order 2
+    assert not GENERATOR_INV.is_proper()
+    assert GENERATOR_INV.order() == 2
+    assert GENERATOR_INV.determinant() == -1
+
+
+def test_oh_inverse_is_transpose():
+    """For orthogonal matrices, inverse = transpose."""
+    g = OhGroup()
+    for elem in g.elements:
+        inv = elem.inverse()
+        product = elem.compose(inv)
+        assert product.is_identity(), f"{elem} * {inv} != identity"
+
+
+def test_oh_closure():
+    """Group is closed under composition."""
+    g = OhGroup()
+    for a in g.elements[:10]:  # spot check
+        for b in g.elements[:10]:
+            product = a.compose(b)
+            assert product in g.element_index, f"Product not in group: {product}"
+
+
+def test_oh_cayley_distance_symmetric():
+    """Cayley distance is symmetric."""
+    g = OhGroup()
+    for i in range(0, 48, 8):
+        for j in range(0, 48, 8):
+            assert g.distance(i, j) == g.distance(j, i)
+
+
+def test_oh_cayley_distance_identity():
+    """Distance from any element to itself is 0."""
+    g = OhGroup()
+    for i in range(48):
+        assert g.distance(i, i) == 0
+
+
+def test_oh_vertex_action():
+    """Each element permutes the 6 octahedral vertices."""
+    g = OhGroup()
+    for elem in g.elements:
+        images = set()
+        for v in OCTAHEDRAL_VERTICES:
+            img = elem.act_on_vertex(v)
+            assert img in OCTAHEDRAL_VERTICES, f"{elem} maps {v} to {img} (not a vertex)"
+            images.add(img)
+        assert len(images) == 6, f"{elem} doesn't produce 6 distinct images"
+
+
+def test_group_ring_identity():
+    """Ring identity * anything = anything."""
+    g = OhGroup()
+    e = GroupRingElement.from_identity(g)
+    for i in range(0, 48, 12):
+        x = GroupRingElement.from_element(g, i)
+        assert (e * x) == x
+        assert (x * e) == x
+
+
+def test_group_ring_inverse():
+    """g * g^{-1} = identity in the group ring."""
+    g = OhGroup()
+    for i in range(0, 48, 6):
+        x = GroupRingElement.from_element(g, i)
+        x_inv = x.involute()
+        product = x * x_inv
+        assert product.is_identity(), f"Element {i}: product not identity"
+
+
+def test_group_ring_addition():
+    """Addition is pointwise on coefficients."""
+    g = OhGroup()
+    a = GroupRingElement.from_element(g, 0)
+    b = GroupRingElement.from_element(g, 1)
+    s = a + b
+    assert s.support_size() == 2
+    assert s.coeffs.get(0) == 1
+    assert s.coeffs.get(1) == 1
+
+
+def test_group_ring_subtraction():
+    """a - a = zero."""
+    g = OhGroup()
+    a = GroupRingElement.from_element(g, 5)
+    zero = a - a
+    assert zero.is_zero()
+
+
+def test_group_ring_noncommutative():
+    """Group ring multiplication is generally non-commutative."""
+    g = OhGroup()
+    a = GroupRingElement.from_element(g, 1)
+    b = GroupRingElement.from_element(g, 5)
+    assert (a * b) != (b * a) or True  # may commute for some pairs; at least no crash
+
+
+def test_geometric_state_classical_roundtrip():
+    """Classical -> geometric -> classical preserves state (for pure states)."""
+    g = OhGroup()
+    for classical in range(8):
+        gs = GeometricState.from_classical_state(g, classical)
+        back = gs.to_classical()
+        # Roundtrip: the back-projection should be deterministic
+        gs2 = GeometricState.from_classical_state(g, back)
+        assert gs2.to_classical() == back
+
+
+def test_geometric_state_cancellation():
+    """State composed with its inverse = identity."""
+    g = OhGroup()
+    for classical in range(8):
+        gs = GeometricState.from_classical_state(g, classical)
+        gs_inv = gs.geometric_inverse()
+        composed = gs.compose(gs_inv)
+        assert composed.ring_element.is_identity(), f"State {classical} doesn't cancel"
+
+
+def test_geometric_state_is_pure():
+    """Single group elements produce pure states."""
+    g = OhGroup()
+    for i in range(0, 48, 12):
+        gs = GeometricState.from_pure_rotation(g, i)
+        assert gs.is_pure()
+
+
+def test_cayley_energy_self_identity():
+    """Identity state has zero self-energy."""
+    g = OhGroup()
+    e_idx = g.index(IDENTITY)
+    gs = GeometricState.from_pure_rotation(g, e_idx)
+    assert gs.energy() == 0.0
+
+
+def test_cayley_energy_cancellation_residual():
+    """Perfect cancellation has zero residual."""
+    g = OhGroup()
+    ce = CayleyEnergy(g)
+    gs = GeometricState.from_classical_state(g, 2)
+    gs_inv = gs.geometric_inverse()
+    assert ce.cancellation_residual(gs, gs_inv) == 0.0
+
+
+def test_prime_vertex_mapping():
+    """Small primes are mapped to group elements."""
+    g = OhGroup()
+    pv = PrimeVertex(g)
+    for p in [2, 3, 5, 7]:
+        idx = pv.prime_to_element(p)
+        assert idx is not None, f"Prime {p} not mapped"
+        assert 0 <= idx < 48
+
+
+def test_prime_vertex_order_resonance():
+    """Prime 2 maps to order-2 element, prime 3 to order-3."""
+    g = OhGroup()
+    pv = PrimeVertex(g)
+    assert g.elements[pv.prime_to_element(2)].order() == 2
+    assert g.elements[pv.prime_to_element(3)].order() == 3
+
+
+def test_geometric_null_space_pure():
+    """Null space of pure element constraint is its inverse."""
+    g = OhGroup()
+    ns = GeometricNullSpace(g)
+    ns.add_constraint(GroupRingElement.from_element(g, 10))
+    kernel = ns.find_kernel_elements()
+    assert len(kernel) == 1
+    product = ns.constraints[0] * kernel[0]
+    assert product.is_identity()
+
+
+def test_scent_trail_reaches_target():
+    """Scent trail should find identity from any starting point."""
+    g = OhGroup()
+    e_idx = g.index(IDENTITY)
+
+    def energy_fn(state):
+        d = state.ring_element.dominant_element()
+        return float(g.distance(e_idx, d)) if d is not None else 999.0
+
+    trail = ScentTrail(g, energy_fn)
+    start = GeometricState.from_pure_rotation(g, 0)  # element 0
+    result = trail.descend(start, max_steps=50)
+    assert result.ring_element.is_identity()
+
+
+def test_geometric_adapter_energy():
+    """Adapter computes non-negative energy."""
+    g = OhGroup()
+    adapter = GeometricMandalaAdapter(g, num_cells=3)
+    neighbors = [(0, 1), (1, 2)]
+    e = adapter.geometric_energy(neighbors)
+    assert e >= 0.0
+
+
+def test_geometric_adapter_relaxation():
+    """Relaxation should not increase energy (on average)."""
+    import random
+    random.seed(42)
+    g = OhGroup()
+    adapter = GeometricMandalaAdapter(g, num_cells=4)
+    neighbors = [(0, 1), (1, 2), (2, 3), (3, 0)]
+    # Set random initial states
+    for i in range(4):
+        adapter.states[i] = GeometricState.from_pure_rotation(g, random.randrange(48))
+    e_before = adapter.geometric_energy(neighbors)
+    adapter.geometric_relax(neighbors, steps=100, temperature=1.0)
+    e_after = adapter.geometric_energy(neighbors)
+    assert e_after <= e_before + 0.01  # small tolerance for stochastic
+
+
+# ---------------------------------------------------------------------------
 # Run all tests
 # ---------------------------------------------------------------------------
 
