@@ -681,6 +681,116 @@ class SovereignMesh:
         return results
 
     # ------------------------------------------------------------------
+    # Noise-assisted Cayley transitions (thermal bridge)
+    # ------------------------------------------------------------------
+
+    def thermal_hop_probability(self, from_id: int, to_id: int,
+                                temperature: float = 1.0) -> float:
+        """
+        Probability of a noise-assisted signal hop between two nodes.
+
+        Inspired by photosynthetic FRET: thermal noise bridges energy gaps
+        between mismatched chromophores. Here, noise bridges Cayley distance
+        gaps — allowing signals to jump to non-adjacent nodes.
+
+        The probability follows a Boltzmann-like distribution:
+            P(hop) = exp(-distance / (temperature * phi))
+
+        At T=0: only Cayley-adjacent hops (distance=1) are possible.
+        At high T: the entire group becomes reachable, but with distance decay.
+
+        This is NOT random noise — it's structured thermal assistance that
+        respects the group geometry (closer elements are always more likely).
+        """
+        d = self.group.distance(from_id, to_id)
+        if d == 0:
+            return 1.0
+        # phi scaling: golden ratio structures the thermal landscape
+        phi = (1 + math.sqrt(5)) / 2
+        return math.exp(-d / (temperature * phi))
+
+    def noisy_broadcast(self, a: int, temperature: float = 0.5) -> Optional[Signal]:
+        """
+        Broadcast with thermal noise: signals can hop across Cayley gaps.
+
+        Standard broadcast follows Cayley edges (generator steps only).
+        Noisy broadcast adds probabilistic jumps to non-adjacent nodes,
+        mimicking the phonon-assisted energy transfer in photosynthesis.
+
+        The thermal bridge enables:
+        1. Faster convergence: signals reach distant nodes without full BFS
+        2. Escape from local traps: a signal stuck in one zone can jump
+        3. Parallel exploration: noise explores paths BFS might miss
+
+        Returns a precipitated signal if smooth relation found.
+        """
+        Q = a * a - self.N
+        if Q <= 0:
+            return None
+
+        self.candidates_tested += 1
+
+        identity_signal = Signal(
+            ring_element=GroupRingElement.from_identity(self.group),
+            origin_a=a,
+            origin_Q=Q,
+        )
+
+        identity_idx = self.group.index(IDENTITY)
+        visited: Set[int] = set()
+        queue = deque([(identity_idx, identity_signal)])
+        best_signal = identity_signal
+
+        while queue:
+            node_id, signal = queue.popleft()
+
+            if node_id in visited:
+                continue
+            visited.add(node_id)
+
+            if not signal.alive:
+                continue
+
+            node = self.nodes[node_id]
+            processed = node.process_signal(signal)
+
+            # Check precipitation (same as standard broadcast)
+            if len(processed.contributions) >= 2:
+                all_exps = {}
+                for node_exp in processed.contributions.values():
+                    for p, e in node_exp.items():
+                        all_exps[p] = all_exps.get(p, 0) + e
+                product = 1
+                for p, e in all_exps.items():
+                    product *= p ** e
+                if product == abs(Q):
+                    self.precipitated.append(processed)
+                    self.health.record_good_signal(processed)
+                    return processed
+
+            if processed.strength() > best_signal.strength():
+                best_signal = processed
+
+            # Standard Cayley neighbors
+            for neighbor_id in node.neighbors:
+                if neighbor_id not in visited:
+                    queue.append((neighbor_id, processed))
+
+            # Thermal bridge: probabilistic hops to non-adjacent nodes
+            if temperature > 0:
+                for candidate_id in range(len(self.nodes)):
+                    if candidate_id in visited:
+                        continue
+                    if candidate_id in node.neighbors:
+                        continue  # Already queued via standard path
+                    p_hop = self.thermal_hop_probability(
+                        node_id, candidate_id, temperature)
+                    if random.random() < p_hop:
+                        queue.append((candidate_id, processed))
+
+        return None
+
+    # ------------------------------------------------------------------
     # Introspection
     # ------------------------------------------------------------------
 

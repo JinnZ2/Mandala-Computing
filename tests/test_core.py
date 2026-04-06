@@ -938,6 +938,249 @@ def test_mesh_status():
 
 
 # ---------------------------------------------------------------------------
+# Quantum FRET + thermal bridge tests
+# ---------------------------------------------------------------------------
+
+from quantum_mandala import QuantumMandalaComputer
+
+
+def _make_qc():
+    """Helper: create a small QuantumMandalaComputer."""
+    return QuantumMandalaComputer(golden_depth=2, sacred_geometry=8,
+                                  entanglement_strength=0.3)
+
+
+def test_fret_coupling_shape():
+    """FRET Hamiltonian is square, hermitian, correct dimension."""
+    qc = _make_qc()
+    H = qc._build_fret_coupling(num_cells=2)
+    dim = 8 ** 2  # 64
+    assert H.shape == (dim, dim), f"Expected ({dim},{dim}), got {H.shape}"
+    # Hermiticity
+    assert np.allclose(H, H.conj().T, atol=1e-12)
+
+
+def test_fret_coupling_off_diagonal():
+    """FRET coupling has nonzero off-diagonal (excitation hopping)."""
+    qc = _make_qc()
+    H = qc._build_fret_coupling(num_cells=2)
+    off_diag = H - np.diag(np.diag(H))
+    assert np.max(np.abs(off_diag)) > 0, "FRET should have off-diagonal terms"
+
+
+def test_fret_coupling_custom_strengths():
+    """Custom coupling strengths are respected."""
+    qc = _make_qc()
+    strengths = {(0, 1): 0.5}
+    H1 = qc._build_fret_coupling(num_cells=2, coupling_strengths=strengths)
+    strengths2 = {(0, 1): 1.0}
+    H2 = qc._build_fret_coupling(num_cells=2, coupling_strengths=strengths2)
+    # Doubling J should double the Hamiltonian
+    assert np.allclose(H2, 2.0 * H1, atol=1e-12)
+
+
+def test_lindblad_operators_count():
+    """Correct number of Lindblad operators per cell."""
+    qc = _make_qc()
+    ops = qc._build_lindblad_operators(num_cells=1, gamma_decay=0.01, gamma_dephase=0.05)
+    # Per cell: 7 decay (states 1-7 -> 0) + 8 dephasing (states 0-7)
+    assert len(ops) == 15, f"Expected 15 ops for 1 cell, got {len(ops)}"
+    ops2 = qc._build_lindblad_operators(num_cells=2, gamma_decay=0.01, gamma_dephase=0.05)
+    assert len(ops2) == 30, f"Expected 30 ops for 2 cells, got {len(ops2)}"
+
+
+def test_lindblad_operators_decay_shape():
+    """Decay operators have correct dimensionality."""
+    qc = _make_qc()
+    ops = qc._build_lindblad_operators(num_cells=1)
+    for L in ops:
+        assert L.shape == (8, 8)
+
+
+def test_lindblad_step_preserves_trace():
+    """Lindblad step preserves trace = 1."""
+    qc = _make_qc()
+    dim = 8
+    rho = np.eye(dim, dtype=complex) / dim  # maximally mixed
+    H = np.diag(np.arange(dim, dtype=complex))
+    ops = qc._build_lindblad_operators(num_cells=1)
+    rho_new = qc._lindblad_step(rho, H, ops, dt=0.1)
+    assert abs(np.trace(rho_new).real - 1.0) < 1e-10
+
+
+def test_lindblad_step_preserves_hermiticity():
+    """Lindblad step preserves hermiticity."""
+    qc = _make_qc()
+    dim = 8
+    rho = np.eye(dim, dtype=complex) / dim
+    H = np.diag(np.arange(dim, dtype=complex))
+    ops = qc._build_lindblad_operators(num_cells=1)
+    rho_new = qc._lindblad_step(rho, H, ops, dt=0.1)
+    assert np.allclose(rho_new, rho_new.conj().T, atol=1e-12)
+
+
+def test_lindblad_step_preserves_positivity():
+    """Lindblad step preserves positivity (all eigenvalues >= 0)."""
+    qc = _make_qc()
+    dim = 8
+    rho = np.eye(dim, dtype=complex) / dim
+    H = np.diag(np.arange(dim, dtype=complex))
+    ops = qc._build_lindblad_operators(num_cells=1)
+    rho_new = qc._lindblad_step(rho, H, ops, dt=0.1)
+    eigvals = np.linalg.eigvalsh(rho_new)
+    assert np.all(eigvals >= -1e-12), f"Negative eigenvalue: {min(eigvals)}"
+
+
+def test_pairwise_coherence_pure_state():
+    """Coherence of a product state should be zero (no entanglement)."""
+    qc = _make_qc()
+    dim = 64  # 2 cells of dim 8
+    # |0,0> state: no coherence between cells
+    rho = np.zeros((dim, dim), dtype=complex)
+    rho[0, 0] = 1.0
+    coh = qc._pairwise_coherence(rho, num_cells=2, cell_a=0, cell_b=1)
+    assert coh < 1e-10, "Product state should have zero pairwise coherence"
+
+
+def test_pairwise_coherence_entangled():
+    """Entangled state should have nonzero coherence."""
+    qc = _make_qc()
+    dim = 64
+    # |00> + |11> (Bell-like state in d=8)
+    psi = np.zeros(dim, dtype=complex)
+    idx_00 = 0 * 8 + 0  # state |0,0>
+    idx_11 = 1 * 8 + 1  # state |1,1>
+    psi[idx_00] = 1.0 / np.sqrt(2)
+    psi[idx_11] = 1.0 / np.sqrt(2)
+    rho = np.outer(psi, psi.conj())
+    coh = qc._pairwise_coherence(rho, num_cells=2, cell_a=0, cell_b=1)
+    assert coh > 0.01, "Entangled state should have nonzero coherence"
+
+
+def test_density_matrix_entropy_pure():
+    """Von Neumann entropy of pure state should be zero."""
+    qc = _make_qc()
+    dim = 8
+    rho = np.zeros((dim, dim), dtype=complex)
+    rho[0, 0] = 1.0
+    S = qc._density_matrix_entropy(rho)
+    assert abs(S) < 1e-10, f"Pure state entropy should be 0, got {S}"
+
+
+def test_density_matrix_entropy_mixed():
+    """Von Neumann entropy of maximally mixed state = log2(d)."""
+    qc = _make_qc()
+    dim = 8
+    rho = np.eye(dim, dtype=complex) / dim
+    S = qc._density_matrix_entropy(rho)
+    assert abs(S - np.log2(dim)) < 1e-10, f"Expected {np.log2(dim)}, got {S}"
+
+
+def test_cell_population_ground():
+    """Ground state |0> has zero excited population."""
+    qc = _make_qc()
+    dim = 8
+    rho = np.zeros((dim, dim), dtype=complex)
+    rho[0, 0] = 1.0
+    pop = qc._cell_population(rho, num_cells=1, cell_idx=0)
+    assert abs(pop) < 1e-10
+
+
+def test_cell_population_excited():
+    """Excited state |1> has population 1."""
+    qc = _make_qc()
+    dim = 8
+    rho = np.zeros((dim, dim), dtype=complex)
+    rho[1, 1] = 1.0
+    pop = qc._cell_population(rho, num_cells=1, cell_idx=0)
+    assert abs(pop - 1.0) < 1e-10
+
+
+def test_thermal_bridge_returns_valid():
+    """Thermal bridge evolution returns expected keys and valid data."""
+    qc = _make_qc()
+    result = qc.thermal_bridge_evolution(
+        'factorization', {'N': 15}, num_cells=2, num_steps=20,
+        gamma_decay=0.01, gamma_dephase=0.05, bridge_strength=0.2
+    )
+    assert "measured_state" in result
+    assert "cell_states" in result
+    assert "history" in result
+    assert "final_coherence" in result
+    assert "final_entropy" in result
+    assert "thermal_bridge_active" in result
+    assert isinstance(result["cell_states"], list)
+    assert len(result["cell_states"]) == 2
+    # History should have at least one entry (step 0)
+    assert len(result["history"]["energy"]) >= 1
+
+
+def test_thermal_bridge_no_nan():
+    """Thermal bridge evolution should never produce NaN."""
+    qc = _make_qc()
+    result = qc.thermal_bridge_evolution(
+        'factorization', {'N': 15}, num_cells=2, num_steps=30,
+        gamma_decay=0.01, gamma_dephase=0.05, bridge_strength=0.2
+    )
+    for e in result["history"]["energy"]:
+        assert not math.isnan(e), "NaN in energy history"
+    for c in result["history"]["coherence_01"]:
+        assert not math.isnan(c), "NaN in coherence history"
+    for s in result["history"]["entropy"]:
+        assert not math.isnan(s), "NaN in entropy history"
+    assert not math.isnan(result["final_entropy"])
+    assert not math.isnan(result["final_coherence"])
+
+
+# ---------------------------------------------------------------------------
+# Noise-assisted Cayley transition tests
+# ---------------------------------------------------------------------------
+
+
+def test_mesh_thermal_bridge_hop():
+    """Thermal noise enables signal hops across Cayley gaps."""
+    mesh = SovereignMesh(15, factor_base_size=10)
+    # Pick two non-adjacent nodes
+    node0 = mesh.nodes[0]
+    node1 = mesh.nodes[1]
+    # thermal_hop should return a probability
+    prob = mesh.thermal_hop_probability(node0.node_id, node1.node_id, temperature=1.0)
+    assert 0.0 <= prob <= 1.0
+
+
+def test_mesh_thermal_hop_decay():
+    """Hop probability decays with Cayley distance."""
+    mesh = SovereignMesh(15, factor_base_size=10)
+    # Find a nearby pair and a far pair
+    n0 = 0
+    near = mesh.nodes[n0].neighbors[0] if mesh.nodes[n0].neighbors else 1
+    far = max(range(48), key=lambda j: mesh.group.distance(n0, j))
+    p_near = mesh.thermal_hop_probability(n0, near, temperature=1.0)
+    p_far = mesh.thermal_hop_probability(n0, far, temperature=1.0)
+    assert p_near >= p_far, "Nearer nodes should have higher hop probability"
+
+
+def test_mesh_thermal_hop_temperature():
+    """Higher temperature increases hop probability."""
+    mesh = SovereignMesh(15, factor_base_size=10)
+    far = max(range(48), key=lambda j: mesh.group.distance(0, j))
+    p_cold = mesh.thermal_hop_probability(0, far, temperature=0.1)
+    p_hot = mesh.thermal_hop_probability(0, far, temperature=10.0)
+    assert p_hot >= p_cold, "Higher temperature should increase hop probability"
+
+
+def test_mesh_noisy_broadcast():
+    """Noisy broadcast should complete without error."""
+    mesh = SovereignMesh(15, factor_base_size=10)
+    sqrt_N = mesh._isqrt(15) + 1
+    # Just verify it runs; may or may not precipitate
+    signal = mesh.noisy_broadcast(sqrt_N, temperature=0.5)
+    # signal is either None or a Signal
+    if signal is not None:
+        assert signal.alive or len(signal.contributions) > 0
+
+
+# ---------------------------------------------------------------------------
 # Run all tests
 # ---------------------------------------------------------------------------
 
