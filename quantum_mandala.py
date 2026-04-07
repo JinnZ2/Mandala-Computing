@@ -376,6 +376,349 @@ class QuantumMandalaComputer:
         return float(-np.sum(eigvals * np.log2(eigvals)))
 
     # ------------------------------------------------------------------
+    # FRET dipolar coupling (XX + YY terms)
+    # ------------------------------------------------------------------
+
+    def _build_fret_coupling(self, num_cells: int, coupling_strengths: Dict[Tuple[int, int], float] = None) -> np.ndarray:
+        """
+        Build FRET dipolar coupling Hamiltonian with XX + YY terms.
+
+        Unlike ZZ coupling (diagonal, classical-like), XX+YY coupling
+        enables excitation hopping between cells — the quantum signature
+        of dipole-dipole interaction.
+
+        For octahedral states 0-7, we generalize the 2-level XX+YY:
+          H_FRET = J * sum_{s != s'} (|s,s'><s',s| + h.c.)
+
+        This means: if cell A is in state s and cell B in state s',
+        they can swap excitations with amplitude J.
+
+        In biological FRET, this is how a photon absorbed by one
+        chromophore hops to a neighbor without re-emission.
+        """
+        d = 8
+        dim = d ** num_cells
+
+        if coupling_strengths is None:
+            # Default: nearest-neighbor chain with FRET-like distance decay
+            coupling_strengths = {}
+            for c in range(num_cells - 1):
+                coupling_strengths[(c, c + 1)] = self.entanglement_strength
+
+        H_fret = np.zeros((dim, dim), dtype=complex)
+
+        for (cell_a, cell_b), J in coupling_strengths.items():
+            if cell_a >= num_cells or cell_b >= num_cells:
+                continue
+            # For each pair of states (s, s'), add hopping term
+            for basis in range(dim):
+                digits = self._basis_to_states(basis, num_cells, d)
+                sa = digits[cell_a]
+                sb = digits[cell_b]
+                if sa != sb:
+                    # Swap excitation: |..sa..sb..> -> |..sb..sa..>
+                    new_digits = list(digits)
+                    new_digits[cell_a] = sb
+                    new_digits[cell_b] = sa
+                    new_basis = self._states_to_basis(new_digits, d)
+                    # Coupling weighted by geometric proximity of states
+                    # States that are adjacent on the octahedron couple more
+                    state_dist = min(abs(sa - sb), d - abs(sa - sb))
+                    fret_weight = J / (1.0 + state_dist)
+                    H_fret[basis, new_basis] += fret_weight
+
+        return H_fret
+
+    # ------------------------------------------------------------------
+    # Lindblad noise channels (open quantum system)
+    # ------------------------------------------------------------------
+
+    def _build_lindblad_operators(self, num_cells: int,
+                                  gamma_decay: float = 0.01,
+                                  gamma_dephase: float = 0.05) -> List[np.ndarray]:
+        """
+        Build Lindblad collapse operators for open-system dynamics.
+
+        Two noise channels per cell:
+        1. Decay (gamma_decay): excitation loss to environment
+           L_decay = sqrt(gamma) * |0><s| for each excited state s>0
+           Models spontaneous emission, thermal relaxation.
+
+        2. Dephasing (gamma_dephase): pure phase noise
+           L_dephase = sqrt(gamma) * |s><s| (diagonal, no population change)
+           Models elastic collisions with thermal bath.
+
+        At room temperature, dephasing >> decay (thermal fluctuations
+        scramble phase faster than they drain energy).
+        """
+        d = 8
+        dim = d ** num_cells
+        collapse_ops = []
+
+        for cell in range(num_cells):
+            # Decay: excited states relax toward ground
+            if gamma_decay > 0:
+                for excited in range(1, d):
+                    L = np.zeros((dim, dim), dtype=complex)
+                    for basis in range(dim):
+                        digits = self._basis_to_states(basis, num_cells, d)
+                        if digits[cell] == excited:
+                            new_digits = list(digits)
+                            new_digits[cell] = 0  # decay to ground
+                            new_basis = self._states_to_basis(new_digits, d)
+                            L[new_basis, basis] = np.sqrt(gamma_decay)
+                    collapse_ops.append(L)
+
+            # Dephasing: diagonal noise (phase scrambling)
+            if gamma_dephase > 0:
+                for state in range(d):
+                    L = np.zeros((dim, dim), dtype=complex)
+                    for basis in range(dim):
+                        digits = self._basis_to_states(basis, num_cells, d)
+                        if digits[cell] == state:
+                            L[basis, basis] = np.sqrt(gamma_dephase)
+                    collapse_ops.append(L)
+
+        return collapse_ops
+
+    def _lindblad_step(self, rho: np.ndarray, H: np.ndarray,
+                       collapse_ops: List[np.ndarray], dt: float) -> np.ndarray:
+        """
+        Single Lindblad master equation step (first-order Euler).
+
+        drho/dt = -i[H, rho] + sum_k (L_k rho L_k^dag - 0.5 {L_k^dag L_k, rho})
+
+        This is the standard open quantum system evolution:
+        - First term: unitary (Hamiltonian) evolution
+        - Second term: dissipation from environment coupling
+
+        The noise is not a bug — it's the thermal bath that makes
+        room-temperature quantum effects possible.
+        """
+        # Unitary part: -i[H, rho]
+        drho = -1j * (H @ rho - rho @ H)
+
+        # Dissipative part: Lindblad terms
+        for L in collapse_ops:
+            Ldag = L.conj().T
+            LdagL = Ldag @ L
+            drho += L @ rho @ Ldag - 0.5 * (LdagL @ rho + rho @ LdagL)
+
+        rho_new = rho + dt * drho
+
+        # Ensure hermiticity
+        rho_new = (rho_new + rho_new.conj().T) / 2
+
+        # Ensure positivity: clamp negative eigenvalues
+        eigvals, eigvecs = np.linalg.eigh(rho_new)
+        eigvals = np.maximum(eigvals, 0)
+        rho_new = (eigvecs * eigvals) @ eigvecs.conj().T
+
+        # Ensure trace = 1
+        tr = np.trace(rho_new).real
+        if tr > 1e-15:
+            rho_new /= tr
+        else:
+            # Reset to maximally mixed if trace collapsed
+            rho_new = np.eye(rho.shape[0], dtype=complex) / rho.shape[0]
+
+        return rho_new
+
+    def _pairwise_coherence(self, rho: np.ndarray, num_cells: int,
+                            cell_a: int, cell_b: int) -> float:
+        """
+        Measure quantum coherence between two cells.
+
+        Traces out all other cells, then measures the magnitude of
+        off-diagonal elements in the reduced 2-cell density matrix.
+
+        High coherence = the cells are quantum-correlated.
+        Zero coherence = classically independent.
+        """
+        d = 8
+        dim = d ** num_cells
+        dim_ab = d * d  # reduced space for cells a and b
+
+        # Build reduced density matrix for cells (a, b)
+        rho_ab = np.zeros((dim_ab, dim_ab), dtype=complex)
+
+        for i in range(dim):
+            for j in range(dim):
+                if abs(rho[i, j]) < 1e-15:
+                    continue
+                di = self._basis_to_states(i, num_cells, d)
+                dj = self._basis_to_states(j, num_cells, d)
+
+                # Check if all OTHER cells match (partial trace condition)
+                match = True
+                for c in range(num_cells):
+                    if c != cell_a and c != cell_b:
+                        if di[c] != dj[c]:
+                            match = False
+                            break
+                if not match:
+                    continue
+
+                # Map to reduced indices
+                ri = di[cell_a] * d + di[cell_b]
+                rj = dj[cell_a] * d + dj[cell_b]
+                rho_ab[ri, rj] += rho[i, j]
+
+        # Coherence = sum of |off-diagonal| elements (l1-norm of coherence)
+        coherence = 0.0
+        for i in range(dim_ab):
+            for j in range(dim_ab):
+                if i != j:
+                    coherence += abs(rho_ab[i, j])
+
+        return coherence
+
+    # ------------------------------------------------------------------
+    # Thermal bridge: phonon-assisted energy transfer
+    # ------------------------------------------------------------------
+
+    def thermal_bridge_evolution(self, problem_type: str, problem_data: Dict,
+                                 num_cells: int = 2, num_steps: int = 100,
+                                 gamma_decay: float = 0.01,
+                                 gamma_dephase: float = 0.05,
+                                 bridge_strength: float = 0.1) -> Dict:
+        """
+        Open-system quantum evolution with thermal bridge.
+
+        The thermal bridge is the key insight from biological FRET:
+        noise doesn't just destroy coherence — it can HELP energy
+        transfer across energy gaps that pure unitary evolution can't
+        bridge efficiently.
+
+        The mechanism:
+        1. Build problem Hamiltonian (unitary dynamics)
+        2. Add FRET dipolar coupling (excitation hopping)
+        3. Add Lindblad noise (thermal bath interaction)
+        4. The noise fills in the energy gap between mismatched cells,
+           acting as a "lubricant" for quantum state transfer
+
+        This is how photosynthesis works: the protein scaffold provides
+        thermal vibrations (phonons) tuned to match energy gaps between
+        chlorophyll molecules, enabling near-perfect energy transfer
+        at room temperature.
+
+        Returns dict with evolution history: energy, coherence, entropy.
+        """
+        d = 8
+        dim = d ** num_cells
+        dt = 0.1
+
+        print(f"\n   Thermal bridge evolution: {num_cells} cells, dim={dim}")
+        print(f"   Noise: decay={gamma_decay}, dephase={gamma_dephase}")
+        print(f"   Bridge coupling: {bridge_strength}")
+
+        # Build Hamiltonian with FRET coupling
+        H_problem = self._build_multicell_hamiltonian(num_cells, problem_type, problem_data)
+        H_fret = self._build_fret_coupling(num_cells)
+        H_total = H_problem + bridge_strength * H_fret
+
+        # Build Lindblad operators
+        collapse_ops = self._build_lindblad_operators(
+            num_cells, gamma_decay=gamma_decay, gamma_dephase=gamma_dephase
+        )
+
+        # Initial state: first cell excited, rest ground
+        # As density matrix (mixed state from the start)
+        psi0 = np.zeros(dim, dtype=complex)
+        initial_digits = [0] * num_cells
+        initial_digits[0] = 1  # first cell in state |1>
+        psi0[self._states_to_basis(initial_digits, d)] = 1.0
+        rho = np.outer(psi0, psi0.conj())
+
+        # Evolution with telemetry
+        history = {
+            "energy": [],
+            "coherence_01": [],
+            "entropy": [],
+            "populations": [[] for _ in range(num_cells)],
+        }
+
+        for step in range(num_steps):
+            # Interpolate: ramp up problem Hamiltonian
+            s = min(step / max(num_steps // 2, 1), 1.0)
+            H_initial = -np.ones((dim, dim), dtype=complex) / dim
+            H = (1 - s) * H_initial + s * H_total
+
+            rho = self._lindblad_step(rho, H, collapse_ops, dt)
+
+            if step % 10 == 0:
+                energy = float(np.real(np.trace(H_problem @ rho)))
+                entropy = self._density_matrix_entropy(rho)
+                coherence = self._pairwise_coherence(rho, num_cells, 0, min(1, num_cells - 1))
+
+                # Per-cell populations
+                for c in range(num_cells):
+                    pop = self._cell_population(rho, num_cells, c)
+                    history["populations"][c].append(pop)
+
+                history["energy"].append(energy)
+                history["coherence_01"].append(coherence)
+                history["entropy"].append(entropy)
+
+                self._emit_sensor("thermal_bridge.energy", step, energy)
+                self._emit_sensor("thermal_bridge.coherence", step, coherence)
+                self._emit_sensor("thermal_bridge.entropy", step, entropy)
+
+                if step % 50 == 0:
+                    print(f"   Step {step:>4d}: E={energy:.4f}  "
+                          f"coh={coherence:.4f}  S={entropy:.3f}")
+
+        # Final measurement
+        probs = np.real(np.diag(rho))
+        probs = np.maximum(probs, 0)
+        probs /= probs.sum()
+        measured = np.random.choice(dim, p=probs)
+        digits = self._basis_to_states(measured, num_cells, d)
+
+        solution = self._extract_quantum_solution(measured, problem_type, problem_data)
+        solution["cell_states"] = digits
+
+        final_coherence = history["coherence_01"][-1] if history["coherence_01"] else 0
+        final_entropy = history["entropy"][-1] if history["entropy"] else 0
+
+        print(f"   Final: states={digits}, coherence={final_coherence:.4f}, "
+              f"entropy={final_entropy:.3f}")
+
+        if final_coherence > 0.01:
+            print(f"   >>> THERMAL BRIDGE ACTIVE: Coherence sustained with noise")
+        else:
+            print(f"   >>> Coherence decayed (try stronger bridge coupling)")
+
+        return {
+            "measured_state": measured,
+            "cell_states": digits,
+            "solution": solution,
+            "history": history,
+            "final_coherence": final_coherence,
+            "final_entropy": final_entropy,
+            "thermal_bridge_active": final_coherence > 0.01,
+        }
+
+    def _density_matrix_entropy(self, rho: np.ndarray) -> float:
+        """Von Neumann entropy: S = -Tr(rho * log2(rho))."""
+        eigvals = np.linalg.eigvalsh(rho)
+        eigvals = eigvals[eigvals > 1e-15]
+        if len(eigvals) == 0:
+            return 0.0
+        return float(-np.sum(eigvals * np.log2(eigvals)))
+
+    def _cell_population(self, rho: np.ndarray, num_cells: int, cell_idx: int) -> float:
+        """Probability that cell_idx is in any excited state (not |0>)."""
+        d = 8
+        dim = d ** num_cells
+        pop = 0.0
+        for basis in range(dim):
+            digits = self._basis_to_states(basis, num_cells, d)
+            if digits[cell_idx] > 0:
+                pop += np.real(rho[basis, basis])
+        return float(pop)
+
+    # ------------------------------------------------------------------
     # Quantum annealing
     # ------------------------------------------------------------------
 
@@ -684,6 +1027,63 @@ def demo_entangled_annealing():
     return result
 
 
+def demo_thermal_bridge():
+    """Thermal bridge: noise-assisted quantum energy transfer."""
+    print("\n" + "=" * 60)
+    print("QUANTUM DEMO: THERMAL BRIDGE (Room Temperature)")
+    print("=" * 60)
+    print("   Like photosynthesis: thermal noise HELPS energy transfer")
+
+    N = 15
+    qc = QuantumMandalaComputer(golden_depth=2, sacred_geometry=8, entanglement_strength=0.3)
+
+    # Compare: no noise vs with noise (thermal bridge)
+    print("\n   --- Pure unitary (no noise, cryogenic) ---")
+    result_pure = qc.thermal_bridge_evolution(
+        "factorization", {"N": N}, num_cells=2, num_steps=100,
+        gamma_decay=0.0, gamma_dephase=0.0, bridge_strength=0.2,
+    )
+
+    print("\n   --- Thermal bridge (room temperature noise) ---")
+    qc2 = QuantumMandalaComputer(golden_depth=2, sacred_geometry=8, entanglement_strength=0.3)
+    result_bridge = qc2.thermal_bridge_evolution(
+        "factorization", {"N": N}, num_cells=2, num_steps=100,
+        gamma_decay=0.01, gamma_dephase=0.05, bridge_strength=0.2,
+    )
+
+    print(f"\n   Comparison:")
+    print(f"     Pure unitary coherence:    {result_pure['final_coherence']:.4f}")
+    print(f"     Thermal bridge coherence:  {result_bridge['final_coherence']:.4f}")
+    print(f"     Bridge active: {result_bridge['thermal_bridge_active']}")
+
+    return result_bridge
+
+
+def demo_fret_coupling():
+    """FRET dipolar coupling: excitation hopping between cells."""
+    print("\n" + "=" * 60)
+    print("QUANTUM DEMO: FRET DIPOLAR COUPLING")
+    print("=" * 60)
+
+    qc = QuantumMandalaComputer(golden_depth=2, sacred_geometry=8, entanglement_strength=0.5)
+
+    # Build FRET Hamiltonian for 2 cells
+    H_fret = qc._build_fret_coupling(2)
+    print(f"\n   FRET coupling matrix: {H_fret.shape[0]}x{H_fret.shape[1]}")
+    print(f"   Non-zero elements: {np.count_nonzero(H_fret)}")
+    print(f"   Hermitian: {np.allclose(H_fret, H_fret.conj().T)}")
+
+    # Compare ZZ (diagonal) vs XX+YY (off-diagonal) coupling
+    H_zz = qc._build_multicell_hamiltonian(2, "factorization", {"N": 15})
+    fret_offdiag = np.count_nonzero(H_fret - np.diag(np.diag(H_fret)))
+    zz_offdiag = np.count_nonzero(H_zz - np.diag(np.diag(H_zz)))
+    print(f"\n   ZZ coupling off-diagonal elements: {zz_offdiag}")
+    print(f"   FRET coupling off-diagonal elements: {fret_offdiag}")
+    print(f"   FRET enables excitation HOPPING (not just energy shifting)")
+
+    return H_fret
+
+
 if __name__ == "__main__":
     print("=" * 60)
     print("QUANTUM MANDALA COMPUTING v2.0")
@@ -695,6 +1095,8 @@ if __name__ == "__main__":
     demo_quantum_superposition()
     demo_qaoa()
     demo_entangled_annealing()
+    demo_fret_coupling()
+    demo_thermal_bridge()
 
     print("\n" + "=" * 60)
     print("ALL QUANTUM DEMONSTRATIONS COMPLETE")
