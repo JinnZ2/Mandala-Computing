@@ -1181,6 +1181,230 @@ def test_mesh_noisy_broadcast():
 
 
 # ---------------------------------------------------------------------------
+# OSL (Octahedral Symbolic Language) tests
+# ---------------------------------------------------------------------------
+
+from osl import (
+    GlyphRegistry, REGISTRY, OSLTokenizer, OSLTranspiler,
+    MacroExpander, ParityVerifier, TokenType,
+    is_illegal_jump, vertex_to_group_element, trajectory_to_group_path,
+    trajectory_composition,
+    _PX, _NX, _PY, _NY, _PZ, _NZ,
+)
+
+
+def test_osl_registry_vertex_count():
+    """Registry has all 8 octahedral vertex glyphs."""
+    assert len(REGISTRY.vertex_glyphs()) == 8
+
+
+def test_osl_registry_animal_count():
+    """Registry has all 7 animal strategy macros."""
+    assert len(REGISTRY.animal_glyphs()) == 7
+
+
+def test_osl_registry_lookup_by_name():
+    """Can look up glyphs by name."""
+    gd = REGISTRY.lookup_name("PX")
+    assert gd is not None
+    assert gd.value == (1, 0, 0)
+    gd = REGISTRY.lookup_name("phi")
+    assert gd is not None
+    assert abs(gd.value - 1.618033988749895) < 1e-10
+
+
+def test_osl_registry_no_collisions():
+    """No glyph maps to two different definitions."""
+    all_glyphs = REGISTRY.all_glyphs()
+    glyphs_set = set(g.glyph for g in all_glyphs)
+    # If there were collisions, len(set) < len(list)
+    assert len(glyphs_set) == len(all_glyphs)
+
+
+def test_osl_tokenize_vertices():
+    """Tokenizer correctly parses vertex glyphs."""
+    tokenizer = OSLTokenizer()
+    tokens = tokenizer.tokenize("\u2191 \u2192 \u2197")  # up right NE
+    assert len(tokens) == 3
+    assert all(t.token_type == TokenType.VERTEX for t in tokens)
+    assert tokens[0].name == "PX"
+    assert tokens[1].name == "PY"
+    assert tokens[2].name == "PZ"
+
+
+def test_osl_tokenize_assignment():
+    """Tokenizer parses key=value assignments."""
+    tokenizer = OSLTokenizer()
+    tokens = tokenizer.tokenize("\u03BB\u2081=0.5")  # lambda_1=0.5
+    assert len(tokens) == 1
+    assert tokens[0].token_type == TokenType.ASSIGN
+    assert tokens[0].value == 0.5
+
+
+def test_osl_tokenize_number():
+    """Tokenizer parses numeric literals."""
+    tokenizer = OSLTokenizer()
+    tokens = tokenizer.tokenize("42.5")
+    assert len(tokens) == 1
+    assert tokens[0].token_type == TokenType.NUMBER
+    assert tokens[0].value == 42.5
+
+
+def test_osl_tokenize_hex_block():
+    """Tokenizer parses hex block references."""
+    tokenizer = OSLTokenizer()
+    tokens = tokenizer.tokenize("#HMR")
+    assert len(tokens) == 1
+    assert tokens[0].token_type == TokenType.BRIDGE
+    assert tokens[0].value == "HMR"
+
+
+def test_osl_tokenize_mixed():
+    """Tokenizer handles mixed glyph types."""
+    tokenizer = OSLTokenizer()
+    src = "\U0001F991 \u2192 \U0001F41D #HMR \u03BB\u2081=0.6 \U0001F6E1\uFE0F"
+    tokens = tokenizer.tokenize(src)
+    types = [t.token_type for t in tokens]
+    assert TokenType.ANIMAL in types
+    assert TokenType.VERTEX in types
+    assert TokenType.BRIDGE in types
+    assert TokenType.ASSIGN in types
+    assert TokenType.SECURITY in types
+
+
+def test_osl_parity_tensor_good():
+    """Tensor parity passes when trace == 1."""
+    v = ParityVerifier()
+    ok, _ = v.verify_tensor({"a": 0.5, "b": 0.3, "c": 0.2})
+    assert ok
+
+
+def test_osl_parity_tensor_bad():
+    """Tensor parity fails when trace != 1."""
+    v = ParityVerifier()
+    ok, _ = v.verify_tensor({"a": 0.5, "b": 0.5, "c": 0.5})
+    assert not ok
+
+
+def test_osl_parity_trajectory_good():
+    """Adjacent vertices pass geometric parity."""
+    v = ParityVerifier()
+    ok, viols = v.verify_trajectory([_PX, _PY, _PZ])
+    assert ok
+    assert len(viols) == 0
+
+
+def test_osl_parity_trajectory_antipodal():
+    """Antipodal jump fails geometric parity."""
+    v = ParityVerifier()
+    ok, viols = v.verify_trajectory([_PX, _NX])
+    assert not ok
+    assert len(viols) == 1
+
+
+def test_osl_illegal_jump_antipodal():
+    """PX -> NX is an illegal jump (antipodal)."""
+    assert is_illegal_jump(_PX, _NX)
+    assert is_illegal_jump(_PY, _NY)
+    assert is_illegal_jump(_PZ, _NZ)
+
+
+def test_osl_legal_jump_adjacent():
+    """PX -> PY is a legal jump (adjacent)."""
+    assert not is_illegal_jump(_PX, _PY)
+    assert not is_illegal_jump(_PX, _PZ)
+    assert not is_illegal_jump(_PY, _NZ)
+
+
+def test_osl_macro_expand_bee():
+    """Bee macro expands to hex tiling + resonance + sync."""
+    exp = MacroExpander()
+    prims = exp.expand("bee")
+    assert len(prims) == 3
+    ops = [p.operation for p in prims]
+    assert "tile_hexagonal" in ops
+    assert "stochastic_resonance" in ops
+    assert "swarm_sync" in ops
+
+
+def test_osl_macro_expand_all_animals():
+    """All 7 animal macros expand without error."""
+    exp = MacroExpander()
+    for name in exp.available_macros():
+        prims = exp.expand(name)
+        assert len(prims) >= 1, f"{name} should have at least 1 primitive"
+
+
+def test_osl_transpile_vertices():
+    """Transpiler produces set_position for vertex tokens."""
+    t = OSLTranspiler()
+    insts = t.compile("\u2191 \u2192 \u2197")
+    opcodes = [i.opcode for i in insts]
+    assert opcodes.count("set_position") == 3
+
+
+def test_osl_transpile_eigenvalues():
+    """Transpiler produces set_eigenvalue for assignments."""
+    t = OSLTranspiler()
+    insts = t.compile("\u03BB\u2081=0.5 \u03BB\u2082=0.3 \u03BB\u2083=0.2")
+    opcodes = [i.opcode for i in insts]
+    assert opcodes.count("set_eigenvalue") == 3
+
+
+def test_osl_transpile_parity_check():
+    """Transpiler appends parity_check when trajectory or tensor present."""
+    t = OSLTranspiler()
+    insts = t.compile("\u2191 \u2192 \u03BB\u2081=0.5")
+    opcodes = [i.opcode for i in insts]
+    assert "parity_check" in opcodes
+
+
+def test_osl_transpile_animal_expansion():
+    """Transpiler expands animal macros into primitive operations."""
+    t = OSLTranspiler()
+    insts = t.compile("\U0001F41D")  # bee
+    opcodes = [i.opcode for i in insts]
+    assert "tile_hexagonal" in opcodes
+    assert "stochastic_resonance" in opcodes
+
+
+def test_osl_vertex_to_group():
+    """OSL vertices map to valid O_h group elements."""
+    from geometric_state_algebra import OhGroup
+    group = OhGroup()
+    for vtx in [_PX, _NX, _PY, _NY, _PZ, _NZ]:
+        elem = vertex_to_group_element(vtx, group)
+        assert elem is not None, f"No group element for vertex {vtx}"
+
+
+def test_osl_trajectory_to_path():
+    """Trajectory converts to a list of group elements."""
+    from geometric_state_algebra import OhGroup
+    group = OhGroup()
+    path = trajectory_to_group_path([_PX, _PY, _PZ], group)
+    assert len(path) == 3
+
+
+def test_osl_trajectory_composition():
+    """Trajectory composition produces a valid group element."""
+    from geometric_state_algebra import OhGroup
+    group = OhGroup()
+    comp = trajectory_composition([_PX, _PY], group)
+    assert comp is not None
+    assert comp.order() > 0
+
+
+def test_osl_compile_and_report():
+    """compile_and_report returns complete analysis."""
+    t = OSLTranspiler()
+    report = t.compile_and_report("\U0001F991 \u2192 \U0001F41D")
+    assert "tokens" in report
+    assert "instructions" in report
+    assert report["has_macros"] is True
+    assert report["tokens"] >= 3
+
+
+# ---------------------------------------------------------------------------
 # Run all tests
 # ---------------------------------------------------------------------------
 
