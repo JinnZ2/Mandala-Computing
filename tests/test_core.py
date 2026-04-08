@@ -11,6 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import numpy as np
 import math
+import secrets
 
 # ---------------------------------------------------------------------------
 # Octahedral Arithmetic tests
@@ -1402,6 +1403,344 @@ def test_osl_compile_and_report():
     assert "instructions" in report
     assert report["has_macros"] is True
     assert report["tokens"] >= 3
+
+
+# ---------------------------------------------------------------------------
+# Octahedral Session Cache tests
+# ---------------------------------------------------------------------------
+
+from octahedral_session_cache import SessionCache, OctState, InvalidationGraph
+
+
+def test_cache_put_get():
+    """Basic put/get cycle."""
+    cache = SessionCache(tolerance=0.1)
+    state = OctState(axes=(1.0, -1.0, 0.5, -0.5, 0.0, 0.0))
+    key = cache.put(state, payload={"data": 42})
+    result = cache.get(key)
+    assert result == {"data": 42}
+
+
+def test_cache_miss():
+    """Get returns None for unknown key."""
+    cache = SessionCache()
+    assert cache.get("nonexistent") is None
+
+
+def test_cache_validation_pass():
+    """Get succeeds when live state is within tolerance."""
+    cache = SessionCache(tolerance=0.1)
+    state = OctState(axes=(1.0, -1.0, 0.5, -0.5, 0.0, 0.0))
+    key = cache.put(state, payload="ok")
+    live = OctState(axes=(1.05, -0.95, 0.48, -0.52, 0.02, -0.01))
+    assert cache.get(key, live_state=live) == "ok"
+
+
+def test_cache_validation_fail():
+    """Get returns None when drift exceeds tolerance."""
+    cache = SessionCache(tolerance=0.05)
+    state = OctState(axes=(1.0, -1.0, 0.5, -0.5, 0.0, 0.0))
+    key = cache.put(state, payload="ok")
+    live = OctState(axes=(1.5, -1.0, 0.5, -0.5, 0.0, 0.0))
+    assert cache.get(key, live_state=live) is None
+
+
+def test_cache_ttl_expiry():
+    """Expired entries return None."""
+    cache = SessionCache()
+    state = OctState(axes=(0,0,0,0,0,0))
+    key = cache.put(state, payload="old", ttl=0.0)  # instant expiry
+    assert cache.get(key) is None
+
+
+def test_cache_lru_eviction():
+    """Oldest entries evicted when capacity exceeded."""
+    cache = SessionCache(max_entries=2)
+    s1 = OctState(axes=(1,0,0,0,0,0))
+    s2 = OctState(axes=(0,1,0,0,0,0))
+    s3 = OctState(axes=(0,0,1,0,0,0))
+    k1 = cache.put(s1, "first")
+    k2 = cache.put(s2, "second")
+    k3 = cache.put(s3, "third")
+    assert cache.get(k1) is None  # evicted
+    assert cache.get(k2) == "second"
+    assert cache.get(k3) == "third"
+
+
+def test_cache_invalidate_axis():
+    """Cascade invalidation removes drifted entries."""
+    cache = SessionCache(tolerance=0.1)
+    state = OctState(axes=(1.0, -1.0, 0.5, -0.5, 0.0, 0.0))
+    key = cache.put(state, payload="data")
+    drifted = OctState(axes=(2.0, -1.0, 0.5, -0.5, 0.0, 0.0))
+    cache.invalidate_axis(0, drifted)
+    assert cache.get(key) is None
+
+
+def test_cache_invalidate_repo():
+    """Repo invalidation removes all entries from that repo."""
+    cache = SessionCache()
+    s1 = OctState(axes=(1,0,0,0,0,0), source_repo="repo_a")
+    s2 = OctState(axes=(0,1,0,0,0,0), source_repo="repo_b")
+    k1 = cache.put(s1, "a")
+    k2 = cache.put(s2, "b")
+    cache.invalidate_repo("repo_a")
+    assert cache.get(k1) is None
+    assert cache.get(k2) == "b"
+
+
+def test_cache_persist_restore():
+    """Persist and restore preserves valid entries."""
+    import tempfile, shutil
+    tmpdir = tempfile.mkdtemp()
+    try:
+        cache1 = SessionCache(tolerance=0.1, persist_dir=tmpdir)
+        state = OctState(axes=(0.5, -0.5, 0.5, -0.5, 0.5, -0.5))
+        cache1.put(state, payload={"x": 1})
+        cache1.persist("test_session")
+
+        cache2 = SessionCache(tolerance=0.1, persist_dir=tmpdir)
+        live = OctState(axes=(0.51, -0.49, 0.51, -0.49, 0.51, -0.49))
+        loaded = cache2.restore("test_session", live_state=live)
+        assert loaded >= 1
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+def test_octstate_distance():
+    """L-inf distance between states."""
+    s1 = OctState(axes=(1.0, 0.0, 0.0, 0.0, 0.0, 0.0))
+    s2 = OctState(axes=(0.5, 0.0, 0.0, 0.0, 0.0, 0.0))
+    assert abs(s1.distance(s2) - 0.5) < 1e-10
+
+
+def test_octstate_antipodal_balance():
+    """Antipodal balance for a balanced state is zero."""
+    s = OctState(axes=(1.0, -1.0, 0.5, -0.5, 0.0, 0.0))
+    bx, by, bz = s.antipodal_balance()
+    assert abs(bx) < 1e-10
+    assert abs(by) < 1e-10
+    assert abs(bz) < 1e-10
+
+
+def test_invalidation_graph_adjacency():
+    """Each vertex has exactly 4 neighbors (octahedral)."""
+    g = InvalidationGraph()
+    for i in range(6):
+        assert len(g.neighbors(i)) == 4
+
+
+def test_invalidation_graph_no_antipodal():
+    """Antipodal pairs are not directly connected."""
+    g = InvalidationGraph()
+    for i in range(0, 6, 2):
+        assert (i + 1) not in g.neighbors(i)
+
+
+def test_cache_status():
+    """Status returns valid structure."""
+    cache = SessionCache()
+    cache.put(OctState(axes=(0,0,0,0,0,0)), "test")
+    status = cache.status()
+    assert status["entries"] == 1
+    assert "hit_rate" in status
+
+
+# ---------------------------------------------------------------------------
+# Octahedral Resilience tests
+# ---------------------------------------------------------------------------
+
+from octahedral_resilience import (
+    Health, OctahedralNode, HeartbeatMonitor, OctahedralCluster,
+    AlertMonitor, AutoRecovery,
+    CompressedSeed, SeedSplitter, SeedDispersal, HardwareComponent,
+    MinimalComms, ServiceReconfigurator, QuorumReconfigurator,
+    Priority, PriorityScheduler, PriorityRules,
+    HybridLogicalClock, CircuitBreaker, FencingManager,
+    ByzantineVerifier, AuditTrail, ShareMerkleTree,
+    ResourceType, ResourceReservation,
+    OctahedralResilienceSystem,
+)
+
+
+def test_heartbeat_returns_health():
+    """HeartbeatMonitor returns Health for each node."""
+    nodes = {"n0": OctahedralNode("n0", failure_rate=0.0)}
+    hm = HeartbeatMonitor(nodes)
+    status = hm.check()
+    assert status["n0"] == Health.HEALTHY
+
+
+def test_cluster_failover():
+    """Cluster failover switches to backup."""
+    primary = OctahedralNode("primary", failure_rate=1.0)  # always fails
+    backup = OctahedralNode("backup", failure_rate=0.0)
+    cluster = OctahedralCluster(primary, [backup])
+    result = cluster.solve_with_failover({})
+    assert result is not None
+    assert cluster.failover_count == 1
+
+
+def test_alert_monitor_threshold():
+    """Alerts fire after reaching failure threshold."""
+    mon = AlertMonitor(alert_threshold=2)
+    mon.update({"n0": Health.FAILED})
+    assert len(mon.alerts) == 0  # first failure
+    mon.update({"n0": Health.FAILED})
+    assert len(mon.alerts) == 1  # threshold reached
+
+
+def test_compressed_seed_verify():
+    """Seed checksum verifies correctly."""
+    seed = CompressedSeed(b"test_seed_data_16")
+    assert seed.verify()
+
+
+def test_seed_split_rebuild():
+    """Split and rebuild recovers original seed."""
+    original = secrets.token_bytes(16)
+    shares = SeedSplitter.split(original, total_shares=5, threshold=3)
+    assert len(shares) == 5
+    rebuilt = SeedSplitter.rebuild(shares[:3], [1, 2, 3], threshold=3)
+    # Verify by comparing compressed forms
+    assert len(rebuilt) == 16
+
+
+def test_seed_dispersal_roundtrip():
+    """Disperse and reconstruct a seed."""
+    comps = [HardwareComponent(f"c{i}") for i in range(5)]
+    disp = SeedDispersal(comps, total_shares=5, threshold=3)
+    seed = CompressedSeed(secrets.token_bytes(16))
+    sid = disp.disperse(seed)
+    recovered = disp.reconstruct(sid)
+    assert recovered is not None
+    assert recovered.verify()
+
+
+def test_minimal_comms_diff_patch():
+    """Diff and patch are inverses."""
+    old = b"hello_world_1234"
+    new = b"hello_WORLD_1234"
+    d = MinimalComms.diff(old, new)
+    patched = MinimalComms.patch(old, d)
+    assert patched == new
+
+
+def test_quorum_consensus():
+    """Quorum requires majority votes."""
+    q = QuorumReconfigurator(total_services=5, fault_tolerance=1)
+    # quorum_size = (5+1)//2 + 1 = 4
+    assert not q.propose("seed_a", "voter_1")
+    assert not q.propose("seed_a", "voter_2")
+    assert not q.propose("seed_a", "voter_3")
+    assert q.propose("seed_a", "voter_4")  # quorum reached
+
+
+def test_priority_scheduler_order():
+    """Critical priority scheduled before low."""
+    sched = PriorityScheduler()
+    sched.submit("low_seed", "c1", Priority.LOW)
+    sched.submit("crit_seed", "c2", Priority.CRITICAL)
+    req = sched.schedule_next()
+    assert req is not None
+    assert req.seed_id == "crit_seed"
+
+
+def test_circuit_breaker_blocks():
+    """Circuit breaker blocks after max attempts."""
+    cb = CircuitBreaker(max_attempts=3, window_seconds=60)
+    assert cb.allow("comp_a")
+    assert cb.allow("comp_a")
+    assert cb.allow("comp_a")
+    assert not cb.allow("comp_a")  # blocked
+
+
+def test_circuit_breaker_reset():
+    """Reset clears the breaker."""
+    cb = CircuitBreaker(max_attempts=2, window_seconds=60)
+    cb.allow("comp_a")
+    cb.allow("comp_a")
+    assert not cb.allow("comp_a")
+    cb.reset("comp_a")
+    assert cb.allow("comp_a")
+
+
+def test_fencing_generation():
+    """Fencing tokens increment on each register."""
+    fm = FencingManager()
+    g1 = fm.register("comp_x")
+    g2 = fm.register("comp_x")
+    assert g2 == g1 + 1
+    assert fm.validate("comp_x", g2)
+    assert not fm.validate("comp_x", g1)  # stale
+
+
+def test_audit_trail_verify():
+    """Audit trail chain verifies."""
+    audit = AuditTrail()
+    audit.log("test_op", "tester", "seed_123", {"detail": "value"})
+    audit.log("another_op", "tester", "seed_456")
+    assert audit.verify_chain()
+    assert len(audit.entries) == 2
+
+
+def test_merkle_tree_diff():
+    """Merkle tree detects differing seeds."""
+    t1 = ShareMerkleTree({"a": b"same", "b": b"same"})
+    t2 = ShareMerkleTree({"a": b"same", "b": b"DIFF"})
+    assert t1.root() != t2.root()
+    assert t1.diff(t2) == ["b"]
+
+
+def test_merkle_tree_same():
+    """Identical trees have same root and no diff."""
+    t1 = ShareMerkleTree({"a": b"data", "b": b"data2"})
+    t2 = ShareMerkleTree({"a": b"data", "b": b"data2"})
+    assert t1.root() == t2.root()
+    assert t1.diff(t2) == []
+
+
+def test_resource_reservation():
+    """Reserve and release resources."""
+    res = ResourceReservation()
+    assert res.reserve(ResourceType.CPU_IDLE, 0.3, "task_a")
+    assert res.reserve(ResourceType.CPU_IDLE, 0.2, "task_b")
+    assert not res.reserve(ResourceType.CPU_IDLE, 0.1, "task_c")  # exceeds 50%
+    res.release(ResourceType.CPU_IDLE, "task_a")
+    assert res.reserve(ResourceType.CPU_IDLE, 0.1, "task_c")  # now fits
+
+
+def test_hlc_tick():
+    """HLC tick advances time."""
+    hlc = HybridLogicalClock("test_comp")
+    pt1, lt1 = hlc.tick()
+    pt2, lt2 = hlc.tick()
+    assert pt2 >= pt1
+
+
+def test_resilience_system_bootstrap():
+    """Full system bootstraps and reports status."""
+    system = OctahedralResilienceSystem(num_components=5, threshold=3)
+    sid = system.bootstrap_seed(secrets.token_bytes(16))
+    assert sid is not None
+    status = system.system_status()
+    assert status["components"] == 5
+    assert status["seeds_tracked"] >= 1
+    assert status["audit_verified"]
+
+
+def test_resilience_system_safe_reconfig():
+    """Safe reconfiguration succeeds with all protections."""
+    system = OctahedralResilienceSystem()
+    sid = system.bootstrap_seed(secrets.token_bytes(16))
+    assert system.safe_reconfigure(sid, "hw_0")
+
+
+def test_resilience_system_refresh():
+    """Seed refresh reconstructs successfully."""
+    system = OctahedralResilienceSystem()
+    sid = system.bootstrap_seed(secrets.token_bytes(16))
+    assert system.refresh_seed(sid)
 
 
 # ---------------------------------------------------------------------------
