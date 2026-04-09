@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from collections import defaultdict
 import math
 
-PHI = (1 + math.sqrt(5)) / 2
+from octahedral_arithmetic import PHI
 
 
 # ---------------------------------------------------------------------------

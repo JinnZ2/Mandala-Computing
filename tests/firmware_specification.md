@@ -32,7 +32,7 @@ struct NodeConfig {
   uint8_t num_neighbors;      // How many adjacent nodes
   uint8_t neighbor_ids[8];    // IDs of physical neighbors
   uint32_t known_smooth_a;    // For healing: a value of known smooth relation
-  uint32_t known_smooth_Q;    // Corresponding Q = a² - N
+  uint32_t known_smooth_Q;    // Corresponding Q = a^2 - N
 };
 
 // ============================================================
@@ -54,7 +54,7 @@ struct NodeState {
 // Step 1: Reception (Binding)
 // Called when a candidate 'a' is broadcast on the bus
 uint8_t check_divisibility(uint32_t a, uint32_t N, NodeConfig* cfg, uint8_t* exponents) {
-  // Compute Q = a² - N (using 64-bit to avoid overflow)
+  // Compute Q = a^2 - N (using 64-bit to avoid overflow)
   uint64_t a64 = a;
   uint64_t N64 = N;
   uint64_t Q = a64 * a64 - N64;
@@ -401,7 +401,7 @@ File: collector_node.ino
 // ============================================================
 struct SmoothRelation {
   uint32_t a;
-  int64_t Q;  // a² - N (signed)
+  int64_t Q;  // a^2 - N (signed)
   uint32_t exponents[FACTOR_BASE_SIZE / 32];  // Bit-packed exponents
 };
 

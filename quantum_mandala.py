@@ -11,6 +11,8 @@ Each cell becomes a qubit-octit (8-level quantum system)
 v2.0: JSON layer wiring, QAOA, sensor telemetry, introspection
 """
 
+from __future__ import annotations
+
 import numpy as np
 from typing import List, Tuple, Dict, Optional
 from dataclasses import dataclass

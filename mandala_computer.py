@@ -10,6 +10,8 @@ Core Principle: The physics does the computation.
 v2.0: JSON layer wiring, exploration algorithms, full encodings, sensor telemetry
 """
 
+from __future__ import annotations
+
 import numpy as np
 from typing import List, Tuple, Optional, Dict, Callable
 from dataclasses import dataclass, field
