@@ -22,6 +22,8 @@ hierarchy (renormalization) connected by non-local correlations
 (entanglement). The ground state of this system IS the solution.
 """
 
+from __future__ import annotations
+
 import numpy as np
 from typing import List, Tuple, Dict, Optional, Callable
 from dataclasses import dataclass, field

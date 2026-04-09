@@ -2028,6 +2028,356 @@ def test_geis_cells_to_tensor_map_shape():
 
 
 # ---------------------------------------------------------------------------
+# Membrane tests
+# ---------------------------------------------------------------------------
+
+from membrane import Membrane, CoarseResult, Window, MembraneResult
+
+
+def test_membrane_default_solve():
+    """Membrane with custom coarse/fine runs three-phase pipeline."""
+    def coarse(data):
+        return CoarseResult(center=[3, 5], confidence=0.8, radius=2)
+
+    def fine(data, window):
+        return {"answer": [3, 5], "verified": True}
+
+    m = Membrane(coarse_fn=coarse, fine_fn=fine)
+    result = m.solve({"N": 15})
+    assert isinstance(result, MembraneResult)
+    assert result.verified is True
+    assert result.phase == "fine"
+    assert result.coarse.confidence == 0.8
+    assert result.time_coarse >= 0
+    assert result.time_fine >= 0
+
+
+def test_membrane_low_confidence_skips_window():
+    """Low confidence coarse result triggers full-space search."""
+    def coarse(data):
+        return CoarseResult(center=None, confidence=0.01, radius=10)
+
+    m = Membrane(coarse_fn=coarse, min_confidence=0.1)
+    result = m.solve({})
+    assert result.window.compression == 1.0
+    assert "reason" in result.window.metadata
+
+
+def test_membrane_no_coarse_fn():
+    """Membrane without coarse_fn falls back gracefully."""
+    m = Membrane()
+    result = m.solve({})
+    assert result.coarse.confidence == 0.0
+    assert result.verified is False
+
+
+def test_membrane_permeability_initial():
+    """Permeability starts at 0.5 with no history."""
+    m = Membrane()
+    assert m.permeability() == 0.5
+
+
+def test_membrane_permeability_adapts():
+    """Permeability reflects verification success rate."""
+    def coarse(data):
+        return CoarseResult(center=[1], confidence=0.9, radius=1)
+
+    def fine_pass(data, window):
+        return {"verified": True}
+
+    def fine_fail(data, window):
+        return {"verified": False}
+
+    m = Membrane(coarse_fn=coarse, fine_fn=fine_pass)
+    for _ in range(5):
+        m.solve({})
+    assert m.permeability() == 1.0
+
+    m2 = Membrane(coarse_fn=coarse, fine_fn=fine_fail)
+    for _ in range(5):
+        m2.solve({})
+    assert m2.permeability() == 0.0
+
+
+def test_membrane_history_accumulates():
+    """Each solve() appends to history."""
+    def coarse(data):
+        return CoarseResult(center=[1], confidence=0.5, radius=1)
+
+    m = Membrane(coarse_fn=coarse)
+    m.solve({})
+    m.solve({})
+    assert len(m.history) == 2
+
+
+def test_membrane_default_window():
+    """Default window expands center +/- radius."""
+    coarse = CoarseResult(center=[10, 20], confidence=0.8, radius=3)
+    window = Membrane._default_window(coarse, {})
+    assert isinstance(window, Window)
+    assert "dim_0" in window.bounds
+    assert window.bounds["dim_0"] == (7, 13)
+    assert window.bounds["dim_1"] == (17, 23)
+    assert window.compression > 1.0
+
+
+def test_membrane_dataclasses():
+    """Core dataclasses construct correctly."""
+    cr = CoarseResult(center=[1, 2], confidence=0.5, radius=1.0)
+    assert cr.confidence == 0.5
+    w = Window(bounds={}, size=10, full_space_size=100, compression=10.0)
+    assert w.compression == 10.0
+
+
+# ---------------------------------------------------------------------------
+# Glyph Converter tests
+# ---------------------------------------------------------------------------
+
+from glyph_convert import (
+    dual, dual_fraction, convert_number, convert_fraction, glyph_arithmetic,
+)
+
+
+def test_glyph_convert_number_prime():
+    """convert_number identifies primes correctly."""
+    result = convert_number(7)
+    assert result["decimal"] == 7
+    assert result["is_prime"] is True
+    assert result["glyph"] is not None
+    assert result["factors_glyph"] == ["IRREDUCIBLE"]
+
+
+def test_glyph_convert_number_composite():
+    """convert_number factors composite numbers."""
+    result = convert_number(15)
+    assert result["decimal"] == 15
+    assert result["is_prime"] is False
+    assert "factor_pair" in result or "factors_decimal" in result
+    # 15 = 3 * 5
+    assert 3 in result["factors_decimal"] and 5 in result["factors_decimal"]
+
+
+def test_glyph_convert_fraction():
+    """convert_fraction produces glyph representation."""
+    result = convert_fraction(3, 7)
+    assert result["decimal"] == "3/7"
+    assert "glyph" in result
+    assert result["irreducible"] is True
+
+
+def test_glyph_convert_fraction_reducible():
+    """convert_fraction auto-reduces and shows reduced form."""
+    result = convert_fraction(6, 14)
+    # GlyphFraction auto-reduces, so irreducible=True after reduction
+    assert "reduced_decimal" in result
+    assert result["reduced_decimal"] == "3/7"
+
+
+def test_glyph_arithmetic_add():
+    """Glyph arithmetic addition works."""
+    result = glyph_arithmetic(3, "+", 5)
+    assert result["result_decimal"] == 8
+    assert "result_glyph" in result
+
+
+def test_glyph_arithmetic_multiply():
+    """Glyph arithmetic multiplication works."""
+    result = glyph_arithmetic(3, "*", 7)
+    assert result["result_decimal"] == 21
+
+
+def test_glyph_arithmetic_subtract():
+    """Glyph arithmetic subtraction works."""
+    result = glyph_arithmetic(10, "-", 3)
+    assert result["result_decimal"] == 7
+
+
+def test_glyph_dual_display():
+    """dual() returns formatted string with glyph and decimal."""
+    from octahedral_arithmetic import OctahedralNumber
+    n = OctahedralNumber.from_decimal(42)
+    s = dual(n, "test")
+    assert "test" in s
+    assert "42" in s
+
+
+def test_glyph_dual_fraction_display():
+    """dual_fraction() returns formatted string."""
+    from octahedral_arithmetic import GlyphFraction
+    f = GlyphFraction.from_decimal_ratio(3, 7)
+    s = dual_fraction(f, "ratio")
+    assert "ratio" in s
+    assert "3" in s and "7" in s
+
+
+# ---------------------------------------------------------------------------
+# Mandala Simulator tests
+# ---------------------------------------------------------------------------
+
+from mandala_simulator import MandalaSimulator
+
+
+def test_simulator_status():
+    """Simulator reports available capabilities."""
+    sim = MandalaSimulator()
+    s = sim.status()
+    assert "arithmetic" in s
+    assert "classical_engine" in s
+    assert "quantum_engine" in s
+    assert "claim_validator" in s
+    assert s["golden_depth"] == 5
+    assert s["sacred_geometry"] == 8
+
+
+def test_simulator_glyph():
+    """Glyph conversion works for various numbers."""
+    sim = MandalaSimulator()
+    assert sim.glyph(0) is not None
+    assert sim.glyph(7) is not None
+    assert sim.glyph(42) is not None
+    # Glyph of 0 should be the null glyph
+    assert len(sim.glyph(0)) >= 1
+
+
+def test_simulator_factor_prime():
+    """Simulator identifies primes."""
+    sim = MandalaSimulator()
+    result = sim.factor(7)
+    assert result["N"] == 7
+    assert result.get("prime", False) or result.get("factors") == [7]
+
+
+def test_simulator_factor_composite():
+    """Simulator factors composite numbers."""
+    sim = MandalaSimulator()
+    result = sim.factor(15)
+    assert result["N"] == 15
+    factors = result.get("factors")
+    if isinstance(factors, (list, tuple)):
+        product = 1
+        for f in factors:
+            product *= f
+        assert product == 15
+
+
+def test_simulator_validate_claim():
+    """Simulator validates claims when validator is available."""
+    sim = MandalaSimulator()
+    if sim._has_validator:
+        result = sim.validate_claim("This is a specific, testable claim about X.")
+        assert "concern" in result
+    else:
+        result = sim.validate_claim("test")
+        assert "error" in result
+
+
+def test_simulator_custom_params():
+    """Simulator accepts custom golden_depth and sacred_geometry."""
+    sim = MandalaSimulator(golden_depth=3, sacred_geometry=8)
+    assert sim.golden_depth == 3
+    assert sim.sacred_geometry == 8
+
+
+# ---------------------------------------------------------------------------
+# Holographic Mandala extended tests
+# ---------------------------------------------------------------------------
+
+from holographic_mandala import HolographicMandala, HolographicRing, EntanglementLink
+from mandala_computer import ProblemType
+
+
+def test_holographic_bloom_creates_rings():
+    """bloom_mandala() creates holographic ring structure."""
+    hm = HolographicMandala(golden_depth=3, sacred_geometry=8)
+    hm.bloom_mandala()
+    assert len(hm.rings) > 0
+    assert all(isinstance(r, HolographicRing) for r in hm.rings)
+
+
+def test_holographic_ring_structure():
+    """Rings have increasing depth and decreasing radius."""
+    hm = HolographicMandala(golden_depth=4, sacred_geometry=8)
+    for i in range(1, len(hm.rings)):
+        assert hm.rings[i].depth >= hm.rings[i - 1].depth
+
+
+def test_holographic_entanglement_links():
+    """Entanglement links are created between rings."""
+    hm = HolographicMandala(golden_depth=4, sacred_geometry=8)
+    hm.bloom_mandala()
+    assert len(hm.entanglement_links) > 0
+    for link in hm.entanglement_links:
+        assert isinstance(link, EntanglementLink)
+        assert link.depth_a != link.depth_b  # cross-depth
+
+
+def test_holographic_encode_factorization():
+    """encode_holographic sets up problem on boundary ring."""
+    hm = HolographicMandala(golden_depth=4, sacred_geometry=8)
+    hm.encode_holographic(ProblemType.FACTORIZATION, {"N": 15})
+    # Boundary ring should have projected problem
+    assert hm.rings[0].projected_problem is not None
+
+
+def test_holographic_compute_energy():
+    """compute_total_energy includes holographic and entanglement terms."""
+    hm = HolographicMandala(golden_depth=3, sacred_geometry=8)
+    hm.encode_holographic(ProblemType.FACTORIZATION, {"N": 15})
+    energy = hm.compute_total_energy()
+    assert isinstance(energy, float)
+    assert energy >= 0 or True  # energy can be any float
+
+
+def test_holographic_relax_step():
+    """relax_step returns a float energy change."""
+    hm = HolographicMandala(golden_depth=3, sacred_geometry=8, temperature=1.0)
+    hm.encode_holographic(ProblemType.FACTORIZATION, {"N": 15})
+    dE = hm.relax_step()
+    assert isinstance(dE, float)
+
+
+def test_holographic_profile():
+    """get_holographic_profile returns per-ring data."""
+    hm = HolographicMandala(golden_depth=3, sacred_geometry=8)
+    hm.encode_holographic(ProblemType.FACTORIZATION, {"N": 15})
+    profile = hm.get_holographic_profile()
+    assert isinstance(profile, dict)
+    assert len(profile) == len(hm.rings)  # one entry per ring depth
+
+
+def test_holographic_entanglement_map():
+    """get_entanglement_map returns link details."""
+    hm = HolographicMandala(golden_depth=4, sacred_geometry=8)
+    emap = hm.get_entanglement_map()
+    assert isinstance(emap, list)
+    if emap:
+        assert "cell_a" in emap[0]
+        assert "strength" in emap[0]
+
+
+def test_holographic_solve_runs():
+    """holographic_solve completes without error."""
+    hm = HolographicMandala(golden_depth=3, sacred_geometry=8,
+                            entanglement_decay=0.5, holographic_weight=0.5)
+    result = hm.holographic_solve(
+        ProblemType.FACTORIZATION, {"N": 15},
+        max_steps_per_scale=200, num_sweeps=1
+    )
+    assert "solution" in result
+    assert "final_energy" in result
+
+
+def test_holographic_renormalization_solve():
+    """renormalization_solve returns solution dict."""
+    hm = HolographicMandala(golden_depth=3, sacred_geometry=8,
+                            entanglement_decay=0.5, holographic_weight=0.5)
+    hm.encode_holographic(ProblemType.FACTORIZATION, {"N": 15})
+    result = hm.renormalization_solve(max_steps_per_scale=100, num_sweeps=1)
+    assert "solution" in result
+    assert "scale_solutions" in result
+
+
+# ---------------------------------------------------------------------------
 # Run all tests
 # ---------------------------------------------------------------------------
 

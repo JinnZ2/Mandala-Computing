@@ -16,10 +16,11 @@ Usage:
     sim.validate_claim("This is fundamentally the best approach.")
 """
 
-import math
+from __future__ import annotations
+
 import time
 
-PHI = (1 + math.sqrt(5)) / 2
+from octahedral_arithmetic import PHI
 
 
 class MandalaSimulator:

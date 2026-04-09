@@ -52,7 +52,6 @@ from __future__ import annotations
 import hashlib
 import secrets
 import time
-import math
 import random
 import threading
 import heapq
@@ -62,12 +61,12 @@ from typing import Dict, List, Optional, Tuple, Set, Any
 from enum import Enum
 from abc import ABC, abstractmethod
 
+from octahedral_arithmetic import PHI
+
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-
-PHI = (1 + math.sqrt(5)) / 2
 
 # Octahedral vertex labels (matching octahedral_session_cache)
 AXIS_LABELS = ("+X", "-X", "+Y", "-Y", "+Z", "-Z")

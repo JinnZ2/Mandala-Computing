@@ -49,12 +49,12 @@ from typing import Dict, Optional, List, Any, Tuple, Set
 from collections import OrderedDict
 from pathlib import Path
 
+from octahedral_arithmetic import PHI
+
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-
-PHI = (1 + math.sqrt(5)) / 2
 
 # The 6 octahedral axes, matching OCTAHEDRAL_VERTICES from geometric_state_algebra
 AXIS_LABELS = ("+X", "-X", "+Y", "-Y", "+Z", "-Z")

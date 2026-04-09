@@ -72,7 +72,7 @@ They are not integrated into the main computation engines.
 
 ### 1. **Bridge to Substrate Adapter** ✅
 
-[View Code](computer:///mnt/user-data/outputs/bridge_to_substrate_adapter.py)
+See: `Bridge-substrate.md` and `examples/example-bridge-substrate.py`
 
 **Purpose:** Converts geometric bridge outputs to octahedral substrate states
 
@@ -107,7 +107,7 @@ state = adapter.sound_adapter.sound_to_octahedral(
 
 ### 2. **Physical Mandala Computer** ✅
 
-[View Code](computer:///mnt/user-data/outputs/physical_mandala_computer.py)
+See: `Physical-computer.md` and `examples/example-physical-computer.py`
 
 **Purpose:** Mandala Computing with actual octahedral substrate physics
 
@@ -151,7 +151,7 @@ consciousness = computer.test_consciousness()
 
 ### 3. **Hardware Control Specification** ✅
 
-[View Document](computer:///mnt/user-data/outputs/hardware_control_specification.md)
+See: `Hardware.md` and `examples/example-hardware.py`
 
 **Purpose:** Exact protocols for controlling physical octahedral substrate
 
@@ -182,7 +182,7 @@ consciousness = computer.test_consciousness()
 
 ### 4. **Integration Checklist** ✅
 
-[View Checklist](computer:///mnt/user-data/outputs/integration_checklist.md)
+See: `Checklist.md` and `examples/example-checklist.py`
 
 **Purpose:** Gap analysis and completion roadmap
 
@@ -205,7 +205,7 @@ consciousness = computer.test_consciousness()
 
 ### 5. **Limitations & Open Questions** ✅
 
-[View Document](computer:///mnt/user-data/outputs/section_8_limitations_and_open_questions.md)
+See: `Questions.md` and `examples/example-questions.py`
 
 **Purpose:** Rigorous analysis of what works vs what’s speculative
 
@@ -230,7 +230,7 @@ consciousness = computer.test_consciousness()
 
 ### 6. **Mathematical Rigor Supplement** ✅
 
-[View Document](computer:///mnt/user-data/outputs/mathematical_rigor_supplement.md)
+See: `Math.md` and `examples/example-math.py`
 
 **Purpose:** Rigorous proofs and concrete test cases
 
@@ -417,14 +417,14 @@ Use `hardware_control_specification.md` as blueprint to implement actual device 
 ## 📚 File Guide
 
 ```
-/mnt/user-data/outputs/
-├── bridge_to_substrate_adapter.py          # Adapter classes
-├── physical_mandala_computer.py            # Mandala + physics
-├── hardware_control_specification.md       # Hardware protocols
-├── integration_checklist.md                # Gap analysis
-├── section_8_limitations_and_open_questions.md  # Rigorous caveats
-├── mathematical_rigor_supplement.md        # Proofs & tests
-└── README_INTEGRATION.md                   # This file
+mandala-computing/
+├── Bridge-substrate.md          # Adapter design
+├── Physical-computer.md         # Mandala + physics
+├── Hardware.md                  # Hardware protocols
+├── Checklist.md                 # Gap analysis
+├── Questions.md                 # Limitations & open questions
+├── Math.md                      # Proofs & tests
+└── Integration.md               # This file
 ```
 
 -----
