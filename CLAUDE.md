@@ -37,7 +37,7 @@ mandala-computing/
 ├── osl.py                     # Octahedral Symbolic Language v1.0 (~965 loc)
 ├── geis.py                    # Geometric Information Encoding System bridge (~695 loc)
 ├── kt_annealer.py             # KT phase annealer + symmetry detector (~430 loc)
-├── mandala_runtime.py         # substrate-agnostic sensor fusion binding (~1440 loc)
+├── mandala_runtime.py         # substrate-agnostic sensor fusion binding (~1900 loc)
 ├── membrane.py                # boundary computation primitive (~470 loc)
 ├── claim_validator.py         # epistemological claim validation (~500 loc)
 ├── glyph_convert.py           # human decimal-to-glyph converter (~355 loc)
@@ -50,7 +50,7 @@ mandala-computing/
 ├── PROJECTS.md                # connected repos
 ├── LICENSE                    # MIT
 ├── examples/                  # 20 runnable example scripts + benchmark
-├── tests/test_core.py         # 285-test suite
+├── tests/test_core.py         # 297-test suite
 └── [17 .md files]             # theory, hardware, integration, proofs, notes
 ```
 
@@ -434,7 +434,7 @@ large systems.
 
 ## build-test-run
 
-Test suite: `python tests/test_core.py` (285 tests across all modules).
+Test suite: `python tests/test_core.py` (297 tests across all modules).
 No formal build system, CI/CD, or linting is configured.
 
 ### run-demos
@@ -567,7 +567,7 @@ Connected repositories by JinnZ2 (listed in `PROJECTS.md` and `.fieldlink.json`)
 - **`OctahedralState`** exists in both `geis.py` (3D cubic coordinates, tokens)
   and implicitly in `octahedral_arithmetic.py` (glyph-space). Use GEIS for
   binary bridging, use octahedral_arithmetic for exact glyph math
-- **test suite:** `python tests/test_core.py` runs 285 tests across all modules
+- **test suite:** `python tests/test_core.py` runs 297 tests across all modules
 - **`.gitignore`** excludes `__pycache__/`, `.pyc`, `.env`, `.pytest_cache/`, etc.
 - **`requirements.txt`** at repo root lists numpy and scipy
 - **flat layout:** all code at root level, no package hierarchy

@@ -57,6 +57,11 @@ class Substrate(Enum):
     Each substrate is a different lossy projection of an underlying
     physical field.  The Mandala's job is to combine projections to
     recover what any single one destroyed.
+
+    These are the WELL-KNOWN substrates for physical-domain encoding.
+    For intelligence substrates (Layer 3), use string values directly
+    in StreamCapability/Basin — the Mandala accepts any hashable
+    substrate, not just this enum.
     """
     BINARY     = "binary"
     TERNARY    = "ternary"
@@ -64,6 +69,11 @@ class Substrate(Enum):
     STOCHASTIC = "stochastic"
     DIGITAL    = "digital"
     ANALOG     = "analog"
+
+
+def substrate_key(s) -> str:
+    """Extract string key from a Substrate enum or a raw string."""
+    return s.value if isinstance(s, Substrate) else str(s)
 
 
 # =========================================================================
@@ -366,8 +376,8 @@ class MandalaRuntime:
         for d in domain_keys:
             geom = geometries[d]
             cf = geom.confidence_field
-            for substrate_key, confidence in cf.items():
-                if substrate_key == "ternary" and confidence > 0:
+            for sk, conf in cf.items():
+                if sk == "ternary" and conf > 0:
                     null_domains.append(d)
                     break
         if len(null_domains) >= 2:
@@ -412,8 +422,8 @@ class MandalaRuntime:
         if shared_substrates:
             for s, ds in shared_substrates.items():
                 agreements.append(("shared_substrate",
-                                   {"substrate": s.value, "domains": ds},
-                                   f"Substrate '{s.value}' spans domains {ds} — "
+                                   {"substrate": substrate_key(s), "domains": ds},
+                                   f"Substrate '{substrate_key(s)}' spans domains {ds} — "
                                    f"enables direct cross-domain comparison"))
 
         # --- Registered coupling rules ---
@@ -536,7 +546,7 @@ class SoundIntersectionRule:
 
         confidence = {}
         for b in basins:
-            confidence[b.substrate.value] = b.depth * b.source_capability.confidence
+            confidence[substrate_key(b.substrate)] = b.depth * b.source_capability.confidence
         if agreement:
             for k in confidence:
                 confidence[k] = min(1.0, confidence[k] * (1.0 + 0.1 * len(agreement)))
@@ -770,7 +780,7 @@ class GravityIntersectionRule:
 
         confidence = {}
         for b in basins:
-            confidence[b.substrate.value] = b.depth * b.source_capability.confidence
+            confidence[substrate_key(b.substrate)] = b.depth * b.source_capability.confidence
         if agreement:
             for k in confidence:
                 confidence[k] = min(1.0, confidence[k] * (1.0 + 0.1 * len(agreement)))
@@ -840,7 +850,7 @@ class ElectricIntersectionRule:
 
         confidence = {}
         for b in basins:
-            confidence[b.substrate.value] = b.depth * b.source_capability.confidence
+            confidence[substrate_key(b.substrate)] = b.depth * b.source_capability.confidence
         if agreement:
             for k in confidence:
                 confidence[k] = min(1.0, confidence[k] * (1.0 + 0.1 * len(agreement)))
@@ -1081,7 +1091,7 @@ class ThermalIntersectionRule:
 
         confidence = {}
         for b in basins:
-            confidence[b.substrate.value] = b.depth * b.source_capability.confidence
+            confidence[substrate_key(b.substrate)] = b.depth * b.source_capability.confidence
         if agreement:
             for k in confidence:
                 confidence[k] = min(1.0, confidence[k] * 1.1)
@@ -1133,7 +1143,7 @@ class MagneticIntersectionRule:
 
         confidence = {}
         for b in basins:
-            confidence[b.substrate.value] = b.depth * b.source_capability.confidence
+            confidence[substrate_key(b.substrate)] = b.depth * b.source_capability.confidence
         if agreement:
             for k in confidence:
                 confidence[k] = min(1.0, confidence[k] * 1.1)
@@ -1239,7 +1249,433 @@ def get_paradigm_matrix() -> dict:
 
 
 # =========================================================================
-# 12. DEMO
+# 15. LAYER 3 → LAYER 4: LIVING INTELLIGENCE DESCRIPTORS
+# =========================================================================
+#
+#  LAYER 4  DYNAMICS / RELATIONSHIPS / ENVIRONMENT
+#           (IntersectionRule consumes these)
+#                       ▲  emits Basin
+#  LAYER 3  INTELLIGENCE PROFILE ← the substrate
+#           bee swarm / quartz lattice / mycelial flow / etc.
+#           each one is its OWN substrate, not a flavor of binary
+#                       ▲  composed of
+#  LAYER 2  BIOLOGY / CHEMISTRY / PHYSICS  (future drill-down)
+#  LAYER 1  ATOMIC / SUB-ATOMIC            (future drill-down)
+#
+#  The flow: LID entity (JSON) → DynamicsProjector → Basin
+# =========================================================================
+
+import json
+import time as _time
+import pathlib
+
+
+@dataclass
+class LIDEntity:
+    """
+    Living Intelligence Descriptor — a Layer 3 intelligence profile.
+
+    Describes an intelligence substrate (bee swarm, quartz lattice,
+    mycelial network, plasma topology, etc.) in enough detail for a
+    DynamicsProjector to emit constraint-geometry Basins.
+
+    Can be loaded from JSON (ontology_index.json) or constructed
+    programmatically.
+    """
+    entity_id: str
+    name: str
+    substrate_type: str
+    category: str
+    dynamics: dict = field(default_factory=dict)
+    environment: dict = field(default_factory=dict)
+    physics_couplings: list = field(default_factory=list)
+    spatial_extent: Optional[tuple] = None
+    temporal_scale_s: Optional[float] = None
+    metadata: dict = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, d: dict) -> LIDEntity:
+        return cls(
+            entity_id=d["entity_id"],
+            name=d["name"],
+            substrate_type=d["substrate_type"],
+            category=d.get("category", "unknown"),
+            dynamics=d.get("dynamics", {}),
+            environment=d.get("environment", {}),
+            physics_couplings=d.get("physics_couplings", []),
+            spatial_extent=tuple(d["spatial_extent"]) if d.get("spatial_extent") else None,
+            temporal_scale_s=d.get("temporal_scale_s"),
+            metadata=d.get("metadata", {}),
+        )
+
+    def to_dict(self) -> dict:
+        return {
+            "entity_id": self.entity_id,
+            "name": self.name,
+            "substrate_type": self.substrate_type,
+            "category": self.category,
+            "dynamics": self.dynamics,
+            "environment": self.environment,
+            "physics_couplings": self.physics_couplings,
+            "spatial_extent": list(self.spatial_extent) if self.spatial_extent else None,
+            "temporal_scale_s": self.temporal_scale_s,
+            "metadata": self.metadata,
+        }
+
+
+def load_ontology_index(path: str,
+                        max_staleness_days: float = 30.0) -> list:
+    """
+    Load LID entities from an ontology_index.json file.
+
+    Includes a staleness check — if the file was last modified more
+    than max_staleness_days ago, a warning is printed (but data is
+    still returned).
+    """
+    p = pathlib.Path(path)
+    if not p.exists():
+        return []
+
+    mtime = p.stat().st_mtime
+    age_days = (_time.time() - mtime) / 86400
+    if age_days > max_staleness_days:
+        print(f"  WARNING: {path} is {age_days:.0f} days old "
+              f"(staleness threshold: {max_staleness_days:.0f})")
+
+    with open(p) as f:
+        data = json.load(f)
+
+    entities_raw = data if isinstance(data, list) else data.get("entities", [])
+    return [LIDEntity.from_dict(e) for e in entities_raw]
+
+
+class DynamicsProjector:
+    """
+    Base class: reads an LID entity + environment and emits Basins.
+
+    Layer 4 — the DynamicsProjector translates an intelligence profile's
+    dynamics, physics couplings, and environmental context into
+    constraint-geometry Basins that the Mandala can breathe.
+
+    Subclass this for each intelligence category:
+      AnimalProjector  → swarm dynamics, neural architecture
+      CrystalProjector → lattice modes, piezoelectric coupling
+      MycelialProjector → network topology, chemical signaling
+      PlasmaProjector  → MHD modes, magnetic confinement
+    """
+
+    def project(self, entity: LIDEntity,
+                environment: Optional[dict] = None) -> list:
+        """
+        Emit one or more Basins from an LID entity.
+
+        Subclasses override this to implement domain-specific projection.
+        The base implementation emits a single generic basin.
+        """
+        env = environment or entity.environment
+        cap = StreamCapability(
+            domain=entity.category,
+            substrate=entity.substrate_type,
+            coverage_fraction=0.5,
+            confidence=0.5,
+        )
+        return [Basin(
+            domain=entity.category,
+            substrate=entity.substrate_type,
+            support=entity.spatial_extent or ("generic", 0, 1),
+            depth=0.5,
+            signature={
+                "entity_id": entity.entity_id,
+                "dynamics": entity.dynamics,
+                "environment": env,
+            },
+            source_capability=cap,
+        )]
+
+
+class AnimalProjector(DynamicsProjector):
+    """
+    Project animal intelligence profiles into Basins.
+
+    Reads swarm dynamics (gradient following, trajectory geometry,
+    communication bandwidth), neural architecture (distributed vs
+    centralised), and environmental coupling (thermal, chemical,
+    acoustic, magnetic).
+    """
+
+    def project(self, entity: LIDEntity,
+                environment: Optional[dict] = None) -> list:
+        env = environment or entity.environment
+        dyn = entity.dynamics
+        basins = []
+
+        gradient_field = dyn.get("gradient_field", {})
+        if gradient_field:
+            strength = gradient_field.get("strength", 0.5)
+            cap = StreamCapability(
+                domain=entity.category,
+                substrate=entity.substrate_type,
+                coverage_fraction=gradient_field.get("coverage", 0.7),
+                confidence=gradient_field.get("confidence", 0.6),
+            )
+            basins.append(Basin(
+                domain=entity.category,
+                substrate=entity.substrate_type,
+                support=entity.spatial_extent or ("swarm_volume", 0, 1),
+                depth=min(1.0, strength),
+                signature={
+                    "mode": "gradient_following",
+                    "gradient_strength": strength,
+                    "gradient_direction": gradient_field.get("direction", [0, 0, 1]),
+                    "swarm_size": dyn.get("swarm_size", 1),
+                    "communication_bandwidth": dyn.get("communication_bandwidth", 0),
+                },
+                source_capability=cap,
+            ))
+
+        trajectory = dyn.get("trajectory_geometry", {})
+        if trajectory:
+            cap = StreamCapability(
+                domain=entity.category,
+                substrate=entity.substrate_type,
+                coverage_fraction=0.6,
+                confidence=0.7,
+            )
+            basins.append(Basin(
+                domain=entity.category,
+                substrate=entity.substrate_type,
+                support=entity.spatial_extent or ("trajectory_space", 0, 1),
+                depth=0.7,
+                signature={
+                    "mode": "trajectory_geometry",
+                    "pattern": trajectory.get("pattern", "random_walk"),
+                    "persistence_length": trajectory.get("persistence_length", 0),
+                    "dimensionality": trajectory.get("dimensionality", 3),
+                },
+                source_capability=cap,
+            ))
+
+        if not basins:
+            return super().project(entity, environment)
+        return basins
+
+
+class CrystalProjector(DynamicsProjector):
+    """
+    Project crystal/mineral intelligence profiles into Basins.
+
+    Reads lattice structure (symmetry group, phonon modes),
+    piezoelectric coupling, defect dynamics, and thermal response.
+    """
+
+    def project(self, entity: LIDEntity,
+                environment: Optional[dict] = None) -> list:
+        env = environment or entity.environment
+        dyn = entity.dynamics
+        basins = []
+
+        lattice = dyn.get("lattice", {})
+        if lattice:
+            cap = StreamCapability(
+                domain=entity.category,
+                substrate=entity.substrate_type,
+                coverage_fraction=lattice.get("coverage", 0.9),
+                confidence=lattice.get("confidence", 0.8),
+            )
+            basins.append(Basin(
+                domain=entity.category,
+                substrate=entity.substrate_type,
+                support=entity.spatial_extent or ("crystal_volume", 0, 1),
+                depth=0.8,
+                signature={
+                    "mode": "lattice_modes",
+                    "symmetry_group": lattice.get("symmetry_group", "unknown"),
+                    "phonon_modes": lattice.get("phonon_modes", 0),
+                    "defect_density": lattice.get("defect_density", 0),
+                    "temperature_K": env.get("temperature_K", 293),
+                },
+                source_capability=cap,
+            ))
+
+        piezo = dyn.get("piezoelectric", {})
+        if piezo:
+            cap = StreamCapability(
+                domain=entity.category,
+                substrate=entity.substrate_type,
+                coverage_fraction=0.7,
+                confidence=piezo.get("confidence", 0.7),
+            )
+            basins.append(Basin(
+                domain=entity.category,
+                substrate=entity.substrate_type,
+                support=entity.spatial_extent or ("crystal_surface", 0, 1),
+                depth=0.6,
+                signature={
+                    "mode": "piezoelectric_coupling",
+                    "d33_pC_N": piezo.get("d33_pC_N", 0),
+                    "resonant_freq_Hz": piezo.get("resonant_freq_Hz", 0),
+                    "coupling_factor": piezo.get("coupling_factor", 0),
+                },
+                source_capability=cap,
+            ))
+
+        if not basins:
+            return super().project(entity, environment)
+        return basins
+
+
+# --- Built-in LID entities for demo / testing ---
+
+BEE_SWARM_LID = LIDEntity(
+    entity_id="LID.ANIMAL.BEE_SWARM",
+    name="Honeybee Swarm",
+    substrate_type="swarm.bee",
+    category="animal_intelligence",
+    dynamics={
+        "gradient_field": {
+            "strength": 0.8,
+            "direction": [0, 0, 1],
+            "coverage": 0.7,
+            "confidence": 0.6,
+        },
+        "trajectory_geometry": {
+            "pattern": "waggle_dance",
+            "persistence_length": 0.3,
+            "dimensionality": 3,
+        },
+        "swarm_size": 10000,
+        "communication_bandwidth": 0.1,
+    },
+    environment={"temperature_K": 308, "humidity": 0.6},
+    physics_couplings=["thermal", "chemical", "acoustic", "magnetic"],
+    spatial_extent=(0, 100),
+    temporal_scale_s=60,
+)
+
+QUARTZ_LATTICE_LID = LIDEntity(
+    entity_id="LID.CRYSTAL.QUARTZ",
+    name="Quartz Crystal Lattice",
+    substrate_type="crystal.quartz",
+    category="crystal_intelligence",
+    dynamics={
+        "lattice": {
+            "symmetry_group": "D3",
+            "phonon_modes": 18,
+            "defect_density": 1e-6,
+            "coverage": 0.95,
+            "confidence": 0.9,
+        },
+        "piezoelectric": {
+            "d33_pC_N": 2.3,
+            "resonant_freq_Hz": 32768,
+            "coupling_factor": 0.1,
+            "confidence": 0.85,
+        },
+    },
+    environment={"temperature_K": 293, "pressure_Pa": 101325},
+    physics_couplings=["electric", "acoustic", "thermal"],
+    spatial_extent=(0, 0.01),
+    temporal_scale_s=3e-5,
+)
+
+
+@dataclass
+class AnimalCrystalCoupling:
+    """
+    Cross-domain coupling: animal intelligence x crystal intelligence.
+
+    Physics: bees sense magnetic fields via magnetite crystals.
+    Crystal piezoelectric response couples to acoustic swarm signals.
+    Shared thermal environment affects both substrates.
+    """
+    domains: tuple = ("animal_intelligence", "crystal_intelligence")
+
+    def couple(self, geom_animal: UnifiedGeometry,
+               geom_crystal: UnifiedGeometry) -> dict:
+        agreements = []
+        tensions = []
+        boosts = {}
+
+        animal_sigs = []
+        for a in (geom_animal.agreement_regions + geom_animal.tension_regions):
+            animal_sigs.append(str(a).lower())
+        crystal_sigs = []
+        for c in (geom_crystal.agreement_regions + geom_crystal.tension_regions):
+            crystal_sigs.append(str(c).lower())
+
+        animal_text = " ".join(animal_sigs)
+        crystal_text = " ".join(crystal_sigs)
+
+        if "acoustic" in animal_text or "acoustic" in crystal_text:
+            agreements.append(("bioacoustic_crystal_coupling",
+                               "Swarm acoustic signals may couple to "
+                               "crystal piezoelectric response"))
+            boosts["animal_intelligence"] = 0.1
+            boosts["crystal_intelligence"] = 0.1
+
+        if geom_animal.substrates_used and geom_crystal.substrates_used:
+            agreements.append(("cross_substrate_intelligence",
+                               f"animal={[substrate_key(s) for s in geom_animal.substrates_used]}",
+                               f"crystal={[substrate_key(s) for s in geom_crystal.substrates_used]}",
+                               "Two distinct intelligence substrates composing "
+                               "through the Mandala"))
+
+        return {"agreements": agreements, "tensions": tensions,
+                "confidence_boosts": boosts}
+
+
+@dataclass
+class IntelligenceIntersectionRule:
+    """
+    Generic intersection rule for any intelligence domain.
+
+    Since intelligence substrates are open-ended (not enum-constrained),
+    this rule handles any domain by looking for common basin signature
+    patterns: gradient fields, trajectory geometry, lattice modes, etc.
+    """
+    domain: str = "intelligence"
+
+    def __init__(self, domain: str = "intelligence"):
+        self.domain = domain
+
+    def intersect(self, basins: list) -> UnifiedGeometry:
+        substrates = {b.substrate for b in basins}
+        agreement: list = []
+        tension: list = []
+
+        modes = [b.signature.get("mode", "") for b in basins if isinstance(b.signature, dict)]
+        if len(set(modes)) > 1:
+            agreement.append(("multi_mode_intelligence",
+                               f"modes={list(set(modes))}",
+                               "Multiple intelligence modes active simultaneously"))
+
+        grad_basins = [b for b in basins
+                       if isinstance(b.signature, dict)
+                       and b.signature.get("mode") == "gradient_following"]
+        lattice_basins = [b for b in basins
+                          if isinstance(b.signature, dict)
+                          and b.signature.get("mode") == "lattice_modes"]
+        if grad_basins and lattice_basins:
+            agreement.append(("gradient_lattice_coupling",
+                               "Gradient-following intelligence meets lattice structure"))
+
+        confidence = {}
+        for b in basins:
+            confidence[substrate_key(b.substrate)] = b.depth * b.source_capability.confidence
+        if agreement:
+            for k in confidence:
+                confidence[k] = min(1.0, confidence[k] * 1.1)
+
+        uncovered = [] if basins else [("entire_field",)]
+        return UnifiedGeometry(
+            domain=self.domain, substrates_used=substrates,
+            agreement_regions=agreement, tension_regions=tension,
+            uncovered_regions=uncovered, confidence_field=confidence,
+        )
+
+
+# =========================================================================
+# 16. DEMO
 # =========================================================================
 
 def demo_breathing():
@@ -1279,7 +1715,7 @@ def demo_breathing():
         print(f"    information axes: {manifest.total_information_axes}")
         for domain, geom in result.items():
             print(f"    domain={domain}")
-            print(f"    substrates={[s.value for s in geom.substrates_used]}")
+            print(f"    substrates={[substrate_key(s) for s in geom.substrates_used]}")
             print(f"    agreement={geom.agreement_regions}")
             print(f"    tension={geom.tension_regions}")
             print(f"    confidence={geom.confidence_field}")
@@ -1393,7 +1829,7 @@ def demo_multi_domain():
     print(f"\n  Total information axes: {manifest.total_information_axes}")
     print(f"  Domains: {list(manifest.domain_coverage.keys())}")
     for d, subs in manifest.domain_coverage.items():
-        print(f"    {d}: {[s.value for s in subs]}")
+        print(f"    {d}: {[substrate_key(s) for s in subs]}")
 
     for domain, geom in sorted(result.items()):
         if domain == "_resonance":
@@ -1405,7 +1841,7 @@ def demo_multi_domain():
             print(f"    coupling strength: {geom.coupling_strength:.2f}")
         else:
             print(f"\n  [{domain}]")
-            print(f"    substrates: {[s.value for s in geom.substrates_used]}")
+            print(f"    substrates: {[substrate_key(s) for s in geom.substrates_used]}")
             print(f"    agreement: {geom.agreement_regions}")
             print(f"    tension: {geom.tension_regions}")
             print(f"    confidence: {geom.confidence_field}")
@@ -1428,11 +1864,86 @@ def demo_paradigm_registry():
     print()
 
 
+def demo_lid_synthesis():
+    """Bee swarm + quartz lattice breathe through the Mandala with RESONATE."""
+    print("=" * 60)
+    print("LID Synthesis — Bee Swarm + Quartz Lattice")
+    print("=" * 60)
+
+    bee_proj = AnimalProjector()
+    quartz_proj = CrystalProjector()
+
+    bee_basins = bee_proj.project(BEE_SWARM_LID)
+    quartz_basins = quartz_proj.project(QUARTZ_LATTICE_LID)
+
+    print(f"\n  Bee basins:    {len(bee_basins)}")
+    for b in bee_basins:
+        print(f"    substrate={substrate_key(b.substrate):20s}  "
+              f"depth={b.depth:.2f}  mode={b.signature.get('mode', '?')}")
+
+    print(f"\n  Quartz basins: {len(quartz_basins)}")
+    for b in quartz_basins:
+        print(f"    substrate={substrate_key(b.substrate):20s}  "
+              f"depth={b.depth:.2f}  mode={b.signature.get('mode', '?')}")
+
+    mandala = MandalaRuntime()
+    mandala.register(IntelligenceIntersectionRule(domain="animal_intelligence"))
+    mandala.register(IntelligenceIntersectionRule(domain="crystal_intelligence"))
+    mandala.register_coupling(AnimalCrystalCoupling())
+
+    all_basins = bee_basins + quartz_basins
+
+    class _BasinStream:
+        def __init__(self, basin):
+            self._basin = basin
+        @property
+        def capability(self):
+            return self._basin.source_capability
+        def read(self):
+            return self._basin.signature
+        def project_to_basin(self):
+            return self._basin
+
+    streams = [_BasinStream(b) for b in all_basins]
+    result, manifest = mandala.breathe_with_manifest(streams)
+
+    print(f"\n  Information axes: {manifest.total_information_axes}")
+    print(f"  Domains: {list(manifest.domain_coverage.keys())}")
+
+    for domain, geom in sorted(result.items()):
+        if domain == "_resonance":
+            print(f"\n  [RESONANCE — cross-domain coupling]")
+            print(f"    domains: {geom.domains_coupled}")
+            for a in geom.cross_domain_agreements:
+                print(f"    AGREE: {a[0]}")
+            for t in geom.cross_domain_tensions:
+                print(f"    TENSION: {t[0]}")
+            print(f"    boosts: {geom.confidence_boosts}")
+            print(f"    coupling strength: {geom.coupling_strength:.2f}")
+        else:
+            print(f"\n  [{domain}]")
+            print(f"    substrates: {[substrate_key(s) for s in geom.substrates_used]}")
+            if geom.agreement_regions:
+                for a in geom.agreement_regions:
+                    print(f"    AGREE: {a[0]}")
+            print(f"    confidence: {geom.confidence_field}")
+
+    # Drill-down preview
+    print(f"\n  Drill-down preview (future-proof):")
+    bee_sub = bee_basins[0].substrate if isinstance(bee_basins[0].substrate, str) else bee_basins[0].substrate
+    if isinstance(bee_sub, str):
+        print(f"    {bee_sub} -> (string substrates support drill via naming)")
+    else:
+        print(f"    {bee_sub} (substrate is enum or string)")
+    print()
+
+
 if __name__ == "__main__":
     demo_breathing()
     demo_classifiers()
     demo_multi_domain()
     demo_paradigm_registry()
+    demo_lid_synthesis()
     print("=" * 60)
     print("The Mandala breathes. Substrates fuse. Geometry emerges.")
     print("=" * 60)

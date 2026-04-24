@@ -3183,6 +3183,151 @@ def test_five_domain_breathing():
 
 
 # ---------------------------------------------------------------------------
+# Layer 3 → Layer 4: LID entities, projectors, intelligence substrates
+# ---------------------------------------------------------------------------
+
+from mandala_runtime import (
+    LIDEntity, DynamicsProjector, AnimalProjector, CrystalProjector,
+    IntelligenceIntersectionRule, AnimalCrystalCoupling,
+    BEE_SWARM_LID, QUARTZ_LATTICE_LID,
+    load_ontology_index, substrate_key,
+)
+
+
+def test_lid_entity_roundtrip():
+    """LIDEntity to_dict/from_dict round-trips."""
+    d = BEE_SWARM_LID.to_dict()
+    restored = LIDEntity.from_dict(d)
+    assert restored.entity_id == BEE_SWARM_LID.entity_id
+    assert restored.substrate_type == "swarm.bee"
+    assert restored.category == "animal_intelligence"
+
+
+def test_lid_entity_fields():
+    """LIDEntity has expected fields for bee and quartz."""
+    assert BEE_SWARM_LID.substrate_type == "swarm.bee"
+    assert QUARTZ_LATTICE_LID.substrate_type == "crystal.quartz"
+    assert "gradient_field" in BEE_SWARM_LID.dynamics
+    assert "lattice" in QUARTZ_LATTICE_LID.dynamics
+
+
+def test_animal_projector_bee():
+    """AnimalProjector emits basins with gradient and trajectory modes."""
+    proj = AnimalProjector()
+    basins = proj.project(BEE_SWARM_LID)
+    assert len(basins) >= 2
+    modes = {b.signature["mode"] for b in basins}
+    assert "gradient_following" in modes
+    assert "trajectory_geometry" in modes
+
+
+def test_animal_projector_depth():
+    """Basin depth reflects gradient strength."""
+    proj = AnimalProjector()
+    basins = proj.project(BEE_SWARM_LID)
+    gradient = next(b for b in basins if b.signature["mode"] == "gradient_following")
+    assert gradient.depth == 0.8  # matches gradient_field strength
+
+
+def test_crystal_projector_quartz():
+    """CrystalProjector emits basins with lattice and piezo modes."""
+    proj = CrystalProjector()
+    basins = proj.project(QUARTZ_LATTICE_LID)
+    assert len(basins) >= 2
+    modes = {b.signature["mode"] for b in basins}
+    assert "lattice_modes" in modes
+    assert "piezoelectric_coupling" in modes
+
+
+def test_crystal_projector_symmetry():
+    """Quartz basin carries D3 symmetry group."""
+    proj = CrystalProjector()
+    basins = proj.project(QUARTZ_LATTICE_LID)
+    lattice = next(b for b in basins if b.signature["mode"] == "lattice_modes")
+    assert lattice.signature["symmetry_group"] == "D3"
+
+
+def test_intelligence_intersection_rule():
+    """IntelligenceIntersectionRule finds multi-mode agreement."""
+    rule = IntelligenceIntersectionRule(domain="animal_intelligence")
+    proj = AnimalProjector()
+    basins = proj.project(BEE_SWARM_LID)
+    geom = rule.intersect(basins)
+    assert len(geom.agreement_regions) > 0
+    assert any("multi_mode" in str(a[0]) for a in geom.agreement_regions)
+
+
+def test_animal_crystal_coupling():
+    """AnimalCrystalCoupling detects cross-substrate intelligence."""
+    coupling = AnimalCrystalCoupling()
+    rule_a = IntelligenceIntersectionRule(domain="animal_intelligence")
+    rule_c = IntelligenceIntersectionRule(domain="crystal_intelligence")
+    bee_basins = AnimalProjector().project(BEE_SWARM_LID)
+    quartz_basins = CrystalProjector().project(QUARTZ_LATTICE_LID)
+    geom_a = rule_a.intersect(bee_basins)
+    geom_c = rule_c.intersect(quartz_basins)
+    result = coupling.couple(geom_a, geom_c)
+    assert len(result["agreements"]) > 0
+    assert any("cross_substrate" in str(a[0]) for a in result["agreements"])
+
+
+def test_open_substrate_in_manifest():
+    """String substrates work in Manifest alongside enum substrates."""
+    cap_enum = StreamCapability("sound", Substrate.BINARY, 0.7, 0.6)
+    cap_str = StreamCapability("animal_intelligence", "swarm.bee", 0.7, 0.6)
+    b1 = Basin("sound", Substrate.BINARY, None, 0.3, {}, cap_enum)
+    b2 = Basin("animal_intelligence", "swarm.bee", None, 0.6, {}, cap_str)
+    m = Manifest(basins=[b1, b2])
+    assert m.total_information_axes == 2
+    assert "sound" in m.basins_by_domain
+    assert "animal_intelligence" in m.basins_by_domain
+
+
+def test_substrate_key_enum_and_string():
+    """substrate_key handles both Substrate enum and raw strings."""
+    assert substrate_key(Substrate.BINARY) == "binary"
+    assert substrate_key("swarm.bee") == "swarm.bee"
+    assert substrate_key(Substrate.QUANTUM) == "quantum"
+
+
+def test_load_ontology_missing_file():
+    """load_ontology_index returns empty list for missing file."""
+    result = load_ontology_index("/nonexistent/path/ontology_index.json")
+    assert result == []
+
+
+def test_lid_synthesis_breathe():
+    """Full bee+quartz synthesis through MandalaRuntime produces resonance."""
+    mandala = MandalaRuntime()
+    mandala.register(IntelligenceIntersectionRule(domain="animal_intelligence"))
+    mandala.register(IntelligenceIntersectionRule(domain="crystal_intelligence"))
+    mandala.register_coupling(AnimalCrystalCoupling())
+
+    bee_basins = AnimalProjector().project(BEE_SWARM_LID)
+    quartz_basins = CrystalProjector().project(QUARTZ_LATTICE_LID)
+
+    class _BS:
+        def __init__(self, b):
+            self._b = b
+        @property
+        def capability(self):
+            return self._b.source_capability
+        def read(self):
+            return self._b.signature
+        def project_to_basin(self):
+            return self._b
+
+    streams = [_BS(b) for b in bee_basins + quartz_basins]
+    result = mandala.breathe(streams)
+    assert "animal_intelligence" in result
+    assert "crystal_intelligence" in result
+    assert "_resonance" in result
+    resonance = result["_resonance"]
+    assert resonance.coupling_strength > 0
+    assert len(resonance.cross_domain_agreements) > 0
+
+
+# ---------------------------------------------------------------------------
 # Run all tests
 # ---------------------------------------------------------------------------
 
