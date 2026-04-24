@@ -2966,6 +2966,223 @@ def test_multi_domain_breathing():
 
 
 # ---------------------------------------------------------------------------
+# RESONATE, coupling rules, thermal/magnetic, gravity projectors
+# ---------------------------------------------------------------------------
+
+from mandala_runtime import (
+    ResonanceResult,
+    GravitySoundCoupling, ElectricSoundCoupling, GravityElectricCoupling,
+    ThermalIntersectionRule, MagneticIntersectionRule,
+    project_gravity_ternary, project_gravity_quantum, project_gravity_stochastic,
+)
+
+
+def test_resonate_null_state_correlation():
+    """RESONATE detects null-state correlation across domains with ternary."""
+    mandala = MandalaRuntime()
+    mandala.register(SoundIntersectionRule())
+    mandala.register(GravityIntersectionRule())
+    cap_s = StreamCapability("sound", Substrate.TERNARY, 0.7, 0.8)
+    cap_g = StreamCapability("gravity", Substrate.TERNARY, 0.8, 0.7)
+    basins = [
+        Basin("sound", Substrate.TERNARY, None, 0.6,
+              {"silences": 2, "attacks": 3, "decays": 3}, cap_s),
+        Basin("gravity", Substrate.TERNARY, None, 0.6,
+              {"null_fraction": 0.3, "symmetry": 0.9}, cap_g),
+    ]
+    manifest = Manifest(basins=basins)
+    geoms = {}
+    for domain, bs in manifest.basins_by_domain.items():
+        rule = mandala.rules.get(domain)
+        if rule:
+            geoms[domain] = rule.intersect(bs)
+    resonance = mandala._resonate(geoms, manifest)
+    assert isinstance(resonance, ResonanceResult)
+    assert any("null_state" in str(a[0]) for a in resonance.cross_domain_agreements)
+
+
+def test_resonate_tension_amplification():
+    """RESONATE detects multi-domain tension."""
+    mandala = MandalaRuntime()
+    mandala.register(ElectricIntersectionRule())
+    mandala.register(GravityIntersectionRule())
+    cap_e_t = StreamCapability("electric", Substrate.TERNARY, 0.7, 0.7)
+    cap_e_b = StreamCapability("electric", Substrate.BINARY, 0.7, 0.5)
+    cap_g_b = StreamCapability("gravity", Substrate.BINARY, 0.7, 0.5)
+    cap_g_q = StreamCapability("gravity", Substrate.QUANTUM, 0.6, 0.8)
+    basins = [
+        Basin("electric", Substrate.TERNARY, None, 0.6,
+              {"zero_fraction": 0.2}, cap_e_t),
+        Basin("electric", Substrate.BINARY, None, 0.3,
+              {"conducting": True}, cap_e_b),
+        Basin("gravity", Substrate.BINARY, None, 0.3,
+              {"stable_fraction": 0.95}, cap_g_b),
+        Basin("gravity", Substrate.QUANTUM, None, 0.7,
+              {"indeterminate_fraction": 0.5}, cap_g_q),
+    ]
+    manifest = Manifest(basins=basins)
+    geoms = {}
+    for domain, bs in manifest.basins_by_domain.items():
+        rule = mandala.rules.get(domain)
+        if rule:
+            geoms[domain] = rule.intersect(bs)
+    resonance = mandala._resonate(geoms, manifest)
+    assert any("tension" in str(t[0]).lower() for t in resonance.cross_domain_tensions)
+
+
+def test_resonate_coupling_strength():
+    """Coupling strength scales with agreements."""
+    r = ResonanceResult(
+        domains_coupled=["a", "b", "c"],
+        cross_domain_agreements=[("x",), ("y",)],
+        cross_domain_tensions=[],
+        confidence_boosts={}, coupling_strength=0.67,
+    )
+    assert r.coupling_strength > 0
+
+
+def test_gravity_sound_coupling():
+    """GravitySoundCoupling detects gravitoacoustic stasis."""
+    coupling = GravitySoundCoupling()
+    geom_grav = UnifiedGeometry(
+        domain="gravity", substrates_used={Substrate.TERNARY},
+        agreement_regions=[("lagrange_corroborated", "null=30%", "indet=40%")],
+        tension_regions=[], uncovered_regions=[], confidence_field={},
+    )
+    geom_sound = UnifiedGeometry(
+        domain="sound", substrates_used={Substrate.BINARY, Substrate.TERNARY},
+        agreement_regions=[("event_count_corroborated", 3, 3)],
+        tension_regions=[], uncovered_regions=[], confidence_field={},
+    )
+    result = coupling.couple(geom_grav, geom_sound)
+    assert len(result["agreements"]) > 0
+    assert "stasis" in result["agreements"][0][0]
+
+
+def test_gravity_electric_coupling_tension():
+    """GravityElectricCoupling detects shared instability."""
+    coupling = GravityElectricCoupling()
+    geom_grav = UnifiedGeometry(
+        domain="gravity", substrates_used={Substrate.BINARY},
+        agreement_regions=[],
+        tension_regions=[("stability_overclaimed",)],
+        uncovered_regions=[], confidence_field={},
+    )
+    geom_elec = UnifiedGeometry(
+        domain="electric", substrates_used={Substrate.BINARY},
+        agreement_regions=[],
+        tension_regions=[("conducting_overclaimed",)],
+        uncovered_regions=[], confidence_field={},
+    )
+    result = coupling.couple(geom_grav, geom_elec)
+    assert len(result["tensions"]) > 0
+
+
+def test_breathe_includes_resonance():
+    """breathe() includes _resonance when domains couple."""
+    mandala = MandalaRuntime()
+    mandala.register(SoundIntersectionRule())
+    mandala.register(GravityIntersectionRule())
+    mandala.register_coupling(GravitySoundCoupling())
+    cap_s = StreamCapability("sound", Substrate.TERNARY, 0.7, 0.8)
+    cap_g = StreamCapability("gravity", Substrate.TERNARY, 0.8, 0.7)
+    basins = [
+        Basin("sound", Substrate.TERNARY, None, 0.6,
+              {"silences": 2, "attacks": 3, "decays": 3}, cap_s),
+        Basin("gravity", Substrate.TERNARY, None, 0.6,
+              {"null_fraction": 0.3}, cap_g),
+    ]
+    streams = [_ToyStream(b.source_capability, [], lambda d, c, b=b: b)
+               for b in basins]
+    result = mandala.breathe(streams)
+    assert "_resonance" in result
+
+
+def test_thermal_intersection_equilibrium():
+    """Thermal rule detects equilibrium corroboration."""
+    rule = ThermalIntersectionRule()
+    cap_t = StreamCapability("thermal", Substrate.TERNARY, 0.8, 0.7)
+    cap_s = StreamCapability("thermal", Substrate.STOCHASTIC, 0.5, 0.6)
+    basins = [
+        Basin("thermal", Substrate.TERNARY, None, 0.6,
+              {"equilibrium_fraction": 0.5}, cap_t),
+        Basin("thermal", Substrate.STOCHASTIC, None, 0.5,
+              {"jitter_rms": 0.05}, cap_s),
+    ]
+    geom = rule.intersect(basins)
+    assert any("equilibrium" in str(a[0]) for a in geom.agreement_regions)
+
+
+def test_magnetic_intersection_barkhausen():
+    """Magnetic rule detects Barkhausen noise during apparent alignment."""
+    rule = MagneticIntersectionRule()
+    cap_t = StreamCapability("magnetic", Substrate.TERNARY, 0.8, 0.7)
+    cap_s = StreamCapability("magnetic", Substrate.STOCHASTIC, 0.5, 0.6)
+    basins = [
+        Basin("magnetic", Substrate.TERNARY, None, 0.6,
+              {"demagnetised_fraction": 0.01}, cap_t),
+        Basin("magnetic", Substrate.STOCHASTIC, None, 0.5,
+              {"jitter_rms": 0.5}, cap_s),
+    ]
+    geom = rule.intersect(basins)
+    assert any("barkhausen" in str(t[0]).lower() for t in geom.tension_regions)
+
+
+def test_gravity_projector_ternary():
+    """project_gravity_ternary creates correct basin from vectors."""
+    vectors = [[0, -9.81, 0], [0, -1.62, 0], [0, 0, 0], [0, 0.05, 0]]
+    basin = project_gravity_ternary(vectors, null_threshold=0.5)
+    assert basin.domain == "gravity"
+    assert basin.substrate == Substrate.TERNARY
+    assert basin.signature["null_count"] > 0
+
+
+def test_gravity_projector_quantum():
+    """project_gravity_quantum creates basin with indeterminate fraction."""
+    stabilities = [0.9, 0.3, 0.55, 0.48, 0.51]
+    basin = project_gravity_quantum(stabilities)
+    assert basin.domain == "gravity"
+    assert basin.substrate == Substrate.QUANTUM
+    assert basin.signature["indeterminate_fraction"] > 0
+
+
+def test_gravity_projector_stochastic():
+    """project_gravity_stochastic creates basin from tidal data."""
+    tidal = [1e-5, 1.1e-5, 0.9e-5, 1.05e-5, 0.95e-5]
+    basin = project_gravity_stochastic(tidal)
+    assert basin.domain == "gravity"
+    assert basin.substrate == Substrate.STOCHASTIC
+    assert "jitter_rms" in basin.signature
+
+
+def test_five_domain_breathing():
+    """MandalaRuntime handles 5 domains simultaneously."""
+    mandala = MandalaRuntime()
+    mandala.register(SoundIntersectionRule())
+    mandala.register(GravityIntersectionRule())
+    mandala.register(ElectricIntersectionRule())
+    mandala.register(ThermalIntersectionRule())
+    mandala.register(MagneticIntersectionRule())
+
+    caps = [
+        StreamCapability("sound", Substrate.BINARY, 0.7, 0.6),
+        StreamCapability("gravity", Substrate.TERNARY, 0.8, 0.7),
+        StreamCapability("electric", Substrate.TERNARY, 0.7, 0.7),
+        StreamCapability("thermal", Substrate.TERNARY, 0.6, 0.5),
+        StreamCapability("magnetic", Substrate.TERNARY, 0.6, 0.5),
+    ]
+    basins = [
+        Basin(c.domain, c.substrate, None, 0.5, {"null_fraction": 0.1}, c)
+        for c in caps
+    ]
+    streams = [_ToyStream(b.source_capability, [], lambda d, c, b=b: b)
+               for b in basins]
+    result = mandala.breathe(streams)
+    domain_keys = [k for k in result if not k.startswith("_")]
+    assert len(domain_keys) == 5
+
+
+# ---------------------------------------------------------------------------
 # Run all tests
 # ---------------------------------------------------------------------------
 

@@ -218,6 +218,43 @@ class UnifiedGeometry:
     confidence_field: dict
 
 
+@dataclass
+class ResonanceResult:
+    """
+    Output of the RESONATE phase: cross-domain coupling analysis.
+
+    This is what makes the Mandala more than N independent wrappers.
+    Resonance detects physics that spans domains — a gravity null
+    co-located with an acoustic equilibrium is a stasis point that
+    neither domain could identify alone.
+
+    Fields:
+        domains_coupled           -- which domains participated
+        cross_domain_agreements   -- where domains corroborate each other
+        cross_domain_tensions     -- where domains conflict (information-rich!)
+        confidence_boosts         -- per-domain confidence adjustments
+        coupling_strength         -- 0-1 scalar: how strongly domains couple
+    """
+    domains_coupled: list
+    cross_domain_agreements: list
+    cross_domain_tensions: list
+    confidence_boosts: dict
+    coupling_strength: float
+
+
+class CouplingRule(Protocol):
+    """
+    Domain-pair-specific coupling rule for the RESONATE phase.
+
+    Registered with MandalaRuntime.register_coupling(). Called during
+    breathing when both domains are present. Returns agreements,
+    tensions, and confidence boosts specific to the domain pair.
+    """
+    domains: tuple  # (domain_a, domain_b)
+    def couple(self, geom_a: UnifiedGeometry,
+               geom_b: UnifiedGeometry) -> dict: ...
+
+
 class IntersectionRule(Protocol):
     """
     Domain-specific rule for combining basins of the same domain.
@@ -255,16 +292,22 @@ class MandalaRuntime:
     richer geometry.  The contract doesn't change -- only the depth.
     """
     rules: dict = field(default_factory=dict)
+    couplings: list = field(default_factory=list)
 
     def register(self, rule) -> None:
         """Register a domain-specific intersection rule."""
         self.rules[rule.domain] = rule
 
+    def register_coupling(self, coupling) -> None:
+        """Register a cross-domain coupling rule."""
+        self.couplings.append(coupling)
+
     def breathe(self, streams: Iterable) -> dict:
         """
-        One breath cycle: inhale streams, expand basins, exhale geometries.
+        One breath cycle: inhale, expand, resonate, exhale.
 
-        Returns dict mapping domain -> UnifiedGeometry.
+        Returns dict mapping domain -> UnifiedGeometry, plus
+        '_resonance' key with cross-domain coupling results.
         """
         manifest = build_manifest(streams)
         geometries: dict = {}
@@ -273,6 +316,9 @@ class MandalaRuntime:
             if rule is None:
                 continue
             geometries[domain] = rule.intersect(basins)
+        resonance = self._resonate(geometries, manifest)
+        if resonance.cross_domain_agreements or resonance.cross_domain_tensions:
+            geometries["_resonance"] = resonance
         return geometries
 
     def breathe_with_manifest(self, streams: Iterable) -> tuple:
@@ -284,7 +330,112 @@ class MandalaRuntime:
             if rule is None:
                 continue
             geometries[domain] = rule.intersect(basins)
+        resonance = self._resonate(geometries, manifest)
+        if resonance.cross_domain_agreements or resonance.cross_domain_tensions:
+            geometries["_resonance"] = resonance
         return geometries, manifest
+
+    def _resonate(self, geometries: dict, manifest: Manifest) -> "ResonanceResult":
+        """
+        RESONATE phase: cross-domain coupling.
+
+        After each domain has been independently intersected, RESONATE
+        looks for agreement and tension BETWEEN domains.  This is where
+        the Mandala becomes more than N independent domain wrappers —
+        it detects cross-domain physics that no single domain can see.
+
+        Built-in heuristics:
+          1. Null-state correlation: domains sharing null/zero/equilibrium
+             at similar support regions corroborate a physical stasis point.
+          2. Tension amplification: domains that both show internal tension
+             may share a common instability source.
+          3. Confidence boost: domains that agree boost each other's
+             confidence; domains that disagree flag cross-domain tension.
+
+        Registered CouplingRules run after the heuristics for
+        domain-pair-specific physics (e.g. electromagnetic-acoustic).
+        """
+        agreements: list = []
+        tensions: list = []
+        confidence_boosts: dict = {}
+
+        domain_keys = [k for k in geometries if not k.startswith("_")]
+
+        # --- Heuristic 1: null-state correlation ---
+        null_domains = []
+        for d in domain_keys:
+            geom = geometries[d]
+            cf = geom.confidence_field
+            for substrate_key, confidence in cf.items():
+                if substrate_key == "ternary" and confidence > 0:
+                    null_domains.append(d)
+                    break
+        if len(null_domains) >= 2:
+            agreements.append(("null_state_cross_domain",
+                               null_domains,
+                               "Multiple domains have ternary coverage — "
+                               "null/equilibrium states can be corroborated"))
+
+        # --- Heuristic 2: tension amplification ---
+        tense_domains = []
+        for d in domain_keys:
+            geom = geometries[d]
+            if geom.tension_regions:
+                tense_domains.append((d, len(geom.tension_regions)))
+        if len(tense_domains) >= 2:
+            tensions.append(("multi_domain_tension",
+                             [(d, n) for d, n in tense_domains],
+                             "Multiple domains show internal tension — "
+                             "possible shared instability source"))
+
+        # --- Heuristic 3: agreement correlation ---
+        agreeing_domains = []
+        for d in domain_keys:
+            geom = geometries[d]
+            if geom.agreement_regions:
+                agreeing_domains.append((d, len(geom.agreement_regions)))
+        if len(agreeing_domains) >= 2:
+            agreements.append(("cross_domain_corroboration",
+                               [(d, n) for d, n in agreeing_domains],
+                               "Multiple domains have internal agreement — "
+                               "strengthens overall confidence"))
+            for d, _ in agreeing_domains:
+                confidence_boosts[d] = 0.1
+
+        # --- Heuristic 4: substrate overlap ---
+        substrate_domains: dict = {}
+        for d in domain_keys:
+            for s in geometries[d].substrates_used:
+                substrate_domains.setdefault(s, []).append(d)
+        shared_substrates = {s: ds for s, ds in substrate_domains.items()
+                             if len(ds) >= 2}
+        if shared_substrates:
+            for s, ds in shared_substrates.items():
+                agreements.append(("shared_substrate",
+                                   {"substrate": s.value, "domains": ds},
+                                   f"Substrate '{s.value}' spans domains {ds} — "
+                                   f"enables direct cross-domain comparison"))
+
+        # --- Registered coupling rules ---
+        for coupling in self.couplings:
+            d_a, d_b = coupling.domains
+            if d_a in geometries and d_b in geometries:
+                result = coupling.couple(geometries[d_a], geometries[d_b])
+                if result.get("agreements"):
+                    agreements.extend(result["agreements"])
+                if result.get("tensions"):
+                    tensions.extend(result["tensions"])
+                if result.get("confidence_boosts"):
+                    for d, boost in result["confidence_boosts"].items():
+                        confidence_boosts[d] = confidence_boosts.get(d, 0) + boost
+
+        return ResonanceResult(
+            domains_coupled=domain_keys,
+            cross_domain_agreements=agreements,
+            cross_domain_tensions=tensions,
+            confidence_boosts=confidence_boosts,
+            coupling_strength=len(agreements) / max(len(domain_keys), 1),
+        )
 
 
 # =========================================================================
@@ -703,7 +854,300 @@ class ElectricIntersectionRule:
 
 
 # =========================================================================
-# 11. UNIFIED ALTERNATIVE PARADIGM REGISTRY
+# 11. REAL GRAVITY PROJECTORS (physics-backed)
+# =========================================================================
+
+def project_gravity_ternary(vectors: list, null_threshold: float = 0.5) -> Basin:
+    """
+    Project gravity vector field data to a ternary basin.
+
+    Uses TernaryClassifier on the y-component (conventional downward axis).
+    Null states correspond to Lagrange points / equipotential surfaces.
+    """
+    tc = TernaryClassifier(null_threshold=null_threshold)
+    y_vals = [v[1] if len(v) > 1 else v[0] for v in vectors]
+    dist = tc.distribution(y_vals)
+    cap = StreamCapability("gravity", Substrate.TERNARY,
+                           coverage_fraction=0.8, confidence=0.7)
+    return Basin(
+        domain="gravity", substrate=Substrate.TERNARY,
+        support=("spatial", 0, len(vectors)), depth=0.6,
+        signature={
+            "null_fraction": dist["null_fraction"],
+            "attract_fraction": dist["fractions"].get(-1, 0),
+            "repel_fraction": dist["fractions"].get(1, 0),
+            "symmetry": dist["symmetry"],
+            "null_count": dist["counts"][0],
+            "total": dist["total"],
+        },
+        source_capability=cap,
+    )
+
+
+def project_gravity_quantum(stability_metrics: list,
+                            uncertainty: float = 0.1) -> Basin:
+    """
+    Project orbital stability data to a quantum superposition basin.
+
+    Each stability value exists in superposition over stable/unstable
+    until measured (integrated).  The indeterminate fraction quantifies
+    how much binary classification would lie.
+    """
+    qm = QuantumSuperpositionModel(threshold=0.5, uncertainty=uncertainty)
+    indet = qm.indeterminate_fraction(stability_metrics)
+    entropy = qm.superposition_entropy(stability_metrics)
+    cap = StreamCapability("gravity", Substrate.QUANTUM,
+                           coverage_fraction=0.6, confidence=0.8)
+    return Basin(
+        domain="gravity", substrate=Substrate.QUANTUM,
+        support=("orbital", 0, len(stability_metrics)), depth=0.7,
+        signature={
+            "indeterminate_fraction": indet,
+            "entropy": entropy,
+            "n_orbits": len(stability_metrics),
+        },
+        source_capability=cap,
+    )
+
+
+def project_gravity_stochastic(tidal_values: list) -> Basin:
+    """
+    Project tidal acceleration data to a stochastic basin.
+
+    Tidal acceleration depends on internal structure (rigidity),
+    which is a probability distribution, not a deterministic scalar.
+    """
+    nm = StochasticNoiseModel(tidal_values)
+    summary = nm.summary()
+    cap = StreamCapability("gravity", Substrate.STOCHASTIC,
+                           coverage_fraction=0.5, confidence=0.6)
+    return Basin(
+        domain="gravity", substrate=Substrate.STOCHASTIC,
+        support=("tidal", 0, len(tidal_values)), depth=0.5,
+        signature={
+            "jitter_rms": summary["jitter_rms"],
+            "jitter_entropy": summary["jitter_entropy_bits"],
+            "disruption_probability": min(1.0, summary["jitter_rms"] * 0.1),
+        },
+        source_capability=cap,
+    )
+
+
+# =========================================================================
+# 12. CONCRETE COUPLING RULES
+# =========================================================================
+
+@dataclass
+class GravitySoundCoupling:
+    """
+    Cross-domain coupling: gravity x sound.
+
+    Physics: acoustic waves propagate differently in gravitational fields.
+    A gravity null (Lagrange point) where sound is in equilibrium indicates
+    a true stasis point. Gravity tension + sound tension may indicate
+    seismic-gravitational coupling.
+    """
+    domains: tuple = ("gravity", "sound")
+
+    def couple(self, geom_grav: UnifiedGeometry,
+               geom_sound: UnifiedGeometry) -> dict:
+        agreements = []
+        tensions = []
+        boosts = {}
+
+        grav_has_null = any(
+            "lagrange" in str(a).lower() or "null" in str(a).lower()
+            for a in geom_grav.agreement_regions
+        )
+        sound_has_agreement = len(geom_sound.agreement_regions) > 0
+
+        if grav_has_null and sound_has_agreement:
+            agreements.append(("gravitoacoustic_stasis",
+                               "gravity null + sound agreement",
+                               "Possible physical stasis point: gravitational "
+                               "equilibrium co-located with acoustic corroboration"))
+            boosts["gravity"] = 0.15
+            boosts["sound"] = 0.1
+
+        if geom_grav.tension_regions and geom_sound.tension_regions:
+            tensions.append(("seismic_gravitational_coupling",
+                             f"gravity_tensions={len(geom_grav.tension_regions)}",
+                             f"sound_tensions={len(geom_sound.tension_regions)}",
+                             "Both domains show instability — possible coupled source"))
+
+        return {"agreements": agreements, "tensions": tensions,
+                "confidence_boosts": boosts}
+
+
+@dataclass
+class ElectricSoundCoupling:
+    """
+    Cross-domain coupling: electric x sound.
+
+    Physics: electromagnetic-acoustic transduction (piezoelectric,
+    magnetostrictive). Electric zero-crossings and sound equilibrium
+    may correlate in electromechanical systems.
+    """
+    domains: tuple = ("electric", "sound")
+
+    def couple(self, geom_elec: UnifiedGeometry,
+               geom_sound: UnifiedGeometry) -> dict:
+        agreements = []
+        tensions = []
+        boosts = {}
+
+        elec_zero = any("zero" in str(t).lower()
+                        for t in geom_elec.tension_regions)
+        sound_agree = len(geom_sound.agreement_regions) > 0
+
+        if elec_zero and sound_agree:
+            agreements.append(("electromechanical_correlation",
+                               "electric zero-crossing + sound agreement",
+                               "Possible piezoelectric or magnetostrictive coupling"))
+            boosts["electric"] = 0.05
+            boosts["sound"] = 0.05
+
+        return {"agreements": agreements, "tensions": tensions,
+                "confidence_boosts": boosts}
+
+
+@dataclass
+class GravityElectricCoupling:
+    """
+    Cross-domain coupling: gravity x electric.
+
+    Physics: gravitoelectric effects, charged particle orbits in
+    gravitational fields. Shared tension indicates coupled instability.
+    """
+    domains: tuple = ("gravity", "electric")
+
+    def couple(self, geom_grav: UnifiedGeometry,
+               geom_elec: UnifiedGeometry) -> dict:
+        agreements = []
+        tensions = []
+        boosts = {}
+
+        if geom_grav.tension_regions and geom_elec.tension_regions:
+            tensions.append(("gravitoelectric_instability",
+                             f"gravity_tensions={len(geom_grav.tension_regions)}",
+                             f"electric_tensions={len(geom_elec.tension_regions)}",
+                             "Both domains unstable — possible charged particle "
+                             "dynamics in gravitational field"))
+        return {"agreements": agreements, "tensions": tensions,
+                "confidence_boosts": boosts}
+
+
+# =========================================================================
+# 13. THERMAL AND MAGNETIC INTERSECTION RULES
+# =========================================================================
+
+@dataclass
+class ThermalIntersectionRule:
+    """
+    Domain rule: fuse thermal basins across substrates.
+
+    Ternary  -> heating / equilibrium / cooling
+    Stochastic -> Boltzmann distribution, thermal fluctuation
+    """
+    domain: str = "thermal"
+
+    def intersect(self, basins: list) -> UnifiedGeometry:
+        substrates = {b.substrate for b in basins}
+        ternary = next((b for b in basins if b.substrate == Substrate.TERNARY), None)
+        stochastic = next((b for b in basins if b.substrate == Substrate.STOCHASTIC), None)
+        binary = next((b for b in basins if b.substrate == Substrate.BINARY), None)
+
+        agreement: list = []
+        tension: list = []
+
+        if ternary and stochastic:
+            equil_frac = ternary.signature.get("equilibrium_fraction", 0)
+            jitter = stochastic.signature.get("jitter_rms", 0)
+            if equil_frac > 0.3 and jitter < 0.1:
+                agreement.append(("thermal_equilibrium_confirmed",
+                                  f"equilibrium={equil_frac:.1%}",
+                                  f"jitter={jitter:.4f}"))
+            if equil_frac < 0.1 and jitter > 0.5:
+                tension.append(("thermal_instability",
+                                f"equilibrium={equil_frac:.1%}",
+                                f"jitter={jitter:.4f}"))
+
+        if binary and ternary:
+            equil_frac = ternary.signature.get("equilibrium_fraction", 0)
+            if equil_frac > 0.2:
+                tension.append(("thermal_equilibrium_erased",
+                                f"equilibrium={equil_frac:.1%}",
+                                "binary cannot represent thermal equilibrium"))
+
+        confidence = {}
+        for b in basins:
+            confidence[b.substrate.value] = b.depth * b.source_capability.confidence
+        if agreement:
+            for k in confidence:
+                confidence[k] = min(1.0, confidence[k] * 1.1)
+
+        uncovered = [] if basins else [("entire_field",)]
+        return UnifiedGeometry(
+            domain=self.domain, substrates_used=substrates,
+            agreement_regions=agreement, tension_regions=tension,
+            uncovered_regions=uncovered, confidence_field=confidence,
+        )
+
+
+@dataclass
+class MagneticIntersectionRule:
+    """
+    Domain rule: fuse magnetic basins across substrates.
+
+    Ternary  -> aligned / demagnetised / anti-aligned
+    Quantum  -> spin superposition (up/down/mixed)
+    Stochastic -> Barkhausen noise as domain wall dynamics
+    """
+    domain: str = "magnetic"
+
+    def intersect(self, basins: list) -> UnifiedGeometry:
+        substrates = {b.substrate for b in basins}
+        ternary = next((b for b in basins if b.substrate == Substrate.TERNARY), None)
+        quantum = next((b for b in basins if b.substrate == Substrate.QUANTUM), None)
+        stochastic = next((b for b in basins if b.substrate == Substrate.STOCHASTIC), None)
+
+        agreement: list = []
+        tension: list = []
+
+        if ternary and quantum:
+            demag_frac = ternary.signature.get("demagnetised_fraction", 0)
+            indet_frac = quantum.signature.get("indeterminate_fraction", 0)
+            if demag_frac > 0.1 and indet_frac > 0.1:
+                agreement.append(("demagnetised_spin_mixed",
+                                  f"demagnetised={demag_frac:.1%}",
+                                  f"spin_mixed={indet_frac:.1%}"))
+
+        if ternary and stochastic:
+            demag_frac = ternary.signature.get("demagnetised_fraction", 0)
+            jitter = stochastic.signature.get("jitter_rms", 0)
+            if demag_frac < 0.05 and jitter > 0.3:
+                tension.append(("barkhausen_noise_during_alignment",
+                                f"demagnetised={demag_frac:.1%}",
+                                f"jitter={jitter:.4f}",
+                                "Domain walls moving despite apparent alignment"))
+
+        confidence = {}
+        for b in basins:
+            confidence[b.substrate.value] = b.depth * b.source_capability.confidence
+        if agreement:
+            for k in confidence:
+                confidence[k] = min(1.0, confidence[k] * 1.1)
+
+        uncovered = [] if basins else [("entire_field",)]
+        return UnifiedGeometry(
+            domain=self.domain, substrates_used=substrates,
+            agreement_regions=agreement, tension_regions=tension,
+            uncovered_regions=uncovered, confidence_field=confidence,
+        )
+
+
+# =========================================================================
+# 14. UNIFIED ALTERNATIVE PARADIGM REGISTRY
 # =========================================================================
 
 class AlternativeParadigm(Enum):
@@ -885,6 +1329,9 @@ def demo_multi_domain():
     mandala.register(SoundIntersectionRule())
     mandala.register(GravityIntersectionRule())
     mandala.register(ElectricIntersectionRule())
+    mandala.register_coupling(GravitySoundCoupling())
+    mandala.register_coupling(ElectricSoundCoupling())
+    mandala.register_coupling(GravityElectricCoupling())
 
     def _proj_grav_ternary(data, cap):
         tc = TernaryClassifier(null_threshold=0.5)
@@ -949,11 +1396,19 @@ def demo_multi_domain():
         print(f"    {d}: {[s.value for s in subs]}")
 
     for domain, geom in sorted(result.items()):
-        print(f"\n  [{domain}]")
-        print(f"    substrates: {[s.value for s in geom.substrates_used]}")
-        print(f"    agreement: {geom.agreement_regions}")
-        print(f"    tension: {geom.tension_regions}")
-        print(f"    confidence: {geom.confidence_field}")
+        if domain == "_resonance":
+            print(f"\n  [RESONANCE — cross-domain coupling]")
+            print(f"    domains: {geom.domains_coupled}")
+            print(f"    agreements: {geom.cross_domain_agreements}")
+            print(f"    tensions: {geom.cross_domain_tensions}")
+            print(f"    boosts: {geom.confidence_boosts}")
+            print(f"    coupling strength: {geom.coupling_strength:.2f}")
+        else:
+            print(f"\n  [{domain}]")
+            print(f"    substrates: {[s.value for s in geom.substrates_used]}")
+            print(f"    agreement: {geom.agreement_regions}")
+            print(f"    tension: {geom.tension_regions}")
+            print(f"    confidence: {geom.confidence_field}")
     print()
 
 
