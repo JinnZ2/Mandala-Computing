@@ -60,6 +60,33 @@
           "repo": "https://github.com/JinnZ2/ai-human-audit-protocol",
           "relation": "audit_framework",
           "status": "active"
+        },
+        {
+          "repo": "https://github.com/JinnZ2/Living-Intelligence-Database",
+          "relation": "intelligence_ontology",
+          "protocol": "lid_basin_bridge_v1.0",
+          "consumes": [
+            "ontology_index.json",
+            "ontology/animal/*.json",
+            "ontology/crystal/*.json",
+            "ontology/plant/*.json",
+            "ontology/plasma/*.json",
+            "ontology/energy/*.json",
+            "ontology/shape/*.json",
+            "ontology/temporal/*.json",
+            "ontology/ai/*.json",
+            "schemas/*.schema.json"
+          ],
+          "bridge_contract": {
+            "source_format": "LID entity JSON (id, name, ontology, patterns, links)",
+            "target_format": "Mandala Basin (domain, substrate, support, depth, signature)",
+            "projectors_implemented": ["AnimalProjector", "CrystalProjector"],
+            "projectors_planned": ["PlantProjector", "EnergyProjector", "PlasmaProjector", "ShapeProjector", "TemporalProjector", "AIProjector"],
+            "staleness_check": "load_ontology_index() checks mtime of ontology_index.json",
+            "entry_point": "mandala_runtime.py → DynamicsProjector.project(LIDEntity) → Basin"
+          },
+          "shared_entities": ["BE", "QU", "OC", "HEX", "SPIRAL", "TORUS"],
+          "status": "active"
         }
       ],
       "incoming": [
@@ -80,6 +107,14 @@
           "repo": "https://github.com/JinnZ2/Geometric-to-Binary-Computational-Bridge",
           "relation": "geometry_source",
           "entities_consumed": ["SHAPE.OCTA", "PROTO.MANDALA_COMPUTE"],
+          "status": "active"
+        },
+        {
+          "repo": "https://github.com/JinnZ2/Living-Intelligence-Database",
+          "relation": "intelligence_provider",
+          "entities_provided": ["BE", "QU", "OC", "HEX", "SPIRAL", "TORUS"],
+          "protocol": "lid_basin_bridge_v1.0",
+          "note": "LID entities projected through DynamicsProjector into Mandala Basins. Each intelligence is its own substrate.",
           "status": "active"
         }
       ]

@@ -2966,6 +2966,810 @@ def test_multi_domain_breathing():
 
 
 # ---------------------------------------------------------------------------
+# RESONATE, coupling rules, thermal/magnetic, gravity projectors
+# ---------------------------------------------------------------------------
+
+from mandala_runtime import (
+    ResonanceResult,
+    GravitySoundCoupling, ElectricSoundCoupling, GravityElectricCoupling,
+    ThermalIntersectionRule, MagneticIntersectionRule,
+    project_gravity_ternary, project_gravity_quantum, project_gravity_stochastic,
+)
+
+
+def test_resonate_null_state_correlation():
+    """RESONATE detects null-state correlation across domains with ternary."""
+    mandala = MandalaRuntime()
+    mandala.register(SoundIntersectionRule())
+    mandala.register(GravityIntersectionRule())
+    cap_s = StreamCapability("sound", Substrate.TERNARY, 0.7, 0.8)
+    cap_g = StreamCapability("gravity", Substrate.TERNARY, 0.8, 0.7)
+    basins = [
+        Basin("sound", Substrate.TERNARY, None, 0.6,
+              {"silences": 2, "attacks": 3, "decays": 3}, cap_s),
+        Basin("gravity", Substrate.TERNARY, None, 0.6,
+              {"null_fraction": 0.3, "symmetry": 0.9}, cap_g),
+    ]
+    manifest = Manifest(basins=basins)
+    geoms = {}
+    for domain, bs in manifest.basins_by_domain.items():
+        rule = mandala.rules.get(domain)
+        if rule:
+            geoms[domain] = rule.intersect(bs)
+    resonance = mandala._resonate(geoms, manifest)
+    assert isinstance(resonance, ResonanceResult)
+    assert any("null_state" in str(a[0]) for a in resonance.cross_domain_agreements)
+
+
+def test_resonate_tension_amplification():
+    """RESONATE detects multi-domain tension."""
+    mandala = MandalaRuntime()
+    mandala.register(ElectricIntersectionRule())
+    mandala.register(GravityIntersectionRule())
+    cap_e_t = StreamCapability("electric", Substrate.TERNARY, 0.7, 0.7)
+    cap_e_b = StreamCapability("electric", Substrate.BINARY, 0.7, 0.5)
+    cap_g_b = StreamCapability("gravity", Substrate.BINARY, 0.7, 0.5)
+    cap_g_q = StreamCapability("gravity", Substrate.QUANTUM, 0.6, 0.8)
+    basins = [
+        Basin("electric", Substrate.TERNARY, None, 0.6,
+              {"zero_fraction": 0.2}, cap_e_t),
+        Basin("electric", Substrate.BINARY, None, 0.3,
+              {"conducting": True}, cap_e_b),
+        Basin("gravity", Substrate.BINARY, None, 0.3,
+              {"stable_fraction": 0.95}, cap_g_b),
+        Basin("gravity", Substrate.QUANTUM, None, 0.7,
+              {"indeterminate_fraction": 0.5}, cap_g_q),
+    ]
+    manifest = Manifest(basins=basins)
+    geoms = {}
+    for domain, bs in manifest.basins_by_domain.items():
+        rule = mandala.rules.get(domain)
+        if rule:
+            geoms[domain] = rule.intersect(bs)
+    resonance = mandala._resonate(geoms, manifest)
+    assert any("tension" in str(t[0]).lower() for t in resonance.cross_domain_tensions)
+
+
+def test_resonate_coupling_strength():
+    """Coupling strength scales with agreements."""
+    r = ResonanceResult(
+        domains_coupled=["a", "b", "c"],
+        cross_domain_agreements=[("x",), ("y",)],
+        cross_domain_tensions=[],
+        confidence_boosts={}, coupling_strength=0.67,
+    )
+    assert r.coupling_strength > 0
+
+
+def test_gravity_sound_coupling():
+    """GravitySoundCoupling detects gravitoacoustic stasis."""
+    coupling = GravitySoundCoupling()
+    geom_grav = UnifiedGeometry(
+        domain="gravity", substrates_used={Substrate.TERNARY},
+        agreement_regions=[("lagrange_corroborated", "null=30%", "indet=40%")],
+        tension_regions=[], uncovered_regions=[], confidence_field={},
+    )
+    geom_sound = UnifiedGeometry(
+        domain="sound", substrates_used={Substrate.BINARY, Substrate.TERNARY},
+        agreement_regions=[("event_count_corroborated", 3, 3)],
+        tension_regions=[], uncovered_regions=[], confidence_field={},
+    )
+    result = coupling.couple(geom_grav, geom_sound)
+    assert len(result["agreements"]) > 0
+    assert "stasis" in result["agreements"][0][0]
+
+
+def test_gravity_electric_coupling_tension():
+    """GravityElectricCoupling detects shared instability."""
+    coupling = GravityElectricCoupling()
+    geom_grav = UnifiedGeometry(
+        domain="gravity", substrates_used={Substrate.BINARY},
+        agreement_regions=[],
+        tension_regions=[("stability_overclaimed",)],
+        uncovered_regions=[], confidence_field={},
+    )
+    geom_elec = UnifiedGeometry(
+        domain="electric", substrates_used={Substrate.BINARY},
+        agreement_regions=[],
+        tension_regions=[("conducting_overclaimed",)],
+        uncovered_regions=[], confidence_field={},
+    )
+    result = coupling.couple(geom_grav, geom_elec)
+    assert len(result["tensions"]) > 0
+
+
+def test_breathe_includes_resonance():
+    """breathe() includes _resonance when domains couple."""
+    mandala = MandalaRuntime()
+    mandala.register(SoundIntersectionRule())
+    mandala.register(GravityIntersectionRule())
+    mandala.register_coupling(GravitySoundCoupling())
+    cap_s = StreamCapability("sound", Substrate.TERNARY, 0.7, 0.8)
+    cap_g = StreamCapability("gravity", Substrate.TERNARY, 0.8, 0.7)
+    basins = [
+        Basin("sound", Substrate.TERNARY, None, 0.6,
+              {"silences": 2, "attacks": 3, "decays": 3}, cap_s),
+        Basin("gravity", Substrate.TERNARY, None, 0.6,
+              {"null_fraction": 0.3}, cap_g),
+    ]
+    streams = [_ToyStream(b.source_capability, [], lambda d, c, b=b: b)
+               for b in basins]
+    result = mandala.breathe(streams)
+    assert "_resonance" in result
+
+
+def test_thermal_intersection_equilibrium():
+    """Thermal rule detects equilibrium corroboration."""
+    rule = ThermalIntersectionRule()
+    cap_t = StreamCapability("thermal", Substrate.TERNARY, 0.8, 0.7)
+    cap_s = StreamCapability("thermal", Substrate.STOCHASTIC, 0.5, 0.6)
+    basins = [
+        Basin("thermal", Substrate.TERNARY, None, 0.6,
+              {"equilibrium_fraction": 0.5}, cap_t),
+        Basin("thermal", Substrate.STOCHASTIC, None, 0.5,
+              {"jitter_rms": 0.05}, cap_s),
+    ]
+    geom = rule.intersect(basins)
+    assert any("equilibrium" in str(a[0]) for a in geom.agreement_regions)
+
+
+def test_magnetic_intersection_barkhausen():
+    """Magnetic rule detects Barkhausen noise during apparent alignment."""
+    rule = MagneticIntersectionRule()
+    cap_t = StreamCapability("magnetic", Substrate.TERNARY, 0.8, 0.7)
+    cap_s = StreamCapability("magnetic", Substrate.STOCHASTIC, 0.5, 0.6)
+    basins = [
+        Basin("magnetic", Substrate.TERNARY, None, 0.6,
+              {"demagnetised_fraction": 0.01}, cap_t),
+        Basin("magnetic", Substrate.STOCHASTIC, None, 0.5,
+              {"jitter_rms": 0.5}, cap_s),
+    ]
+    geom = rule.intersect(basins)
+    assert any("barkhausen" in str(t[0]).lower() for t in geom.tension_regions)
+
+
+def test_gravity_projector_ternary():
+    """project_gravity_ternary creates correct basin from vectors."""
+    vectors = [[0, -9.81, 0], [0, -1.62, 0], [0, 0, 0], [0, 0.05, 0]]
+    basin = project_gravity_ternary(vectors, null_threshold=0.5)
+    assert basin.domain == "gravity"
+    assert basin.substrate == Substrate.TERNARY
+    assert basin.signature["null_count"] > 0
+
+
+def test_gravity_projector_quantum():
+    """project_gravity_quantum creates basin with indeterminate fraction."""
+    stabilities = [0.9, 0.3, 0.55, 0.48, 0.51]
+    basin = project_gravity_quantum(stabilities)
+    assert basin.domain == "gravity"
+    assert basin.substrate == Substrate.QUANTUM
+    assert basin.signature["indeterminate_fraction"] > 0
+
+
+def test_gravity_projector_stochastic():
+    """project_gravity_stochastic creates basin from tidal data."""
+    tidal = [1e-5, 1.1e-5, 0.9e-5, 1.05e-5, 0.95e-5]
+    basin = project_gravity_stochastic(tidal)
+    assert basin.domain == "gravity"
+    assert basin.substrate == Substrate.STOCHASTIC
+    assert "jitter_rms" in basin.signature
+
+
+def test_five_domain_breathing():
+    """MandalaRuntime handles 5 domains simultaneously."""
+    mandala = MandalaRuntime()
+    mandala.register(SoundIntersectionRule())
+    mandala.register(GravityIntersectionRule())
+    mandala.register(ElectricIntersectionRule())
+    mandala.register(ThermalIntersectionRule())
+    mandala.register(MagneticIntersectionRule())
+
+    caps = [
+        StreamCapability("sound", Substrate.BINARY, 0.7, 0.6),
+        StreamCapability("gravity", Substrate.TERNARY, 0.8, 0.7),
+        StreamCapability("electric", Substrate.TERNARY, 0.7, 0.7),
+        StreamCapability("thermal", Substrate.TERNARY, 0.6, 0.5),
+        StreamCapability("magnetic", Substrate.TERNARY, 0.6, 0.5),
+    ]
+    basins = [
+        Basin(c.domain, c.substrate, None, 0.5, {"null_fraction": 0.1}, c)
+        for c in caps
+    ]
+    streams = [_ToyStream(b.source_capability, [], lambda d, c, b=b: b)
+               for b in basins]
+    result = mandala.breathe(streams)
+    domain_keys = [k for k in result if not k.startswith("_")]
+    assert len(domain_keys) == 5
+
+
+# ---------------------------------------------------------------------------
+# Layer 3 → Layer 4: LID entities, projectors, intelligence substrates
+# ---------------------------------------------------------------------------
+
+from mandala_runtime import (
+    LIDEntity, DynamicsProjector, AnimalProjector, CrystalProjector,
+    IntelligenceIntersectionRule, AnimalCrystalCoupling,
+    BEE_SWARM_LID, QUARTZ_LATTICE_LID,
+    load_ontology_index, substrate_key,
+)
+
+
+def test_lid_entity_roundtrip():
+    """LIDEntity to_dict/from_dict round-trips."""
+    d = BEE_SWARM_LID.to_dict()
+    restored = LIDEntity.from_dict(d)
+    assert restored.entity_id == BEE_SWARM_LID.entity_id
+    assert restored.substrate_type == "swarm.bee"
+    assert restored.category == "animal_intelligence"
+
+
+def test_lid_entity_fields():
+    """LIDEntity has expected fields for bee and quartz."""
+    assert BEE_SWARM_LID.substrate_type == "swarm.bee"
+    assert QUARTZ_LATTICE_LID.substrate_type == "crystal.quartz"
+    assert "gradient_field" in BEE_SWARM_LID.dynamics
+    assert "lattice" in QUARTZ_LATTICE_LID.dynamics
+
+
+def test_animal_projector_bee():
+    """AnimalProjector emits basins with gradient and trajectory modes."""
+    proj = AnimalProjector()
+    basins = proj.project(BEE_SWARM_LID)
+    assert len(basins) >= 2
+    modes = {b.signature["mode"] for b in basins}
+    assert "gradient_following" in modes
+    assert "trajectory_geometry" in modes
+
+
+def test_animal_projector_depth():
+    """Basin depth reflects gradient strength."""
+    proj = AnimalProjector()
+    basins = proj.project(BEE_SWARM_LID)
+    gradient = next(b for b in basins if b.signature["mode"] == "gradient_following")
+    assert gradient.depth == 0.8  # matches gradient_field strength
+
+
+def test_crystal_projector_quartz():
+    """CrystalProjector emits basins with lattice and piezo modes."""
+    proj = CrystalProjector()
+    basins = proj.project(QUARTZ_LATTICE_LID)
+    assert len(basins) >= 2
+    modes = {b.signature["mode"] for b in basins}
+    assert "lattice_modes" in modes
+    assert "piezoelectric_coupling" in modes
+
+
+def test_crystal_projector_symmetry():
+    """Quartz basin carries D3 symmetry group."""
+    proj = CrystalProjector()
+    basins = proj.project(QUARTZ_LATTICE_LID)
+    lattice = next(b for b in basins if b.signature["mode"] == "lattice_modes")
+    assert lattice.signature["symmetry_group"] == "D3"
+
+
+def test_intelligence_intersection_rule():
+    """IntelligenceIntersectionRule finds multi-mode agreement."""
+    rule = IntelligenceIntersectionRule(domain="animal_intelligence")
+    proj = AnimalProjector()
+    basins = proj.project(BEE_SWARM_LID)
+    geom = rule.intersect(basins)
+    assert len(geom.agreement_regions) > 0
+    assert any("multi_mode" in str(a[0]) for a in geom.agreement_regions)
+
+
+def test_animal_crystal_coupling():
+    """AnimalCrystalCoupling detects cross-substrate intelligence."""
+    coupling = AnimalCrystalCoupling()
+    rule_a = IntelligenceIntersectionRule(domain="animal_intelligence")
+    rule_c = IntelligenceIntersectionRule(domain="crystal_intelligence")
+    bee_basins = AnimalProjector().project(BEE_SWARM_LID)
+    quartz_basins = CrystalProjector().project(QUARTZ_LATTICE_LID)
+    geom_a = rule_a.intersect(bee_basins)
+    geom_c = rule_c.intersect(quartz_basins)
+    result = coupling.couple(geom_a, geom_c)
+    assert len(result["agreements"]) > 0
+    assert any("cross_substrate" in str(a[0]) for a in result["agreements"])
+
+
+def test_open_substrate_in_manifest():
+    """String substrates work in Manifest alongside enum substrates."""
+    cap_enum = StreamCapability("sound", Substrate.BINARY, 0.7, 0.6)
+    cap_str = StreamCapability("animal_intelligence", "swarm.bee", 0.7, 0.6)
+    b1 = Basin("sound", Substrate.BINARY, None, 0.3, {}, cap_enum)
+    b2 = Basin("animal_intelligence", "swarm.bee", None, 0.6, {}, cap_str)
+    m = Manifest(basins=[b1, b2])
+    assert m.total_information_axes == 2
+    assert "sound" in m.basins_by_domain
+    assert "animal_intelligence" in m.basins_by_domain
+
+
+def test_substrate_key_enum_and_string():
+    """substrate_key handles both Substrate enum and raw strings."""
+    assert substrate_key(Substrate.BINARY) == "binary"
+    assert substrate_key("swarm.bee") == "swarm.bee"
+    assert substrate_key(Substrate.QUANTUM) == "quantum"
+
+
+def test_load_ontology_missing_file():
+    """load_ontology_index returns empty list for missing file."""
+    result = load_ontology_index("/nonexistent/path/ontology_index.json")
+    assert result == []
+
+
+def test_lid_synthesis_breathe():
+    """Full bee+quartz synthesis through MandalaRuntime produces resonance."""
+    mandala = MandalaRuntime()
+    mandala.register(IntelligenceIntersectionRule(domain="animal_intelligence"))
+    mandala.register(IntelligenceIntersectionRule(domain="crystal_intelligence"))
+    mandala.register_coupling(AnimalCrystalCoupling())
+
+    bee_basins = AnimalProjector().project(BEE_SWARM_LID)
+    quartz_basins = CrystalProjector().project(QUARTZ_LATTICE_LID)
+
+    class _BS:
+        def __init__(self, b):
+            self._b = b
+        @property
+        def capability(self):
+            return self._b.source_capability
+        def read(self):
+            return self._b.signature
+        def project_to_basin(self):
+            return self._b
+
+    streams = [_BS(b) for b in bee_basins + quartz_basins]
+    result = mandala.breathe(streams)
+    assert "animal_intelligence" in result
+    assert "crystal_intelligence" in result
+    assert "_resonance" in result
+    resonance = result["_resonance"]
+    assert resonance.coupling_strength > 0
+    assert len(resonance.cross_domain_agreements) > 0
+
+
+# ---------------------------------------------------------------------------
+# LID real-schema integration tests
+# ---------------------------------------------------------------------------
+
+
+def test_lid_from_real_schema():
+    """LIDEntity.from_lid_json reads actual LID ontology format."""
+    bee_json = {
+        "id": "BE", "name": "Bee", "ontology": "animal",
+        "description": "Swarm coordination and hexagonal optimization.",
+        "patterns": [
+            {"name": "hexagonal_tessellation", "type": "geometric_efficiency",
+             "efficiency_factor": 0.97, "geometry": "hexagonal_close_packing",
+             "applications": ["space_optimization"]},
+            {"name": "swarm_coordination", "type": "distributed_processing",
+             "efficiency_factor": 0.92, "geometry": "network_topology",
+             "applications": ["distributed_systems"]},
+        ],
+        "links": [{"relation": "geometry_link", "target": "HEX"},
+                   {"relation": "resonance", "target": "SPIRAL"}],
+    }
+    entity = LIDEntity.from_lid_json(bee_json)
+    assert entity.entity_id == "BE"
+    assert entity.substrate_type == "animal.bee"
+    assert entity.category == "animal_intelligence"
+    assert len(entity.dynamics["patterns"]) == 2
+
+
+def test_animal_projector_real_lid_patterns():
+    """AnimalProjector reads real LID patterns with efficiency_factor."""
+    bee_json = {
+        "id": "BE", "name": "Bee", "ontology": "animal",
+        "description": "Swarm coordination.",
+        "patterns": [
+            {"name": "hex", "type": "geometric_efficiency",
+             "efficiency_factor": 0.97, "geometry": "hexagonal"},
+            {"name": "swarm", "type": "distributed_processing",
+             "efficiency_factor": 0.92, "geometry": "network"},
+            {"name": "waggle", "type": "information_compression",
+             "efficiency_factor": 0.89, "geometry": "polar"},
+        ],
+        "links": [],
+    }
+    entity = LIDEntity.from_lid_json(bee_json)
+    proj = AnimalProjector()
+    basins = proj.project(entity)
+    assert len(basins) == 3
+    modes = {b.signature["mode"] for b in basins}
+    assert "geometric_efficiency" in modes
+    assert "distributed_processing" in modes
+    depths = [b.depth for b in basins]
+    assert max(depths) == 0.97
+
+
+def test_crystal_projector_real_lid():
+    """CrystalProjector reads real LID quartz entity via from_lid_json."""
+    quartz_json = {
+        "id": "QU", "name": "Quartz", "ontology": "crystal",
+        "description": "Trigonal silicon dioxide with piezoelectric coupling.",
+        "patterns": [
+            {"name": "piezo_response", "type": "coupling",
+             "efficiency_factor": 0.85, "geometry": "trigonal"},
+        ],
+        "links": [{"relation": "energy_coupling", "target": "EM"}],
+    }
+    entity = LIDEntity.from_lid_json(quartz_json)
+    assert entity.substrate_type == "crystal.quartz"
+    proj = CrystalProjector()
+    basins = proj.project(entity)
+    assert len(basins) >= 1
+
+
+# ---------------------------------------------------------------------------
+# Generative Synthesis Engine tests
+# ---------------------------------------------------------------------------
+
+from mandala_runtime import (
+    SynthesisRule, SynthesisResult, SynthesisEngine,
+    load_synthesis_rules,
+)
+
+
+def test_synthesis_rule_from_jsonl():
+    """SynthesisRule.from_jsonl_line parses RSC expand.jsonl format."""
+    line = '{"when":{"op":"ALIGN","args":["X","Y"]},"then":"Z","priority":7,"why":"test"}'
+    rule = SynthesisRule.from_jsonl_line(line)
+    assert rule.op == "ALIGN"
+    assert rule.args == ["X", "Y"]
+    assert rule.then == "Z"
+    assert rule.priority == 7
+
+
+def test_synthesis_rule_with_guard():
+    """Rules with guard.requires parse correctly."""
+    line = '{"when":{"op":"ALIGN","args":["A","B"]},"then":"C","priority":5,"guard":{"requires":["CAP_X"]},"why":"guarded"}'
+    rule = SynthesisRule.from_jsonl_line(line)
+    assert rule.guard_requires == ["CAP_X"]
+
+
+def test_synthesis_rule_roundtrip():
+    """to_dict produces valid structure."""
+    rule = SynthesisRule(op="EXPAND", args=["SHAPE"], then="CAP", priority=9, why="test")
+    d = rule.to_dict()
+    assert d["when"]["op"] == "EXPAND"
+    assert d["then"] == "CAP"
+
+
+def test_synthesis_engine_built_in_rules():
+    """SynthesisEngine ships with built-in rules."""
+    engine = SynthesisEngine()
+    assert len(engine.rules) >= 5
+
+
+def test_synthesis_engine_align_fires():
+    """ALIGN rule fires when both tags are present in basins."""
+    engine = SynthesisEngine()
+    cap = StreamCapability("test", "swarm.bee", 0.7, 0.6)
+    basins = [
+        Basin("animal", "swarm.bee", None, 0.8,
+              {"mode": "gradient_following"}, cap),
+        Basin("crystal", "crystal.quartz", None, 0.8,
+              {"mode": "lattice_modes"}, cap),
+    ]
+    results = engine.synthesize(basins, {})
+    assert len(results) > 0
+    products = {r.product for r in results}
+    assert "gradient_lattice_resonance" in products
+
+
+def test_synthesis_engine_expand_fires():
+    """EXPAND rule fires on matching tag."""
+    engine = SynthesisEngine()
+    engine.add_rule(SynthesisRule(
+        op="EXPAND", args=["test_tag"], then="expanded_cap", priority=5, why="test"))
+    cap = StreamCapability("test", "test_tag", 0.7, 0.6)
+    basins = [Basin("test", "test_tag", None, 0.5, {"mode": "test_tag"}, cap)]
+    results = engine.synthesize(basins, {})
+    products = {r.product for r in results}
+    assert "expanded_cap" in products
+
+
+def test_synthesis_result_has_new_basin():
+    """SynthesisResult contains a generated Basin."""
+    engine = SynthesisEngine()
+    cap = StreamCapability("test", "swarm.bee", 0.7, 0.6)
+    basins = [
+        Basin("animal", "swarm.bee", None, 0.8,
+              {"mode": "gradient_following"}, cap),
+        Basin("crystal", "crystal.quartz", None, 0.8,
+              {"mode": "lattice_modes"}, cap),
+    ]
+    results = engine.synthesize(basins, {})
+    for r in results:
+        assert r.new_basin is not None
+        assert r.new_basin.domain == "synthesis"
+        assert "emergent." in substrate_key(r.new_basin.substrate)
+
+
+def test_synthesis_integrated_in_breathe():
+    """MandalaRuntime.breathe includes synthesis when enabled."""
+    mandala = MandalaRuntime()
+    mandala.register(IntelligenceIntersectionRule(domain="animal_intelligence"))
+    mandala.register(IntelligenceIntersectionRule(domain="crystal_intelligence"))
+    mandala.enable_synthesis()
+
+    bee_basins = AnimalProjector().project(BEE_SWARM_LID)
+    quartz_basins = CrystalProjector().project(QUARTZ_LATTICE_LID)
+
+    class _BS:
+        def __init__(self, b):
+            self._b = b
+        @property
+        def capability(self):
+            return self._b.source_capability
+        def read(self):
+            return self._b.signature
+        def project_to_basin(self):
+            return self._b
+
+    streams = [_BS(b) for b in bee_basins + quartz_basins]
+    result = mandala.breathe(streams)
+    assert "_resonance" in result
+    resonance = result["_resonance"]
+    assert len(resonance.synthesis_products) > 0
+    assert any("SYNTHESIS" in str(a[0]) for a in resonance.cross_domain_agreements)
+
+
+def test_load_synthesis_rules_missing_file():
+    """load_synthesis_rules returns empty list for missing file."""
+    assert load_synthesis_rules("/nonexistent/rules.jsonl") == []
+
+
+# ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Verification, provenance, measurable dynamics tests
+# ---------------------------------------------------------------------------
+
+
+def test_synthesis_verification_runs():
+    """SynthesisEngine verifies claims via claim_validator."""
+    engine = SynthesisEngine()
+    cap = StreamCapability("test", "swarm.bee", 0.7, 0.6)
+    basins = [
+        Basin("animal", "swarm.bee", None, 0.8,
+              {"mode": "gradient_following"}, cap),
+        Basin("crystal", "crystal.quartz", None, 0.8,
+              {"mode": "lattice_modes"}, cap),
+    ]
+    results = engine.synthesize(basins, {})
+    for r in results:
+        assert r.verification is not None
+        assert "concern" in r.verification
+        assert "falsifiability" in r.verification
+        assert 0.0 <= r.verification["concern"] <= 1.0
+
+
+def test_synthesis_high_concern_attenuates_depth():
+    """High-concern synthesis products get attenuated depth."""
+    engine = SynthesisEngine()
+    cap = StreamCapability("test", "swarm.bee", 0.7, 0.6)
+    basins = [
+        Basin("animal", "swarm.bee", None, 0.8,
+              {"mode": "gradient_following"}, cap),
+        Basin("crystal", "crystal.quartz", None, 0.8,
+              {"mode": "lattice_modes"}, cap),
+    ]
+    results = engine.synthesize(basins, {})
+    for r in results:
+        if r.verification and r.verification["concern"] > 0.7:
+            assert r.new_basin.depth < 0.8 * 0.8
+
+
+def test_basin_provenance_field():
+    """Basin accepts provenance dict."""
+    cap = StreamCapability("test", Substrate.BINARY, 0.7, 0.6)
+    b = Basin("test", Substrate.BINARY, None, 0.5, {},
+              source_capability=cap,
+              provenance={"projector": "TestProjector", "entity_id": "X"})
+    assert b.provenance["projector"] == "TestProjector"
+
+
+def test_basin_provenance_none_default():
+    """Basin provenance defaults to None."""
+    cap = StreamCapability("test", Substrate.BINARY, 0.7, 0.6)
+    b = Basin("test", Substrate.BINARY, None, 0.5, {}, source_capability=cap)
+    assert b.provenance is None
+
+
+def test_animal_projector_provenance():
+    """AnimalProjector attaches provenance to all basins."""
+    proj = AnimalProjector()
+    basins = proj.project(BEE_SWARM_LID)
+    for b in basins:
+        assert b.provenance is not None
+        assert b.provenance["projector"] == "AnimalProjector"
+        assert b.provenance["entity_id"] == "LID.ANIMAL.BEE_SWARM"
+
+
+def test_crystal_projector_provenance():
+    """CrystalProjector attaches provenance to all basins."""
+    proj = CrystalProjector()
+    basins = proj.project(QUARTZ_LATTICE_LID)
+    for b in basins:
+        assert b.provenance is not None
+        assert b.provenance["projector"] == "CrystalProjector"
+
+
+def test_animal_projector_measurable_collectivity():
+    """AnimalProjector grounds collectivity in measurable dynamics."""
+    proj = AnimalProjector()
+    basins = proj.project(BEE_SWARM_LID)
+    prov = basins[0].provenance
+    assert "is_collective" in prov
+    assert "collectivity_score" in prov
+    assert prov["collectivity_score"] > 0
+    assert "score=" in prov["collectivity_evidence"]
+    assert "physics couplings" in prov["collectivity_evidence"]
+
+
+def test_multi_observer_tension():
+    """IntelligenceIntersectionRule detects multi-observer tension."""
+    rule = IntelligenceIntersectionRule(domain="test")
+    cap = StreamCapability("test", "swarm.bee", 0.7, 0.6)
+    b1 = Basin("test", "swarm.bee", None, 0.5, {"mode": "gradient"},
+               source_capability=cap,
+               provenance={"entity_id": "BE", "observer_tradition": "western_entomology"})
+    b2 = Basin("test", "swarm.bee", None, 0.5, {"mode": "waggle"},
+               source_capability=cap,
+               provenance={"entity_id": "BE", "observer_tradition": "indigenous_knowledge"})
+    geom = rule.intersect([b1, b2])
+    assert any("multi_observer" in str(t[0]) for t in geom.tension_regions)
+
+
+def test_no_multi_observer_tension_same_tradition():
+    """Same observer tradition produces no multi-observer tension."""
+    rule = IntelligenceIntersectionRule(domain="test")
+    cap = StreamCapability("test", "swarm.bee", 0.7, 0.6)
+    b1 = Basin("test", "swarm.bee", None, 0.5, {"mode": "a"},
+               source_capability=cap,
+               provenance={"entity_id": "BE", "observer_tradition": "default"})
+    b2 = Basin("test", "swarm.bee", None, 0.5, {"mode": "b"},
+               source_capability=cap,
+               provenance={"entity_id": "BE", "observer_tradition": "default"})
+    geom = rule.intersect([b1, b2])
+    assert not any("multi_observer" in str(t[0]) for t in geom.tension_regions)
+
+
+def test_synthesis_basin_carries_verified_flag():
+    """Generated synthesis basins carry verified=True in signature."""
+    engine = SynthesisEngine()
+    cap = StreamCapability("test", "swarm.bee", 0.7, 0.6)
+    basins = [
+        Basin("animal", "swarm.bee", None, 0.8,
+              {"mode": "gradient_following"}, cap),
+        Basin("crystal", "crystal.quartz", None, 0.8,
+              {"mode": "lattice_modes"}, cap),
+    ]
+    results = engine.synthesize(basins, {})
+    for r in results:
+        assert r.new_basin.signature["verified"] is True
+        assert r.new_basin.signature["concern"] is not None
+
+
+# ---------------------------------------------------------------------------
+# Risk mitigation gap closure tests
+# ---------------------------------------------------------------------------
+
+
+def test_verification_grounding_score():
+    """Verification includes physics grounding score."""
+    engine = SynthesisEngine()
+    cap = StreamCapability("test", "swarm.bee", 0.7, 0.6)
+    basins = [
+        Basin("animal", "swarm.bee", None, 0.8,
+              {"mode": "gradient_following"}, cap),
+        Basin("crystal", "crystal.quartz", None, 0.8,
+              {"mode": "lattice_modes"}, cap),
+    ]
+    results = engine.synthesize(basins, {})
+    for r in results:
+        assert "grounding_score" in r.verification
+        assert 0.0 <= r.verification["grounding_score"] <= 1.0
+
+
+def test_verification_physics_units_counted():
+    """Verification counts physics units when present."""
+    engine = SynthesisEngine()
+    engine.add_rule(SynthesisRule(
+        op="EXPAND", args=["test_unit"],
+        then="unit_test_cap", priority=5,
+        why="This resonance occurs at 32768 Hz with d33 = 2.3 pC/N coupling"))
+    cap = StreamCapability("test", "test_unit", 0.7, 0.6)
+    basins = [Basin("test", "test_unit", None, 0.5, {"mode": "test_unit"}, cap)]
+    results = engine.synthesize(basins, {})
+    assert len(results) > 0
+    assert results[-1].verification["physics_units_found"] > 0
+
+
+def test_collectivity_score_numeric():
+    """Collectivity is a numeric score, not a boolean from string matching."""
+    proj = AnimalProjector()
+    basins = proj.project(BEE_SWARM_LID)
+    prov = basins[0].provenance
+    assert isinstance(prov["collectivity_score"], float)
+    assert 0 <= prov["collectivity_score"] <= 2.0
+
+
+def test_collectivity_uses_swarm_size():
+    """Large swarm_size contributes to collectivity score."""
+    from mandala_runtime import LIDEntity
+    entity_large = LIDEntity(
+        entity_id="TEST_LARGE", name="Large Swarm",
+        substrate_type="swarm.large", category="animal_intelligence",
+        dynamics={"swarm_size": 50000,
+                  "gradient_field": {"strength": 0.5}})
+    entity_solo = LIDEntity(
+        entity_id="TEST_SOLO", name="Solo Animal",
+        substrate_type="animal.solo", category="animal_intelligence",
+        dynamics={"swarm_size": 1,
+                  "gradient_field": {"strength": 0.5}})
+    proj = AnimalProjector()
+    large_prov = proj.project(entity_large)[0].provenance
+    solo_prov = proj.project(entity_solo)[0].provenance
+    assert large_prov["collectivity_score"] > solo_prov["collectivity_score"]
+
+
+def test_provenance_report():
+    """provenance_report surfaces curation data."""
+    mandala = MandalaRuntime()
+    cap1 = StreamCapability("test", "swarm.bee", 0.7, 0.6)
+    cap2 = StreamCapability("test", "crystal.quartz", 0.7, 0.6)
+    b1 = Basin("test", "swarm.bee", None, 0.5, {},
+               source_capability=cap1,
+               provenance={"projector": "AnimalProjector",
+                           "entity_id": "BE",
+                           "observer_tradition": "default"})
+    b2 = Basin("test", "crystal.quartz", None, 0.5, {},
+               source_capability=cap2,
+               provenance={"projector": "CrystalProjector",
+                           "entity_id": "QU",
+                           "observer_tradition": "default"})
+    m = Manifest(basins=[b1, b2])
+    report = mandala.provenance_report(m)
+    assert report["total_basins"] == 2
+    assert report["basins_with_provenance"] == 2
+    assert report["entities_covered"] == 2
+    assert "AnimalProjector" in report["projectors"]
+
+
+def test_provenance_report_multi_observer():
+    """provenance_report detects multi-observer conflicts."""
+    mandala = MandalaRuntime()
+    cap = StreamCapability("test", "swarm.bee", 0.7, 0.6)
+    b1 = Basin("test", "swarm.bee", None, 0.5, {},
+               source_capability=cap,
+               provenance={"projector": "AP", "entity_id": "BE",
+                           "observer_tradition": "western"})
+    b2 = Basin("test", "swarm.bee", None, 0.5, {},
+               source_capability=cap,
+               provenance={"projector": "AP", "entity_id": "BE",
+                           "observer_tradition": "indigenous"})
+    m = Manifest(basins=[b1, b2])
+    report = mandala.provenance_report(m)
+    assert len(report["multi_observer_conflicts"]) == 1
+    assert "BE" in report["multi_observer_conflicts"][0]["entity_id"]
+
+
+def test_cayley_factor_in_synthesis():
+    """Synthesis basins carry cayley_factor in signature."""
+    engine = SynthesisEngine()
+    cap = StreamCapability("test", "swarm.bee", 0.7, 0.6)
+    basins = [
+        Basin("animal", "swarm.bee", None, 0.8,
+              {"mode": "gradient_following"}, cap),
+        Basin("crystal", "crystal.quartz", None, 0.8,
+              {"mode": "lattice_modes"}, cap),
+    ]
+    results = engine.synthesize(basins, {})
+    for r in results:
+        assert "cayley_factor" in r.new_basin.signature
+        assert 0.5 <= r.new_basin.signature["cayley_factor"] <= 1.0
+
+
 # Run all tests
 # ---------------------------------------------------------------------------
 
