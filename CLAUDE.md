@@ -36,6 +36,7 @@ mandala-computing/
 ├── octahedral_session_cache.py# session caching with octahedral invalidation (~710 loc)
 ├── osl.py                     # Octahedral Symbolic Language v1.0 (~965 loc)
 ├── geis.py                    # Geometric Information Encoding System bridge (~695 loc)
+├── kt_annealer.py             # KT phase annealer + symmetry detector (~430 loc)
 ├── membrane.py                # boundary computation primitive (~470 loc)
 ├── claim_validator.py         # epistemological claim validation (~500 loc)
 ├── glyph_convert.py           # human decimal-to-glyph converter (~355 loc)
@@ -48,7 +49,7 @@ mandala-computing/
 ├── PROJECTS.md                # connected repos
 ├── LICENSE                    # MIT
 ├── examples/                  # 20 runnable example scripts + benchmark
-├── tests/test_core.py         # 225-test suite
+├── tests/test_core.py         # 240-test suite
 └── [17 .md files]             # theory, hardware, integration, proofs, notes
 ```
 
@@ -243,6 +244,19 @@ Includes pre-built configurations for factorization, SAT, and optimization.
 
 **key classes:** `Membrane`, `CoarseResult`, `Window`, `MembraneResult`
 
+### kt-annealer (`kt_annealer.py`)
+
+Kosterlitz-Thouless annealer — phase-based optimisation via topological defect
+dynamics. Ported from Geometric-to-Binary-Computational-Bridge/Engine. Operates
+on continuous XY-model phases with vortex detection and phi-lattice coupling.
+Maps octahedral states 0-7 to phases s*pi/4 for continuous optimisation, then
+quantises back. Also includes a 3-D symmetry detector (reflective/rotational).
+
+**key classes:** `KTAnnealer`, `KTConfig`, `AnnealStep`, `SymmetryDetector`
+
+**key functions:** `kt_anneal_mandala()`, `detect_mandala_symmetries()`,
+`anneal_network_phases()`, `states_to_phases()`, `phases_to_states()`
+
 ---
 
 ## mathematical-framework
@@ -386,7 +400,7 @@ large systems.
 
 ## build-test-run
 
-Test suite: `python tests/test_core.py` (225 tests across all modules).
+Test suite: `python tests/test_core.py` (240 tests across all modules).
 No formal build system, CI/CD, or linting is configured.
 
 ### run-demos
@@ -519,7 +533,7 @@ Connected repositories by JinnZ2 (listed in `PROJECTS.md` and `.fieldlink.json`)
 - **`OctahedralState`** exists in both `geis.py` (3D cubic coordinates, tokens)
   and implicitly in `octahedral_arithmetic.py` (glyph-space). Use GEIS for
   binary bridging, use octahedral_arithmetic for exact glyph math
-- **test suite:** `python tests/test_core.py` runs 225 tests across all modules
+- **test suite:** `python tests/test_core.py` runs 240 tests across all modules
 - **`.gitignore`** excludes `__pycache__/`, `.pyc`, `.env`, `.pytest_cache/`, etc.
 - **`requirements.txt`** at repo root lists numpy and scipy
 - **flat layout:** all code at root level, no package hierarchy

@@ -2378,6 +2378,178 @@ def test_holographic_renormalization_solve():
 
 
 # ---------------------------------------------------------------------------
+# KT Annealer tests
+# ---------------------------------------------------------------------------
+
+from kt_annealer import (
+    KTAnnealer, KTConfig, AnnealStep,
+    SymmetryDetector,
+    states_to_phases, phases_to_states,
+    anneal_network_phases,
+    kt_anneal_mandala, detect_mandala_symmetries,
+)
+
+
+def _make_triangle_adj():
+    """3-node triangle adjacency."""
+    return [[1, 2], [0, 2], [0, 1]]
+
+
+def _make_square_adj():
+    """4-node ring adjacency."""
+    return [[1, 3], [0, 2], [1, 3], [0, 2]]
+
+
+def test_kt_annealer_energy_decreases():
+    """Annealing should lower energy."""
+    rng = np.random.default_rng(42)
+    phases = rng.uniform(0, 2 * math.pi, 4)
+    adj = _make_square_adj()
+    cfg = KTConfig(J=1.0, T_start=3.0, T_final=0.1, n_steps=100, seed=42)
+    ann = KTAnnealer(phases, adj, cfg)
+    ann.anneal()
+    s = ann.summary()
+    assert s["energy_final"] <= s["energy_start"]
+
+
+def test_kt_annealer_coherence_increases():
+    """Coherence should increase during annealing."""
+    rng = np.random.default_rng(7)
+    phases = rng.uniform(0, 2 * math.pi, 4)
+    adj = _make_square_adj()
+    cfg = KTConfig(J=1.618, T_start=5.0, T_final=0.2, n_steps=200, seed=7)
+    ann = KTAnnealer(phases, adj, cfg)
+    ann.anneal()
+    s = ann.summary()
+    assert s["coherence_final"] >= s["coherence_start"]
+
+
+def test_kt_annealer_history_recorded():
+    """History has one entry per step."""
+    phases = np.zeros(3)
+    adj = _make_triangle_adj()
+    cfg = KTConfig(n_steps=50, seed=0)
+    ann = KTAnnealer(phases, adj, cfg)
+    ann.anneal()
+    assert len(ann.history) == 50
+    assert all(isinstance(h, AnnealStep) for h in ann.history)
+
+
+def test_kt_config_T_KT():
+    """T_KT = pi*J/2."""
+    cfg = KTConfig(J=1.618)
+    expected = math.pi * 1.618 / 2.0
+    assert abs(cfg.T_KT - expected) < 1e-10
+
+
+def test_kt_anneal_step_fields():
+    """AnnealStep has all expected fields."""
+    step = AnnealStep(step=0, temperature=1.0, energy=-2.0,
+                      phase_coherence=0.5, vortex_count=1,
+                      acceptance_rate=0.8)
+    assert step.step == 0
+    assert step.vortex_count == 1
+
+
+def test_kt_summary_keys():
+    """summary() returns expected keys."""
+    phases = np.zeros(3)
+    adj = _make_triangle_adj()
+    cfg = KTConfig(n_steps=10, seed=0)
+    ann = KTAnnealer(phases, adj, cfg)
+    ann.anneal()
+    s = ann.summary()
+    for key in ("T_KT", "energy_start", "energy_final", "coherence_final",
+                "vortices_start", "vortices_final", "kt_transition_step"):
+        assert key in s
+
+
+def test_kt_phases_roundtrip():
+    """states_to_phases -> phases_to_states is identity for exact phases."""
+    states = [0, 1, 2, 3, 4, 5, 6, 7]
+    phases = states_to_phases(states)
+    recovered = phases_to_states(phases)
+    assert recovered == states
+
+
+def test_kt_phases_quantisation():
+    """Phases near state boundaries quantise correctly."""
+    # Phase just above state 3 boundary -> should still round to 3
+    phase_3 = 3 * math.pi / 4
+    result = phases_to_states(np.array([phase_3 + 0.01]))
+    assert result[0] == 3
+
+
+def test_symmetry_cube_vertices():
+    """Cube vertices have reflective symmetry on all 3 axes."""
+    cube = np.array([
+        [1, 1, 1], [1, 1, -1], [1, -1, 1], [1, -1, -1],
+        [-1, 1, 1], [-1, 1, -1], [-1, -1, 1], [-1, -1, -1],
+    ], dtype=float)
+    det = SymmetryDetector()
+    syms = det.find_symmetries(cube)
+    reflective = [s for s in syms if s["type"] == "reflective"]
+    assert len(reflective) == 3  # x, y, z planes
+
+
+def test_symmetry_random_none():
+    """Random points should have no symmetries."""
+    rng = np.random.default_rng(99)
+    pts = rng.standard_normal((6, 3))
+    det = SymmetryDetector()
+    syms = det.find_symmetries(pts)
+    assert len(syms) == 0
+
+
+def test_symmetry_reduction_factor():
+    """reduction_factor returns max among symmetries."""
+    det = SymmetryDetector()
+    assert det.reduction_factor([]) == 1.0
+    syms = [{"reduction_factor": 2.0}, {"reduction_factor": 4.0}]
+    assert det.reduction_factor(syms) == 4.0
+
+
+def test_symmetry_single_point():
+    """Single point has no symmetries."""
+    det = SymmetryDetector()
+    assert det.find_symmetries(np.array([[0, 0, 0]])) == []
+
+
+def test_anneal_network_phases_returns_tuple():
+    """anneal_network_phases returns (phases, summary)."""
+    phases = np.zeros(3)
+    adj = _make_triangle_adj()
+    cfg = KTConfig(n_steps=10, seed=0)
+    result, summary = anneal_network_phases(phases, adj, cfg)
+    assert isinstance(result, np.ndarray)
+    assert len(result) == 3
+    assert isinstance(summary, dict)
+
+
+def test_kt_mandala_bridge_runs():
+    """kt_anneal_mandala runs on a MandalaComputer without error."""
+    from mandala_computer import MandalaComputer
+    mc = MandalaComputer(golden_depth=3, sacred_geometry=8)
+    mc.bloom_mandala()
+    mc.encode_factorization(15)
+    cfg = KTConfig(n_steps=50, seed=42)
+    result = kt_anneal_mandala(mc, config=cfg)
+    assert "ground_state" in result
+    assert "coherence" in result
+    assert "vortices_final" in result
+    assert len(result["ground_state"]) == len(mc.cells)
+
+
+def test_kt_mandala_symmetries():
+    """detect_mandala_symmetries returns a list."""
+    from mandala_computer import MandalaComputer
+    mc = MandalaComputer(golden_depth=3, sacred_geometry=8)
+    mc.bloom_mandala()
+    syms = detect_mandala_symmetries(mc)
+    assert isinstance(syms, list)
+
+
+# ---------------------------------------------------------------------------
 # Run all tests
 # ---------------------------------------------------------------------------
 
