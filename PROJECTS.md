@@ -35,6 +35,9 @@ This project is part of a larger ecosystem of symbolic sensors, computational to
 - **[Polyhedral-Intelligence](https://github.com/JinnZ2/Polyhedral-Intelligence)**  
   Multi-angle, multi-domain intelligence models shaped by polyhedral abstraction.
 
+- **[Living-Intelligence-Database](https://github.com/JinnZ2/Living-Intelligence-Database)**  
+  Ontological database of ~200 living intelligences (animal, plant, crystal, plasma, energy, shape, temporal, AI). Source of LID entities projected through `mandala_runtime.py` DynamicsProjectors into Mandala Basins. Each intelligence is its own substrate — bee swarm logic, quartz lattice, mycelial network, etc.
+
 - **[biomachine_ecology](https://github.com/JinnZ2/biomachine_ecology)**  
   Ecology of hybrid systems—organic + machine, sensory + symbolic, adaptive + co-creative.
 

@@ -1308,6 +1308,52 @@ class LIDEntity:
             metadata=d.get("metadata", {}),
         )
 
+    @classmethod
+    def from_lid_json(cls, entity: dict) -> LIDEntity:
+        """
+        Construct from an actual Living-Intelligence-Database entity JSON.
+
+        LID schema: id, name, ontology, description, patterns (list of
+        {name, type, efficiency_factor, geometry, applications}),
+        links (list of {relation, target}), core_attributes, etc.
+        """
+        eid = entity.get("id", "UNKNOWN")
+        name = entity.get("name", eid)
+        ontology = entity.get("ontology", "unknown")
+        desc = entity.get("description", "")
+
+        patterns = entity.get("patterns", [])
+        links = entity.get("links", [])
+        core = entity.get("core_attributes", {})
+
+        dynamics = {}
+        if patterns:
+            dynamics["patterns"] = patterns
+        if core:
+            dynamics["core_attributes"] = core
+
+        physics_couplings = []
+        for link in links:
+            rel = link.get("relation", "")
+            if rel in ("energy_coupling", "resonance", "geometry_link"):
+                physics_couplings.append(link.get("target", ""))
+
+        return cls(
+            entity_id=eid,
+            name=name,
+            substrate_type=f"{ontology}.{name.lower().replace(' ', '_')}",
+            category=f"{ontology}_intelligence",
+            dynamics=dynamics,
+            environment={},
+            physics_couplings=physics_couplings,
+            metadata={
+                "description": desc,
+                "links": links,
+                "symbolic_code": entity.get("symbolic_code", ""),
+                "emoji": entity.get("emoji", ""),
+            },
+        )
+
     def to_dict(self) -> dict:
         return {
             "entity_id": self.entity_id,
@@ -1454,6 +1500,34 @@ class AnimalProjector(DynamicsProjector):
                 },
                 source_capability=cap,
             ))
+
+        # LID real-schema path: read from dynamics["patterns"] list
+        lid_patterns = dyn.get("patterns", [])
+        if not basins and lid_patterns:
+            for pat in lid_patterns:
+                if not isinstance(pat, dict):
+                    continue
+                eff = pat.get("efficiency_factor", 0.5)
+                cap = StreamCapability(
+                    domain=entity.category,
+                    substrate=entity.substrate_type,
+                    coverage_fraction=0.7,
+                    confidence=min(1.0, eff),
+                )
+                basins.append(Basin(
+                    domain=entity.category,
+                    substrate=entity.substrate_type,
+                    support=entity.spatial_extent or ("pattern_space", 0, 1),
+                    depth=min(1.0, eff),
+                    signature={
+                        "mode": pat.get("type", pat.get("name", "unknown")),
+                        "pattern_name": pat.get("name", ""),
+                        "geometry": pat.get("geometry", ""),
+                        "efficiency": eff,
+                        "applications": pat.get("applications", []),
+                    },
+                    source_capability=cap,
+                ))
 
         if not basins:
             return super().project(entity, environment)

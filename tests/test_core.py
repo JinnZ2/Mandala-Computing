@@ -3328,6 +3328,78 @@ def test_lid_synthesis_breathe():
 
 
 # ---------------------------------------------------------------------------
+# LID real-schema integration tests
+# ---------------------------------------------------------------------------
+
+
+def test_lid_from_real_schema():
+    """LIDEntity.from_lid_json reads actual LID ontology format."""
+    bee_json = {
+        "id": "BE", "name": "Bee", "ontology": "animal",
+        "description": "Swarm coordination and hexagonal optimization.",
+        "patterns": [
+            {"name": "hexagonal_tessellation", "type": "geometric_efficiency",
+             "efficiency_factor": 0.97, "geometry": "hexagonal_close_packing",
+             "applications": ["space_optimization"]},
+            {"name": "swarm_coordination", "type": "distributed_processing",
+             "efficiency_factor": 0.92, "geometry": "network_topology",
+             "applications": ["distributed_systems"]},
+        ],
+        "links": [{"relation": "geometry_link", "target": "HEX"},
+                   {"relation": "resonance", "target": "SPIRAL"}],
+    }
+    entity = LIDEntity.from_lid_json(bee_json)
+    assert entity.entity_id == "BE"
+    assert entity.substrate_type == "animal.bee"
+    assert entity.category == "animal_intelligence"
+    assert len(entity.dynamics["patterns"]) == 2
+
+
+def test_animal_projector_real_lid_patterns():
+    """AnimalProjector reads real LID patterns with efficiency_factor."""
+    bee_json = {
+        "id": "BE", "name": "Bee", "ontology": "animal",
+        "description": "Swarm coordination.",
+        "patterns": [
+            {"name": "hex", "type": "geometric_efficiency",
+             "efficiency_factor": 0.97, "geometry": "hexagonal"},
+            {"name": "swarm", "type": "distributed_processing",
+             "efficiency_factor": 0.92, "geometry": "network"},
+            {"name": "waggle", "type": "information_compression",
+             "efficiency_factor": 0.89, "geometry": "polar"},
+        ],
+        "links": [],
+    }
+    entity = LIDEntity.from_lid_json(bee_json)
+    proj = AnimalProjector()
+    basins = proj.project(entity)
+    assert len(basins) == 3
+    modes = {b.signature["mode"] for b in basins}
+    assert "geometric_efficiency" in modes
+    assert "distributed_processing" in modes
+    depths = [b.depth for b in basins]
+    assert max(depths) == 0.97
+
+
+def test_crystal_projector_real_lid():
+    """CrystalProjector reads real LID quartz entity via from_lid_json."""
+    quartz_json = {
+        "id": "QU", "name": "Quartz", "ontology": "crystal",
+        "description": "Trigonal silicon dioxide with piezoelectric coupling.",
+        "patterns": [
+            {"name": "piezo_response", "type": "coupling",
+             "efficiency_factor": 0.85, "geometry": "trigonal"},
+        ],
+        "links": [{"relation": "energy_coupling", "target": "EM"}],
+    }
+    entity = LIDEntity.from_lid_json(quartz_json)
+    assert entity.substrate_type == "crystal.quartz"
+    proj = CrystalProjector()
+    basins = proj.project(entity)
+    assert len(basins) >= 1
+
+
+# ---------------------------------------------------------------------------
 # Run all tests
 # ---------------------------------------------------------------------------
 

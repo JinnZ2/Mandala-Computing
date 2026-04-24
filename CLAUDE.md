@@ -557,6 +557,7 @@ Connected repositories by JinnZ2 (listed in `PROJECTS.md` and `.fieldlink.json`)
 - Polyhedral-Intelligence
 - ai-human-audit-protocol
 - Fractal-Compass-Atlas
+- Living-Intelligence-Database (LID — ontology source for intelligence substrates)
 
 ---
 
