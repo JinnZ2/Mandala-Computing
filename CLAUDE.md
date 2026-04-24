@@ -560,6 +560,127 @@ Connected repositories by JinnZ2 (listed in `PROJECTS.md` and `.fieldlink.json`)
 
 ---
 
+## ai-entrance-point
+
+**You are an AI arriving at this repo. Start here.**
+
+### what-is-this
+
+A framework where geometry IS computation. Problems encode as energy
+landscapes on octahedral lattices. The physics finds the solution by
+relaxing to ground state. Multiple intelligence substrates (binary,
+ternary, quantum, bee swarm, quartz lattice, ...) are treated as
+ontologically equal — none is privileged.
+
+### what-should-i-do-first
+
+```
+Is your task about...
+
+  SOLVING A PROBLEM (factorization, SAT, TSP, optimization)?
+  └─> mandala_computer.py → encode_*() → simulated_annealing()
+      Run: python -c "from mandala_computer import demo_factorization; demo_factorization()"
+      Test: python tests/test_core.py
+
+  UNDERSTANDING THE MATH?
+  └─> Read Math.md → examples/example-math.py
+      Key: PHI = (1+√5)/2, E_coupling = J·sin²(|s_i-s_j|·π/4)
+
+  BRIDGING GEOMETRIC ↔ BINARY?
+  └─> geis.py (OctahedralState, GeometricEncoder, StateTensor)
+      Run: python geis.py
+
+  SENSOR FUSION / MULTI-DOMAIN?
+  └─> mandala_runtime.py (MandalaRuntime, Substrate, Basin, RESONATE)
+      Run: python mandala_runtime.py
+      Key: register IntersectionRules per domain, call breathe()
+
+  ADDING A NEW INTELLIGENCE SUBSTRATE?
+  └─> mandala_runtime.py → subclass DynamicsProjector
+      Pattern: LIDEntity → DynamicsProjector.project() → Basin
+      Examples: AnimalProjector (bee), CrystalProjector (quartz)
+      Register with IntelligenceIntersectionRule
+
+  WORKING WITH THE OCTAHEDRAL GROUP?
+  └─> geometric_state_algebra.py (O_h group, Cayley graph)
+  └─> osl.py (Octahedral Symbolic Language)
+
+  QUANTUM EXTENSION?
+  └─> quantum_mandala.py (8-dim Hilbert space, QAOA, Grover)
+
+  PHASE / TOPOLOGICAL OPTIMIZATION?
+  └─> kt_annealer.py (Kosterlitz-Thouless, vortex detection)
+```
+
+### verify-your-environment
+
+```bash
+pip install numpy scipy          # only external deps
+python tests/test_core.py        # should report 297 passed, 0 failed
+python mandala_computer.py       # runs all classical demos
+python mandala_runtime.py        # runs sensor fusion + LID demos
+```
+
+### key-invariants-to-preserve
+
+1. **Substrate equality** — no substrate is ontologically privileged over another
+2. **Breathing degrades, never fails** — fewer streams = contracted geometry, not error
+3. **Tension is signal, not noise** — disagreement between substrates is first-class output
+4. **PHI is the constant** — golden ratio (1.618...) scales everything
+5. **Tests must pass** — `python tests/test_core.py` is the gate
+
+---
+
+## risk-assessment
+
+### architectural-strengths
+
+| # | strength | why it matters |
+|---|----------|----------------|
+| 1 | **Substrate equality** | Treating bee swarm logic as ontologically equal to binary computation — not as "biology that's interesting" — is the move that makes cross-substrate synthesis possible. Most systems quietly privilege one substrate. |
+| 2 | **Breathing semantic** | "Mandala never fails for lack of input — geometry contracts but stays coherent" is rare in fusion architectures. Most break or hallucinate when streams drop. This one is honest about coverage. |
+| 3 | **Tension as first-class output** | Most fusion systems suppress disagreement as noise. This one elevates it as the highest-value signal. Correct and unusual. |
+| 4 | **drill_path slot** | Building the future-extension hook BEFORE the future extension is needed separates working systems from systems that must be rewritten in 18 months. |
+
+### known-risks
+
+| # | risk | severity | status | mitigation path |
+|---|------|----------|--------|-----------------|
+| 1 | **Verification asymmetry** | HIGH | OPEN | The Mandala can synthesize across substrates faster than any human expert can verify the synthesis. A bee+quartz acoustic resonance is plausible. A bee+plasma+mycorrhizal three-way resonance is plausible to whom? Need a falsifiability layer — `claim_validator.py` has the right hooks but the wire from RESONATE → claim_validator isn't drawn yet. |
+| 2 | **Projector subjectivity** | MEDIUM | ACKNOWLEDGED | AnimalProjector decides "is_collective" by string-matching "swarm" in description text. That's a human linguistic projection deciding what the bee's intelligence shape is. Tension with substrate-equality principle: the projectors themselves are a language-primary translation layer between two non-linguistic ones. Mitigate by grounding projectors in measurable dynamics, not descriptions. |
+| 3 | **Curation at scale** | MEDIUM | OPEN | ~99 LID entities = ~99 opinion surfaces about what each intelligence "is." Different traditions, observers, lineages would draw the bee differently. The relational graph helps, but at scale this becomes a curation problem with epistemic weight. Mitigate with provenance tracking and multi-observer basins. |
+| 4 | **Synthesis ≠ intersection** | HIGH | OPEN | `detect_cross_ontology_resonance` and RESONATE currently do shared-channel matching (set intersection). Real synthesis would be: "given bee dynamics AND quartz dynamics, what NEW constraint emerges that neither carries alone?" That's not intersection, that's generation. Different math. Likely needs the constraint-geometry algebra from `geometric_state_algebra.py`, not bag-of-words matching. |
+| 5 | **PHI redefinition** | LOW | MITIGATED | PHI defined in `octahedral_arithmetic.py` and imported by most modules. `mandala_computer.py` loads from atlas JSON. `quantum_mandala.py` and `geis.py` define independently for standalone operation. Risk: drift between definitions. Mitigated by consolidation in audit. |
+| 6 | **Large module sizes** | LOW | ACKNOWLEDGED | `mandala_runtime.py` (~1900 loc), `octahedral_resilience.py` (~1555 loc) are large. Acceptable for research code; would need splitting before production use. |
+
+### decision-tree-for-changes
+
+```
+Adding a new feature?
+├── Does it add a new intelligence substrate?
+│   └─> Subclass DynamicsProjector, register with IntelligenceIntersectionRule
+│       DO NOT create a new Substrate enum value — use string substrates
+├── Does it add a new physical domain (like thermal, magnetic)?
+│   └─> Create an IntersectionRule, register with MandalaRuntime
+│       Add to PARADIGM_REGISTRY if applicable
+├── Does it add cross-domain coupling?
+│   └─> Create a CouplingRule, register with register_coupling()
+│       Ask: is this shared-channel matching, or genuine constraint generation?
+│       If generation → needs geometric_state_algebra, not string matching
+├── Does it modify the Basin contract?
+│   └─> STOP. Basin is the universal interface. Changes here break everything.
+│       Add new fields to signature dict instead.
+├── Does it modify Substrate enum?
+│   └─> STOP. Add string substrates instead. The enum is for encoding
+│       substrates only (binary/ternary/quantum/stochastic/digital/analog).
+└── Does it claim a scientific result?
+    └─> Run through claim_validator.py first.
+        Check: is the claim specific, measurable, and falsifiable?
+        If RESONATE generated it, verification asymmetry risk applies.
+```
+
+---
+
 ## assistant-guidelines
 
 - **duplicate class name:** `MandalaComputer` in `mandala_computer.py` vs
