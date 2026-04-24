@@ -18,10 +18,6 @@ Usage:
 
 from __future__ import annotations
 
-import time
-
-from octahedral_arithmetic import PHI
-
 
 class MandalaSimulator:
     """

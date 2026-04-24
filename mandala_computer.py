@@ -19,13 +19,12 @@ from enum import Enum
 import time
 import json
 import pathlib
-import copy
 import math
 
 # Optional: glyph-native arithmetic. If unavailable, factorization solutions
 # omit glyph representations but all computation still works.
 try:
-    from octahedral_arithmetic import OctahedralNumber, states_to_number, factor_pair_glyphs
+    from octahedral_arithmetic import OctahedralNumber
     HAS_GLYPH_MATH = True
 except ImportError:
     HAS_GLYPH_MATH = False

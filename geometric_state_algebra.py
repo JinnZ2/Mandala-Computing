@@ -1,8 +1,7 @@
 """\nGEOMETRIC STATE ALGEBRA v1.0\nReplace flat integer states with the full octahedral symmetry group O_h.\n\nInstead of states 0-7 (integers that happen to be labeled geometrically),\nstates ARE symmetry operations: rotations and reflections of the octahedron.\nCancellation is group composition to identity. The algebraic structure is\nthe group ring Z[O_h] -- fundamentally richer than GF(2).\n\nKey insight: the octahedral group O_h has 48 elements (24 rotations x {I, -I}).\nThe current system collapses this to 8 states, losing 40 dimensions of\ngeometric information. This module restores them.\n\nCore types:\nOhElement      -- single symmetry operation (3x3 integer matrix)\nOhGroup        -- the full 48-element group with Cayley graph\nGroupRingElement -- formal sum in Z[O_h], the geometric superposition\nGeometricState -- cell state that IS a group element\nCayleyEnergy   -- coupling energy from Cayley graph distance\n\nDesign:\n- All matrices are exact integers (-1, 0, 1) -- no floating point\n- Group multiplication is matrix multiplication\n- Inverses are transposes (orthogonal group)\n- Cayley distance replaces |s_i - s_j|\n- Group ring replaces GF(2) for null space analysis\n"""
 
 from __future__ import annotations
-from typing import List, Dict, Tuple, Optional, Set, FrozenSet
-from dataclasses import dataclass, field
+from typing import List, Dict, Tuple, Optional, Set
 from collections import defaultdict
 import math
 

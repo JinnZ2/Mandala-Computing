@@ -29,11 +29,10 @@ from enum import Enum
 import math
 
 from geometric_state_algebra import (
-    OhElement, OhGroup, GroupRingElement, GeometricState,
-    CayleyEnergy, IDENTITY, OCTAHEDRAL_VERTICES,
-    GENERATOR_RZ90, GENERATOR_RX90, GENERATOR_INV,
+    OhElement, OhGroup,
+    IDENTITY,
 )
-from octahedral_arithmetic import OctahedralNumber, PHI, BASE
+from octahedral_arithmetic import PHI
 
 
 # ---------------------------------------------------------------------------

@@ -55,13 +55,11 @@ import time
 import random
 import threading
 import heapq
-from collections import deque, OrderedDict
+from collections import deque
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple, Set, Any
 from enum import Enum
 from abc import ABC, abstractmethod
-
-from octahedral_arithmetic import PHI
 
 
 # ---------------------------------------------------------------------------

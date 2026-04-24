@@ -31,8 +31,8 @@ import math
 import time
 
 from mandala_computer import (
-    MandalaComputer, MandalaCell, ProblemType, SensorReading,
-    PHI, FRET_CUTOFF, OCTAHEDRAL_STATES, _STATE_GLYPHS,
+    MandalaComputer, ProblemType,
+    PHI, _STATE_GLYPHS,
 )
 
 try:
