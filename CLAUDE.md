@@ -37,6 +37,7 @@ mandala-computing/
 ├── osl.py                     # Octahedral Symbolic Language v1.0 (~965 loc)
 ├── geis.py                    # Geometric Information Encoding System bridge (~695 loc)
 ├── kt_annealer.py             # KT phase annealer + symmetry detector (~430 loc)
+├── mandala_runtime.py         # substrate-agnostic sensor fusion binding (~380 loc)
 ├── membrane.py                # boundary computation primitive (~470 loc)
 ├── claim_validator.py         # epistemological claim validation (~500 loc)
 ├── glyph_convert.py           # human decimal-to-glyph converter (~355 loc)
@@ -49,7 +50,7 @@ mandala-computing/
 ├── PROJECTS.md                # connected repos
 ├── LICENSE                    # MIT
 ├── examples/                  # 20 runnable example scripts + benchmark
-├── tests/test_core.py         # 240-test suite
+├── tests/test_core.py         # 255-test suite
 └── [17 .md files]             # theory, hardware, integration, proofs, notes
 ```
 
@@ -257,6 +258,19 @@ quantises back. Also includes a 3-D symmetry detector (reflective/rotational).
 **key functions:** `kt_anneal_mandala()`, `detect_mandala_symmetries()`,
 `anneal_network_phases()`, `states_to_phases()`, `phases_to_states()`
 
+### mandala-runtime (`mandala_runtime.py`)
+
+Substrate-agnostic sensor fusion binding layer. Sits above domain-specific
+modules and unifies whatever encoding streams are available at runtime.
+The Mandala "breathes": expands with more substrates (richer geometry),
+contracts with fewer (still coherent). Defines Substrate taxonomy
+(binary/ternary/quantum/stochastic/digital/analog), stream protocols,
+Basin contributions, Manifest snapshots, and an intersection engine
+that finds agreement and tension between substrates.
+
+**key classes:** `MandalaRuntime`, `Substrate`, `StreamCapability`, `Basin`,
+`Manifest`, `UnifiedGeometry`, `SoundIntersectionRule`
+
 ---
 
 ## mathematical-framework
@@ -400,7 +414,7 @@ large systems.
 
 ## build-test-run
 
-Test suite: `python tests/test_core.py` (240 tests across all modules).
+Test suite: `python tests/test_core.py` (255 tests across all modules).
 No formal build system, CI/CD, or linting is configured.
 
 ### run-demos
@@ -533,7 +547,7 @@ Connected repositories by JinnZ2 (listed in `PROJECTS.md` and `.fieldlink.json`)
 - **`OctahedralState`** exists in both `geis.py` (3D cubic coordinates, tokens)
   and implicitly in `octahedral_arithmetic.py` (glyph-space). Use GEIS for
   binary bridging, use octahedral_arithmetic for exact glyph math
-- **test suite:** `python tests/test_core.py` runs 240 tests across all modules
+- **test suite:** `python tests/test_core.py` runs 255 tests across all modules
 - **`.gitignore`** excludes `__pycache__/`, `.pyc`, `.env`, `.pytest_cache/`, etc.
 - **`requirements.txt`** at repo root lists numpy and scipy
 - **flat layout:** all code at root level, no package hierarchy
