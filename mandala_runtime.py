@@ -136,16 +136,18 @@ class Basin:
     toward deep basins when streams conflict.
 
     Fields:
-        support   -- region descriptor (depends on domain)
-        depth     -- 0.0 = shallow/broad, 1.0 = deep/narrow
-        signature -- substrate-native constraint payload
+        support    -- region descriptor (depends on domain)
+        depth      -- 0.0 = shallow/broad, 1.0 = deep/narrow
+        signature  -- substrate-native constraint payload
+        provenance -- who created this basin, when, under what tradition
     """
     domain: str
-    substrate: Substrate
+    substrate: Any
     support: Any
     depth: float
     signature: Any
-    source_capability: StreamCapability = field(repr=False)
+    source_capability: Any = field(default=None, repr=False)
+    provenance: Optional[dict] = None
 
 
 # =========================================================================
@@ -1257,6 +1259,7 @@ class SynthesisResult:
     product: str
     why: str
     new_basin: Optional[Any] = None
+    verification: Optional[dict] = None
 
 
 class SynthesisEngine:
@@ -1416,6 +1419,12 @@ class SynthesisEngine:
     def _fire(self, rule: SynthesisRule, source_basins: list) -> SynthesisResult:
         max_depth = max((b.depth for b in source_basins), default=0.5)
         new_depth = min(1.0, max_depth * 0.8)
+
+        # Epistemological verification: validate the synthesis claim
+        verification = self._verify_claim(rule.why)
+        if verification and verification["concern"] > 0.7:
+            new_depth *= (1.0 - verification["concern"] * 0.5)
+
         cap = StreamCapability(
             domain="synthesis", substrate=f"emergent.{rule.then}",
             coverage_fraction=0.5, confidence=new_depth,
@@ -1429,6 +1438,8 @@ class SynthesisEngine:
                 "operation": rule.op,
                 "source_substrates": [substrate_key(b.substrate) for b in source_basins],
                 "why": rule.why, "priority": rule.priority,
+                "verified": verification is not None,
+                "concern": verification["concern"] if verification else None,
             },
             source_capability=cap,
         )
@@ -1436,7 +1447,23 @@ class SynthesisEngine:
             source_basins=source_basins,
             operation=f"{rule.op}({', '.join(rule.args)})",
             product=rule.then, why=rule.why, new_basin=new_basin,
+            verification=verification,
         )
+
+    @staticmethod
+    def _verify_claim(claim_text: str) -> Optional[dict]:
+        """Run claim through epistemological validator if available."""
+        try:
+            from claim_validator import validate_claim
+            report = validate_claim(claim_text)
+            return {
+                "concern": report.overall_concern,
+                "interpretation": report.interpretation,
+                "falsifiability": report.falsifiability.score,
+                "tier_scores": {d.name: d.score for d in report.domain_scores},
+            }
+        except ImportError:
+            return None
 
 
 # =========================================================================
@@ -1719,7 +1746,20 @@ class DynamicsProjector:
                 "environment": env,
             },
             source_capability=cap,
+            provenance=self._make_provenance(entity),
         )]
+
+    @staticmethod
+    def _make_provenance(entity: LIDEntity) -> dict:
+        """Build provenance record for a projected Basin."""
+        return {
+            "projector": "DynamicsProjector",
+            "entity_id": entity.entity_id,
+            "entity_name": entity.name,
+            "substrate_type": entity.substrate_type,
+            "source": entity.metadata.get("description", "")[:100] if entity.metadata else "",
+            "observer_tradition": entity.metadata.get("observer_tradition", "default"),
+        }
 
 
 class AnimalProjector(DynamicsProjector):
@@ -1814,6 +1854,18 @@ class AnimalProjector(DynamicsProjector):
 
         if not basins:
             return super().project(entity, environment)
+        prov = self._make_provenance(entity)
+        prov["projector"] = "AnimalProjector"
+        # Measurable collectivity: multiple patterns with coordination/swarm types
+        coordination_patterns = [p for p in (dyn.get("patterns", []))
+                                 if isinstance(p, dict)
+                                 and p.get("type", "") in ("distributed_processing",
+                                     "energy_efficiency", "swarm_coordination")]
+        prov["is_collective"] = len(coordination_patterns) >= 1
+        prov["collectivity_evidence"] = (f"{len(coordination_patterns)} coordination "
+                                         f"patterns (measured, not string-matched)")
+        for b in basins:
+            b.provenance = prov
         return basins
 
 
@@ -1878,6 +1930,10 @@ class CrystalProjector(DynamicsProjector):
 
         if not basins:
             return super().project(entity, environment)
+        prov = self._make_provenance(entity)
+        prov["projector"] = "CrystalProjector"
+        for b in basins:
+            b.provenance = prov
         return basins
 
 
@@ -2016,9 +2072,27 @@ class IntelligenceIntersectionRule:
             agreement.append(("gradient_lattice_coupling",
                                "Gradient-following intelligence meets lattice structure"))
 
+        # Multi-observer tension: same entity described differently
+        entities_seen: dict = {}
+        for b in basins:
+            if b.provenance:
+                eid = b.provenance.get("entity_id", "")
+                tradition = b.provenance.get("observer_tradition", "default")
+                if eid:
+                    entities_seen.setdefault(eid, set()).add(tradition)
+        for eid, traditions in entities_seen.items():
+            if len(traditions) > 1:
+                tension.append(("multi_observer_tension",
+                                f"entity={eid}",
+                                f"traditions={sorted(traditions)}",
+                                "Same intelligence described by different observer "
+                                "traditions — descriptions may conflict"))
+
         confidence = {}
         for b in basins:
-            confidence[substrate_key(b.substrate)] = b.depth * b.source_capability.confidence
+            cap = b.source_capability
+            conf = cap.confidence if cap else 0.5
+            confidence[substrate_key(b.substrate)] = b.depth * conf
         if agreement:
             for k in confidence:
                 confidence[k] = min(1.0, confidence[k] * 1.1)

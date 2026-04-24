@@ -3520,6 +3520,133 @@ def test_load_synthesis_rules_missing_file():
 
 
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Verification, provenance, measurable dynamics tests
+# ---------------------------------------------------------------------------
+
+
+def test_synthesis_verification_runs():
+    """SynthesisEngine verifies claims via claim_validator."""
+    engine = SynthesisEngine()
+    cap = StreamCapability("test", "swarm.bee", 0.7, 0.6)
+    basins = [
+        Basin("animal", "swarm.bee", None, 0.8,
+              {"mode": "gradient_following"}, cap),
+        Basin("crystal", "crystal.quartz", None, 0.8,
+              {"mode": "lattice_modes"}, cap),
+    ]
+    results = engine.synthesize(basins, {})
+    for r in results:
+        assert r.verification is not None
+        assert "concern" in r.verification
+        assert "falsifiability" in r.verification
+        assert 0.0 <= r.verification["concern"] <= 1.0
+
+
+def test_synthesis_high_concern_attenuates_depth():
+    """High-concern synthesis products get attenuated depth."""
+    engine = SynthesisEngine()
+    cap = StreamCapability("test", "swarm.bee", 0.7, 0.6)
+    basins = [
+        Basin("animal", "swarm.bee", None, 0.8,
+              {"mode": "gradient_following"}, cap),
+        Basin("crystal", "crystal.quartz", None, 0.8,
+              {"mode": "lattice_modes"}, cap),
+    ]
+    results = engine.synthesize(basins, {})
+    for r in results:
+        if r.verification and r.verification["concern"] > 0.7:
+            assert r.new_basin.depth < 0.8 * 0.8
+
+
+def test_basin_provenance_field():
+    """Basin accepts provenance dict."""
+    cap = StreamCapability("test", Substrate.BINARY, 0.7, 0.6)
+    b = Basin("test", Substrate.BINARY, None, 0.5, {},
+              source_capability=cap,
+              provenance={"projector": "TestProjector", "entity_id": "X"})
+    assert b.provenance["projector"] == "TestProjector"
+
+
+def test_basin_provenance_none_default():
+    """Basin provenance defaults to None."""
+    cap = StreamCapability("test", Substrate.BINARY, 0.7, 0.6)
+    b = Basin("test", Substrate.BINARY, None, 0.5, {}, source_capability=cap)
+    assert b.provenance is None
+
+
+def test_animal_projector_provenance():
+    """AnimalProjector attaches provenance to all basins."""
+    proj = AnimalProjector()
+    basins = proj.project(BEE_SWARM_LID)
+    for b in basins:
+        assert b.provenance is not None
+        assert b.provenance["projector"] == "AnimalProjector"
+        assert b.provenance["entity_id"] == "LID.ANIMAL.BEE_SWARM"
+
+
+def test_crystal_projector_provenance():
+    """CrystalProjector attaches provenance to all basins."""
+    proj = CrystalProjector()
+    basins = proj.project(QUARTZ_LATTICE_LID)
+    for b in basins:
+        assert b.provenance is not None
+        assert b.provenance["projector"] == "CrystalProjector"
+
+
+def test_animal_projector_measurable_collectivity():
+    """AnimalProjector uses pattern types, not string matching, for collectivity."""
+    proj = AnimalProjector()
+    basins = proj.project(BEE_SWARM_LID)
+    prov = basins[0].provenance
+    assert "is_collective" in prov
+    assert "measured" in prov["collectivity_evidence"]
+
+
+def test_multi_observer_tension():
+    """IntelligenceIntersectionRule detects multi-observer tension."""
+    rule = IntelligenceIntersectionRule(domain="test")
+    cap = StreamCapability("test", "swarm.bee", 0.7, 0.6)
+    b1 = Basin("test", "swarm.bee", None, 0.5, {"mode": "gradient"},
+               source_capability=cap,
+               provenance={"entity_id": "BE", "observer_tradition": "western_entomology"})
+    b2 = Basin("test", "swarm.bee", None, 0.5, {"mode": "waggle"},
+               source_capability=cap,
+               provenance={"entity_id": "BE", "observer_tradition": "indigenous_knowledge"})
+    geom = rule.intersect([b1, b2])
+    assert any("multi_observer" in str(t[0]) for t in geom.tension_regions)
+
+
+def test_no_multi_observer_tension_same_tradition():
+    """Same observer tradition produces no multi-observer tension."""
+    rule = IntelligenceIntersectionRule(domain="test")
+    cap = StreamCapability("test", "swarm.bee", 0.7, 0.6)
+    b1 = Basin("test", "swarm.bee", None, 0.5, {"mode": "a"},
+               source_capability=cap,
+               provenance={"entity_id": "BE", "observer_tradition": "default"})
+    b2 = Basin("test", "swarm.bee", None, 0.5, {"mode": "b"},
+               source_capability=cap,
+               provenance={"entity_id": "BE", "observer_tradition": "default"})
+    geom = rule.intersect([b1, b2])
+    assert not any("multi_observer" in str(t[0]) for t in geom.tension_regions)
+
+
+def test_synthesis_basin_carries_verified_flag():
+    """Generated synthesis basins carry verified=True in signature."""
+    engine = SynthesisEngine()
+    cap = StreamCapability("test", "swarm.bee", 0.7, 0.6)
+    basins = [
+        Basin("animal", "swarm.bee", None, 0.8,
+              {"mode": "gradient_following"}, cap),
+        Basin("crystal", "crystal.quartz", None, 0.8,
+              {"mode": "lattice_modes"}, cap),
+    ]
+    results = engine.synthesize(basins, {})
+    for r in results:
+        assert r.new_basin.signature["verified"] is True
+        assert r.new_basin.signature["concern"] is not None
+
+
 # Run all tests
 # ---------------------------------------------------------------------------
 

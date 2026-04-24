@@ -50,7 +50,7 @@ mandala-computing/
 ├── PROJECTS.md                # connected repos
 ├── LICENSE                    # MIT
 ├── examples/                  # 20 runnable example scripts + benchmark
-├── tests/test_core.py         # 309-test suite
+├── tests/test_core.py         # 319-test suite
 └── [17 .md files]             # theory, hardware, integration, proofs, notes
 ```
 
@@ -434,7 +434,7 @@ large systems.
 
 ## build-test-run
 
-Test suite: `python tests/test_core.py` (309 tests across all modules).
+Test suite: `python tests/test_core.py` (319 tests across all modules).
 No formal build system, CI/CD, or linting is configured.
 
 ### run-demos
@@ -647,9 +647,9 @@ python mandala_runtime.py        # runs sensor fusion + LID demos
 
 | # | risk | severity | status | mitigation path |
 |---|------|----------|--------|-----------------|
-| 1 | **Verification asymmetry** | HIGH | OPEN | The Mandala can synthesize across substrates faster than any human expert can verify the synthesis. A bee+quartz acoustic resonance is plausible. A bee+plasma+mycorrhizal three-way resonance is plausible to whom? Need a falsifiability layer — `claim_validator.py` has the right hooks but the wire from RESONATE → claim_validator isn't drawn yet. |
-| 2 | **Projector subjectivity** | MEDIUM | ACKNOWLEDGED | AnimalProjector decides "is_collective" by string-matching "swarm" in description text. That's a human linguistic projection deciding what the bee's intelligence shape is. Tension with substrate-equality principle: the projectors themselves are a language-primary translation layer between two non-linguistic ones. Mitigate by grounding projectors in measurable dynamics, not descriptions. |
-| 3 | **Curation at scale** | MEDIUM | OPEN | ~99 LID entities = ~99 opinion surfaces about what each intelligence "is." Different traditions, observers, lineages would draw the bee differently. The relational graph helps, but at scale this becomes a curation problem with epistemic weight. Mitigate with provenance tracking and multi-observer basins. |
+| 1 | **Verification asymmetry** | HIGH | MITIGATED | `SynthesisEngine._verify_claim()` now runs every synthesis product through `claim_validator.py` before reporting it. High-concern claims (>0.7) get depth-attenuated. Example: bee+quartz gradient-lattice resonance scores 0.82 concern / 0.0 falsifiability → depth attenuated from 0.64 to 0.38. The system can see its own synthesis is epistemologically suspect. Remaining gap: the validator uses text analysis, not physics-grounded falsifiability. |
+| 2 | **Projector subjectivity** | MEDIUM | MITIGATED | AnimalProjector now determines `is_collective` by counting coordination-type patterns (measurable: `distributed_processing`, `energy_efficiency`, `swarm_coordination`) instead of string-matching "swarm" in descriptions. Provenance records carry `collectivity_evidence` explaining the measurement. Remaining tension: the pattern *type names* are still human-assigned labels — grounding in measured dynamics (efficiency_factor thresholds, link topology) would be the next step. |
+| 3 | **Curation at scale** | MEDIUM | MITIGATED | Basin now carries a `provenance` dict (projector, entity_id, observer_tradition, evidence). `IntelligenceIntersectionRule` detects multi-observer tension: when the same entity is described by different traditions, the conflict is elevated as tension rather than averaged away. Remaining gap: no provenance UI or curation workflow yet — the data is tracked but not surfaced to human curators. |
 | 4 | **Synthesis ≠ intersection** | HIGH | MITIGATED | `SynthesisEngine` (ported from RSC rule engine) now fires generative EXPAND/ALIGN/STRUCTURE rules during RESONATE, producing NEW Basins from interactions. Example: ALIGN(gradient_following, lattice_modes) → gradient_lattice_resonance. Rules loadable from RSC `expand.jsonl` format. Remaining gap: rules are still pattern-matched, not algebraically derived from `geometric_state_algebra.py`. |
 | 5 | **PHI redefinition** | LOW | MITIGATED | PHI defined in `octahedral_arithmetic.py` and imported by most modules. `mandala_computer.py` loads from atlas JSON. `quantum_mandala.py` and `geis.py` define independently for standalone operation. Risk: drift between definitions. Mitigated by consolidation in audit. |
 | 6 | **Large module sizes** | LOW | ACKNOWLEDGED | `mandala_runtime.py` (~1900 loc), `octahedral_resilience.py` (~1555 loc) are large. Acceptable for research code; would need splitting before production use. |
@@ -689,7 +689,7 @@ Adding a new feature?
 - **`OctahedralState`** exists in both `geis.py` (3D cubic coordinates, tokens)
   and implicitly in `octahedral_arithmetic.py` (glyph-space). Use GEIS for
   binary bridging, use octahedral_arithmetic for exact glyph math
-- **test suite:** `python tests/test_core.py` runs 309 tests across all modules
+- **test suite:** `python tests/test_core.py` runs 319 tests across all modules
 - **`.gitignore`** excludes `__pycache__/`, `.pyc`, `.env`, `.pytest_cache/`, etc.
 - **`requirements.txt`** at repo root lists numpy and scipy
 - **flat layout:** all code at root level, no package hierarchy
