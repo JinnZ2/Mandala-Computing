@@ -3400,6 +3400,126 @@ def test_crystal_projector_real_lid():
 
 
 # ---------------------------------------------------------------------------
+# Generative Synthesis Engine tests
+# ---------------------------------------------------------------------------
+
+from mandala_runtime import (
+    SynthesisRule, SynthesisResult, SynthesisEngine,
+    load_synthesis_rules,
+)
+
+
+def test_synthesis_rule_from_jsonl():
+    """SynthesisRule.from_jsonl_line parses RSC expand.jsonl format."""
+    line = '{"when":{"op":"ALIGN","args":["X","Y"]},"then":"Z","priority":7,"why":"test"}'
+    rule = SynthesisRule.from_jsonl_line(line)
+    assert rule.op == "ALIGN"
+    assert rule.args == ["X", "Y"]
+    assert rule.then == "Z"
+    assert rule.priority == 7
+
+
+def test_synthesis_rule_with_guard():
+    """Rules with guard.requires parse correctly."""
+    line = '{"when":{"op":"ALIGN","args":["A","B"]},"then":"C","priority":5,"guard":{"requires":["CAP_X"]},"why":"guarded"}'
+    rule = SynthesisRule.from_jsonl_line(line)
+    assert rule.guard_requires == ["CAP_X"]
+
+
+def test_synthesis_rule_roundtrip():
+    """to_dict produces valid structure."""
+    rule = SynthesisRule(op="EXPAND", args=["SHAPE"], then="CAP", priority=9, why="test")
+    d = rule.to_dict()
+    assert d["when"]["op"] == "EXPAND"
+    assert d["then"] == "CAP"
+
+
+def test_synthesis_engine_built_in_rules():
+    """SynthesisEngine ships with built-in rules."""
+    engine = SynthesisEngine()
+    assert len(engine.rules) >= 5
+
+
+def test_synthesis_engine_align_fires():
+    """ALIGN rule fires when both tags are present in basins."""
+    engine = SynthesisEngine()
+    cap = StreamCapability("test", "swarm.bee", 0.7, 0.6)
+    basins = [
+        Basin("animal", "swarm.bee", None, 0.8,
+              {"mode": "gradient_following"}, cap),
+        Basin("crystal", "crystal.quartz", None, 0.8,
+              {"mode": "lattice_modes"}, cap),
+    ]
+    results = engine.synthesize(basins, {})
+    assert len(results) > 0
+    products = {r.product for r in results}
+    assert "gradient_lattice_resonance" in products
+
+
+def test_synthesis_engine_expand_fires():
+    """EXPAND rule fires on matching tag."""
+    engine = SynthesisEngine()
+    engine.add_rule(SynthesisRule(
+        op="EXPAND", args=["test_tag"], then="expanded_cap", priority=5, why="test"))
+    cap = StreamCapability("test", "test_tag", 0.7, 0.6)
+    basins = [Basin("test", "test_tag", None, 0.5, {"mode": "test_tag"}, cap)]
+    results = engine.synthesize(basins, {})
+    products = {r.product for r in results}
+    assert "expanded_cap" in products
+
+
+def test_synthesis_result_has_new_basin():
+    """SynthesisResult contains a generated Basin."""
+    engine = SynthesisEngine()
+    cap = StreamCapability("test", "swarm.bee", 0.7, 0.6)
+    basins = [
+        Basin("animal", "swarm.bee", None, 0.8,
+              {"mode": "gradient_following"}, cap),
+        Basin("crystal", "crystal.quartz", None, 0.8,
+              {"mode": "lattice_modes"}, cap),
+    ]
+    results = engine.synthesize(basins, {})
+    for r in results:
+        assert r.new_basin is not None
+        assert r.new_basin.domain == "synthesis"
+        assert "emergent." in substrate_key(r.new_basin.substrate)
+
+
+def test_synthesis_integrated_in_breathe():
+    """MandalaRuntime.breathe includes synthesis when enabled."""
+    mandala = MandalaRuntime()
+    mandala.register(IntelligenceIntersectionRule(domain="animal_intelligence"))
+    mandala.register(IntelligenceIntersectionRule(domain="crystal_intelligence"))
+    mandala.enable_synthesis()
+
+    bee_basins = AnimalProjector().project(BEE_SWARM_LID)
+    quartz_basins = CrystalProjector().project(QUARTZ_LATTICE_LID)
+
+    class _BS:
+        def __init__(self, b):
+            self._b = b
+        @property
+        def capability(self):
+            return self._b.source_capability
+        def read(self):
+            return self._b.signature
+        def project_to_basin(self):
+            return self._b
+
+    streams = [_BS(b) for b in bee_basins + quartz_basins]
+    result = mandala.breathe(streams)
+    assert "_resonance" in result
+    resonance = result["_resonance"]
+    assert len(resonance.synthesis_products) > 0
+    assert any("SYNTHESIS" in str(a[0]) for a in resonance.cross_domain_agreements)
+
+
+def test_load_synthesis_rules_missing_file():
+    """load_synthesis_rules returns empty list for missing file."""
+    assert load_synthesis_rules("/nonexistent/rules.jsonl") == []
+
+
+# ---------------------------------------------------------------------------
 # Run all tests
 # ---------------------------------------------------------------------------
 
