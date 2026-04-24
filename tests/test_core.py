@@ -3770,6 +3770,98 @@ def test_cayley_factor_in_synthesis():
         assert 0.5 <= r.new_basin.signature["cayley_factor"] <= 1.0
 
 
+# ---------------------------------------------------------------------------
+# Thermodynamic tier hierarchy and fabrication constraint tests
+# ---------------------------------------------------------------------------
+
+from claim_validator import validate_claim, DomainScore
+from mandala_runtime import FabricationConstraints
+
+
+def test_tier_hierarchy_t1_dominates():
+    """T1 Physics/Thermo concern floors the overall score when high."""
+    report = validate_claim(
+        "This fundamentally transforms everything permanently and "
+        "essentially violates conservation of energy by definition."
+    )
+    t1 = next(d for d in report.domain_scores if d.tier == 1)
+    assert t1.score > 0.5
+    assert report.overall_concern >= t1.score * 0.8
+
+
+def test_tier_weights_sum():
+    """Tier weights give T1 the most influence."""
+    report = validate_claim("Measured 3.2% improvement over 5 years at 95% CI.")
+    scores = {d.tier: d.score for d in report.domain_scores}
+    # T1 weight 0.40 > T4 weight 0.15
+    assert len(scores) == 4
+
+
+def test_specific_claim_still_low_concern():
+    """Specific, measurable claims still score low concern."""
+    report = validate_claim(
+        "This system reduces energy consumption by 12% as measured "
+        "over 18 months in a controlled trial with n=500."
+    )
+    assert report.overall_concern < 0.6
+
+
+def test_fabrication_constraints_load():
+    """FabricationConstraints loads from atlas/fabrication_pathway.json."""
+    fc = FabricationConstraints.load()
+    assert fc.energy_per_bit_aJ > 0
+    assert fc.min_temp_K == 77
+    assert fc.max_temp_K == 400
+    assert len(fc.stages) == 7
+
+
+def test_fabrication_temperature_valid():
+    """Room temperature is within operational envelope."""
+    fc = FabricationConstraints.load()
+    result = fc.validate_temperature(293)
+    assert result["valid"] is True
+
+
+def test_fabrication_temperature_too_low():
+    """Cryogenic below 77K is outside envelope."""
+    fc = FabricationConstraints.load()
+    result = fc.validate_temperature(4)
+    assert result["valid"] is False
+    assert "quantum tunneling" in result["note"]
+
+
+def test_fabrication_temperature_too_high():
+    """Above 400K exceeds thermal noise limit."""
+    fc = FabricationConstraints.load()
+    result = fc.validate_temperature(500)
+    assert result["valid"] is False
+    assert "thermal noise" in result["note"]
+
+
+def test_fabrication_energy_reversible():
+    """Sub-Landauer energy is reversible regime."""
+    fc = FabricationConstraints.load()
+    result = fc.validate_energy(1e-4)
+    assert result["reversible_regime"] is True
+
+
+def test_fabrication_energy_irreversible():
+    """Above Landauer is irreversible regime."""
+    fc = FabricationConstraints.load()
+    result = fc.validate_energy(0.1)
+    assert result["above_landauer"] is True
+    assert result["reversible_regime"] is False
+
+
+def test_fabrication_summary():
+    """Summary returns all key constraints."""
+    fc = FabricationConstraints.load()
+    s = fc.summary()
+    assert "energy_per_bit_aJ" in s
+    assert "temp_range_K" in s
+    assert "stages" in s
+
+
 # Run all tests
 # ---------------------------------------------------------------------------
 

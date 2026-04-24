@@ -403,11 +403,22 @@ def validate_claim(text: str) -> ValidationReport:
     domains.append(DomainScore("Empirical Observation", 4, round(emp, 4),
                                "Evidence base and measurement"))
 
-    # Aggregate: mean + multi-domain boost
-    mean_score = sum(d.score for d in domains) / len(domains)
+    # Aggregate: tier hierarchy — lower tiers DOMINATE higher tiers.
+    # T1 (physics/thermo) concern floors the overall score.
+    # If T1 fails, the claim fails regardless of T3/T4 success.
+    tier_weights = {1: 0.40, 2: 0.25, 3: 0.20, 4: 0.15}
+    weighted_score = sum(
+        tier_weights.get(d.tier, 0.1) * d.score for d in domains
+    )
     n_flagged = sum(1 for d in domains if d.score > 0.5)
     multi_boost = 0.1 * max(0, n_flagged - 2)
-    overall = round(_clamp(mean_score + multi_boost), 4)
+
+    # T1 floor: if physics/thermo concern > 0.6, it becomes the minimum
+    t1_score = next((d.score for d in domains if d.tier == 1), 0)
+    if t1_score > 0.6:
+        weighted_score = max(weighted_score, t1_score)
+
+    overall = round(_clamp(weighted_score + multi_boost), 4)
 
     if overall < 0.25:
         interp = "LOW CONCERN -- epistemically sound"
