@@ -2550,6 +2550,422 @@ def test_kt_mandala_symmetries():
 
 
 # ---------------------------------------------------------------------------
+# Mandala Runtime tests
+# ---------------------------------------------------------------------------
+
+from mandala_runtime import (
+    Substrate, StreamCapability, Basin, Manifest, UnifiedGeometry,
+    MandalaRuntime, SoundIntersectionRule, build_manifest,
+    _ToyStream, _project_sound_binary, _project_sound_ternary,
+    _project_sound_digital,
+)
+
+
+def test_runtime_substrate_enum():
+    """All 6 substrates defined."""
+    assert len(Substrate) == 6
+    assert Substrate.BINARY.value == "binary"
+    assert Substrate.QUANTUM.value == "quantum"
+
+
+def test_runtime_stream_capability():
+    """StreamCapability holds domain, substrate, coverage, confidence."""
+    cap = StreamCapability("sound", Substrate.BINARY, 0.7, 0.6, 44100)
+    assert cap.domain == "sound"
+    assert cap.substrate == Substrate.BINARY
+    assert cap.coverage_fraction == 0.7
+    assert cap.confidence == 0.6
+    assert cap.sample_rate == 44100
+
+
+def test_runtime_basin_construction():
+    """Basin stores stream contribution."""
+    cap = StreamCapability("gravity", Substrate.TERNARY, 0.5, 0.8)
+    b = Basin(domain="gravity", substrate=Substrate.TERNARY,
+              support=("spatial", 0, 100), depth=0.6,
+              signature={"attract": 5}, source_capability=cap)
+    assert b.domain == "gravity"
+    assert b.depth == 0.6
+
+
+def test_runtime_manifest_empty():
+    """Empty manifest has zero information axes."""
+    m = Manifest(basins=[])
+    assert m.total_information_axes == 0
+    assert m.basins_by_domain == {}
+    assert m.basins_by_substrate == {}
+
+
+def test_runtime_manifest_grouping():
+    """Manifest groups basins by domain and substrate."""
+    cap1 = StreamCapability("sound", Substrate.BINARY, 0.7, 0.6)
+    cap2 = StreamCapability("sound", Substrate.TERNARY, 0.7, 0.8)
+    cap3 = StreamCapability("gravity", Substrate.BINARY, 0.5, 0.9)
+    b1 = Basin("sound", Substrate.BINARY, None, 0.3, {}, cap1)
+    b2 = Basin("sound", Substrate.TERNARY, None, 0.6, {}, cap2)
+    b3 = Basin("gravity", Substrate.BINARY, None, 0.4, {}, cap3)
+    m = Manifest(basins=[b1, b2, b3])
+    assert len(m.basins_by_domain["sound"]) == 2
+    assert len(m.basins_by_domain["gravity"]) == 1
+    assert len(m.basins_by_substrate[Substrate.BINARY]) == 2
+    assert m.total_information_axes == 3
+
+
+def test_runtime_build_manifest_tolerates_failures():
+    """build_manifest skips streams that fail to project."""
+    class _FailStream:
+        @property
+        def capability(self):
+            return StreamCapability("broken", Substrate.BINARY, 0, 0)
+        def read(self):
+            return None
+        def project_to_basin(self):
+            raise RuntimeError("sensor offline")
+
+    good = _ToyStream(
+        _capability=StreamCapability("sound", Substrate.BINARY, 0.7, 0.6),
+        _data=[1, 0, 1], _projector=_project_sound_binary,
+    )
+    m = build_manifest([_FailStream(), good])
+    assert len(m.basins) == 1
+
+
+def test_runtime_mandala_breathe_no_rules():
+    """Breathing with no registered rules returns empty dict."""
+    mandala = MandalaRuntime()
+    good = _ToyStream(
+        _capability=StreamCapability("sound", Substrate.BINARY, 0.7, 0.6),
+        _data=[1, 0, 1], _projector=_project_sound_binary,
+    )
+    result = mandala.breathe([good])
+    assert result == {}
+
+
+def test_runtime_mandala_breathe_binary_only():
+    """Single binary stream -> contracted geometry."""
+    mandala = MandalaRuntime()
+    mandala.register(SoundIntersectionRule())
+    stream = _ToyStream(
+        _capability=StreamCapability("sound", Substrate.BINARY, 0.7, 0.6),
+        _data=[1, 0, 0, 1, 0, 1, 0, 0],
+        _projector=_project_sound_binary,
+    )
+    result = mandala.breathe([stream])
+    assert "sound" in result
+    geom = result["sound"]
+    assert Substrate.BINARY in geom.substrates_used
+    assert len(geom.substrates_used) == 1
+    assert "binary" in geom.confidence_field
+
+
+def test_runtime_mandala_breathe_expansion():
+    """More substrates -> more information axes and agreement."""
+    mandala = MandalaRuntime()
+    mandala.register(SoundIntersectionRule())
+
+    binary = _ToyStream(
+        _capability=StreamCapability("sound", Substrate.BINARY, 0.7, 0.6, 44100),
+        _data=[1, 0, 0, 1, 0, 1, 0, 0],
+        _projector=_project_sound_binary,
+    )
+    ternary = _ToyStream(
+        _capability=StreamCapability("sound", Substrate.TERNARY, 0.7, 0.8, 44100),
+        _data=[+1, -1, 0, +1, -1, +1, -1, 0],
+        _projector=_project_sound_ternary,
+    )
+    digital = _ToyStream(
+        _capability=StreamCapability("sound", Substrate.DIGITAL, 0.9, 0.95, 44100),
+        _data=[12000, -8000, 100, 15000, -9000, 14000, -7500, 200],
+        _projector=_project_sound_digital,
+    )
+
+    r1, m1 = mandala.breathe_with_manifest([binary])
+    r3, m3 = mandala.breathe_with_manifest([binary, ternary, digital])
+    assert m1.total_information_axes < m3.total_information_axes
+    assert len(r3["sound"].substrates_used) == 3
+
+
+def test_runtime_sound_agreement():
+    """Binary onsets matching ternary attacks produces agreement."""
+    mandala = MandalaRuntime()
+    mandala.register(SoundIntersectionRule())
+    binary = _ToyStream(
+        _capability=StreamCapability("sound", Substrate.BINARY, 0.7, 0.6),
+        _data=[1, 0, 0, 1, 0, 1, 0, 0],
+        _projector=_project_sound_binary,
+    )
+    ternary = _ToyStream(
+        _capability=StreamCapability("sound", Substrate.TERNARY, 0.7, 0.8),
+        _data=[+1, -1, 0, +1, -1, +1, -1, 0],
+        _projector=_project_sound_ternary,
+    )
+    result = mandala.breathe([binary, ternary])
+    geom = result["sound"]
+    assert len(geom.agreement_regions) > 0
+    assert geom.agreement_regions[0][0] == "event_count_corroborated"
+
+
+def test_runtime_sound_tension():
+    """Mismatched binary/ternary counts produce tension."""
+    mandala = MandalaRuntime()
+    mandala.register(SoundIntersectionRule())
+    binary = _ToyStream(
+        _capability=StreamCapability("sound", Substrate.BINARY, 0.7, 0.6),
+        _data=[1, 1, 1, 1, 1, 0, 0, 0],  # 5 onsets
+        _projector=_project_sound_binary,
+    )
+    ternary = _ToyStream(
+        _capability=StreamCapability("sound", Substrate.TERNARY, 0.7, 0.8),
+        _data=[+1, -1, 0, 0, 0, 0, 0, 0],  # 1 attack
+        _projector=_project_sound_ternary,
+    )
+    result = mandala.breathe([binary, ternary])
+    geom = result["sound"]
+    assert len(geom.tension_regions) > 0
+
+
+def test_runtime_unified_geometry_fields():
+    """UnifiedGeometry has all expected fields."""
+    geom = UnifiedGeometry(
+        domain="test", substrates_used={Substrate.BINARY},
+        agreement_regions=[], tension_regions=[],
+        uncovered_regions=[], confidence_field={"binary": 0.5},
+    )
+    assert geom.domain == "test"
+    assert isinstance(geom.confidence_field, dict)
+
+
+def test_runtime_projector_binary():
+    """Binary projector counts onsets correctly."""
+    cap = StreamCapability("sound", Substrate.BINARY, 0.7, 0.6)
+    basin = _project_sound_binary([1, 0, 1, 1, 0], cap)
+    assert basin.signature["onsets"] == 3
+    assert basin.signature["frames"] == 5
+    assert basin.depth == 0.3
+
+
+def test_runtime_projector_ternary():
+    """Ternary projector counts attacks, decays, silences."""
+    cap = StreamCapability("sound", Substrate.TERNARY, 0.7, 0.8)
+    basin = _project_sound_ternary([+1, -1, 0, +1, 0], cap)
+    assert basin.signature["attacks"] == 2
+    assert basin.signature["decays"] == 1
+    assert basin.signature["silences"] == 2
+
+
+def test_runtime_projector_digital():
+    """Digital projector computes peak and mean."""
+    cap = StreamCapability("sound", Substrate.DIGITAL, 0.9, 0.95)
+    basin = _project_sound_digital([100, -200, 50], cap)
+    assert basin.signature["peak"] == 200
+    assert basin.signature["samples"] == 3
+    assert basin.depth == 0.9
+
+
+# ---------------------------------------------------------------------------
+# Mandala Runtime — expanded alternative computing tests
+# ---------------------------------------------------------------------------
+
+from mandala_runtime import (
+    TernaryClassifier, QuantumSuperpositionModel, StochasticNoiseModel,
+    GravityIntersectionRule, ElectricIntersectionRule,
+    AlternativeParadigm, ParadigmMapping, PARADIGM_REGISTRY,
+    get_paradigms_for_domain, get_paradigm_matrix,
+)
+
+
+def test_ternary_classifier_basic():
+    """TernaryClassifier returns -1, 0, +1 correctly."""
+    tc = TernaryClassifier(null_threshold=0.5)
+    assert tc.classify(9.81) == 1
+    assert tc.classify(-1.62) == -1
+    assert tc.classify(0.0) == 0
+    assert tc.classify(0.3) == 0  # within threshold
+
+
+def test_ternary_classifier_distribution():
+    """distribution returns counts, fractions, symmetry."""
+    tc = TernaryClassifier(null_threshold=0.5)
+    dist = tc.distribution([5.0, -3.0, 0.0, 0.1, -0.2, 10.0])
+    assert dist["total"] == 6
+    assert sum(dist["counts"].values()) == 6
+    assert 0 <= dist["symmetry"] <= 1
+    assert 0 <= dist["null_fraction"] <= 1
+
+
+def test_ternary_classifier_vector():
+    """classify_vector works on multi-component vectors."""
+    tc = TernaryClassifier(null_threshold=0.01)
+    assert tc.classify_vector([0.0, -9.81, 0.0], component=1) == -1
+    assert tc.classify_vector([0.0, 0.0, 0.0]) == 0
+
+
+def test_ternary_classifier_labels():
+    """Custom labels returned correctly."""
+    tc = TernaryClassifier(positive_label="attract", null_label="null",
+                           negative_label="repel")
+    assert tc.label(1) == "attract"
+    assert tc.label(0) == "null"
+    assert tc.label(-1) == "repel"
+
+
+def test_quantum_superposition_classify():
+    """QuantumSuperpositionModel classifies above/below/indeterminate."""
+    qm = QuantumSuperpositionModel(threshold=0.5, uncertainty=0.1)
+    assert qm.classify(0.9)["state"] == "above"
+    assert qm.classify(0.1)["state"] == "below"
+    assert qm.classify(0.5)["state"] == "indeterminate"
+
+
+def test_quantum_superposition_entropy():
+    """Entropy is positive for mixed populations."""
+    qm = QuantumSuperpositionModel(threshold=0.5, uncertainty=0.1)
+    values = [0.9, 0.1, 0.5, 0.48, 0.52]
+    entropy = qm.superposition_entropy(values)
+    assert entropy > 0
+
+
+def test_quantum_superposition_indeterminate():
+    """indeterminate_fraction detects values near threshold."""
+    qm = QuantumSuperpositionModel(threshold=0.5, uncertainty=0.1)
+    values = [0.48, 0.52, 0.5, 0.9, 0.1]
+    frac = qm.indeterminate_fraction(values)
+    assert frac > 0  # some values near 0.5
+
+
+def test_quantum_superposition_zero_uncertainty():
+    """Zero uncertainty gives hard binary classification."""
+    qm = QuantumSuperpositionModel(threshold=0.5, uncertainty=0.0)
+    assert qm.classify(0.6)["state"] == "above"
+    assert qm.classify(0.4)["state"] == "below"
+
+
+def test_stochastic_noise_model():
+    """StochasticNoiseModel computes jitter statistics."""
+    nm = StochasticNoiseModel([0.3, 1.8, 3.5, 0.8, 2.1])
+    s = nm.summary()
+    assert s["jitter_rms"] > 0
+    assert s["samples"] == 5
+
+
+def test_stochastic_noise_short():
+    """Single-sample input has zero jitter."""
+    nm = StochasticNoiseModel([1.0])
+    assert nm.jitter_rms == 0
+
+
+def test_gravity_intersection_rule_agreement():
+    """Gravity rule finds agreement between ternary nulls and quantum indeterminate."""
+    rule = GravityIntersectionRule()
+    cap_t = StreamCapability("gravity", Substrate.TERNARY, 0.8, 0.7)
+    cap_q = StreamCapability("gravity", Substrate.QUANTUM, 0.6, 0.8)
+    basins = [
+        Basin("gravity", Substrate.TERNARY, None, 0.6,
+              {"null_fraction": 0.3, "symmetry": 0.9}, cap_t),
+        Basin("gravity", Substrate.QUANTUM, None, 0.7,
+              {"indeterminate_fraction": 0.4, "entropy": 1.5}, cap_q),
+    ]
+    geom = rule.intersect(basins)
+    assert len(geom.agreement_regions) > 0
+    assert geom.agreement_regions[0][0] == "lagrange_corroborated"
+
+
+def test_gravity_intersection_rule_tension():
+    """Gravity rule detects binary/quantum stability overclaim."""
+    rule = GravityIntersectionRule()
+    cap_b = StreamCapability("gravity", Substrate.BINARY, 0.7, 0.5)
+    cap_q = StreamCapability("gravity", Substrate.QUANTUM, 0.6, 0.8)
+    basins = [
+        Basin("gravity", Substrate.BINARY, None, 0.3,
+              {"stable_fraction": 0.95}, cap_b),
+        Basin("gravity", Substrate.QUANTUM, None, 0.7,
+              {"indeterminate_fraction": 0.5}, cap_q),
+    ]
+    geom = rule.intersect(basins)
+    assert len(geom.tension_regions) > 0
+    assert "overclaimed" in geom.tension_regions[0][0]
+
+
+def test_electric_intersection_rule_tension():
+    """Electric rule detects conducting overclaim."""
+    rule = ElectricIntersectionRule()
+    cap_b = StreamCapability("electric", Substrate.BINARY, 0.7, 0.5)
+    cap_s = StreamCapability("electric", Substrate.STOCHASTIC, 0.5, 0.6)
+    basins = [
+        Basin("electric", Substrate.BINARY, None, 0.3,
+              {"conducting": True}, cap_b),
+        Basin("electric", Substrate.STOCHASTIC, None, 0.5,
+              {"conducting_probability": 0.4}, cap_s),
+    ]
+    geom = rule.intersect(basins)
+    assert len(geom.tension_regions) > 0
+
+
+def test_electric_intersection_zero_erased():
+    """Electric rule detects when binary erases ternary zero-crossings."""
+    rule = ElectricIntersectionRule()
+    cap_t = StreamCapability("electric", Substrate.TERNARY, 0.7, 0.7)
+    cap_b = StreamCapability("electric", Substrate.BINARY, 0.7, 0.5)
+    basins = [
+        Basin("electric", Substrate.TERNARY, None, 0.6,
+              {"zero_fraction": 0.15}, cap_t),
+        Basin("electric", Substrate.BINARY, None, 0.3,
+              {"conducting": True}, cap_b),
+    ]
+    geom = rule.intersect(basins)
+    assert any("erased" in t[0] for t in geom.tension_regions)
+
+
+def test_paradigm_registry_complete():
+    """All 7 paradigms present in registry."""
+    paradigm_names = {p.paradigm for p in PARADIGM_REGISTRY}
+    assert len(paradigm_names) == 7
+    for p in AlternativeParadigm:
+        assert p in paradigm_names
+
+
+def test_paradigms_for_domain():
+    """get_paradigms_for_domain returns applicable paradigms."""
+    sound_paradigms = get_paradigms_for_domain("sound")
+    assert len(sound_paradigms) >= 3  # ternary, quantum, stochastic at minimum
+    electric_paradigms = get_paradigms_for_domain("electric")
+    assert any(p.paradigm == AlternativeParadigm.MEMRISTIVE for p in electric_paradigms)
+
+
+def test_paradigm_matrix():
+    """get_paradigm_matrix returns dict of dicts."""
+    matrix = get_paradigm_matrix()
+    assert "ternary" in matrix
+    assert matrix["ternary"]["sound"] is True
+    assert matrix["memristive"]["sound"] is False
+    assert matrix["memristive"]["electric"] is True
+
+
+def test_multi_domain_breathing():
+    """MandalaRuntime handles 3 domains simultaneously."""
+    mandala = MandalaRuntime()
+    mandala.register(SoundIntersectionRule())
+    mandala.register(GravityIntersectionRule())
+    mandala.register(ElectricIntersectionRule())
+
+    cap_s = StreamCapability("sound", Substrate.BINARY, 0.7, 0.6)
+    cap_g = StreamCapability("gravity", Substrate.TERNARY, 0.8, 0.7)
+    cap_e = StreamCapability("electric", Substrate.TERNARY, 0.7, 0.7)
+
+    basins = [
+        Basin("sound", Substrate.BINARY, None, 0.3,
+              {"onsets": 3, "frames": 8}, cap_s),
+        Basin("gravity", Substrate.TERNARY, None, 0.6,
+              {"null_fraction": 0.1, "symmetry": 0.9}, cap_g),
+        Basin("electric", Substrate.TERNARY, None, 0.6,
+              {"zero_fraction": 0.05, "symmetry": 0.95}, cap_e),
+    ]
+    manifest = Manifest(basins=basins)
+    assert manifest.total_information_axes == 3
+    assert set(manifest.domain_coverage.keys()) == {"sound", "gravity", "electric"}
+
+
+# ---------------------------------------------------------------------------
 # Run all tests
 # ---------------------------------------------------------------------------
 
