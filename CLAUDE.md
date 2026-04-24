@@ -50,7 +50,7 @@ mandala-computing/
 ├── PROJECTS.md                # connected repos
 ├── LICENSE                    # MIT
 ├── examples/                  # 20 runnable example scripts + benchmark
-├── tests/test_core.py         # 319-test suite
+├── tests/test_core.py         # 326-test suite
 └── [17 .md files]             # theory, hardware, integration, proofs, notes
 ```
 
@@ -434,7 +434,7 @@ large systems.
 
 ## build-test-run
 
-Test suite: `python tests/test_core.py` (319 tests across all modules).
+Test suite: `python tests/test_core.py` (326 tests across all modules).
 No formal build system, CI/CD, or linting is configured.
 
 ### run-demos
@@ -689,7 +689,7 @@ Adding a new feature?
 - **`OctahedralState`** exists in both `geis.py` (3D cubic coordinates, tokens)
   and implicitly in `octahedral_arithmetic.py` (glyph-space). Use GEIS for
   binary bridging, use octahedral_arithmetic for exact glyph math
-- **test suite:** `python tests/test_core.py` runs 319 tests across all modules
+- **test suite:** `python tests/test_core.py` runs 326 tests across all modules
 - **`.gitignore`** excludes `__pycache__/`, `.pyc`, `.env`, `.pytest_cache/`, etc.
 - **`requirements.txt`** at repo root lists numpy and scipy
 - **flat layout:** all code at root level, no package hierarchy

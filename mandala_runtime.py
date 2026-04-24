@@ -321,6 +321,57 @@ class MandalaRuntime:
         """Enable generative synthesis in the RESONATE phase."""
         self.synthesis = engine or SynthesisEngine()
 
+    def provenance_report(self, manifest: Manifest) -> dict:
+        """
+        Surface provenance data for human curation.
+
+        Returns a structured report showing:
+          - Which projectors created which basins
+          - Which observer traditions are represented
+          - Where multi-observer conflicts exist
+          - Entity coverage (which LID entities have basins)
+        """
+        projectors: dict = {}
+        traditions: dict = {}
+        entities: dict = {}
+        conflicts: list = []
+
+        for b in manifest.basins:
+            if not b.provenance:
+                projectors.setdefault("unknown", []).append(substrate_key(b.substrate))
+                continue
+
+            proj = b.provenance.get("projector", "unknown")
+            projectors.setdefault(proj, []).append(substrate_key(b.substrate))
+
+            tradition = b.provenance.get("observer_tradition", "default")
+            traditions.setdefault(tradition, []).append(
+                b.provenance.get("entity_id", "?"))
+
+            eid = b.provenance.get("entity_id", "")
+            if eid:
+                entities.setdefault(eid, []).append(tradition)
+
+        for eid, trads in entities.items():
+            unique = set(trads)
+            if len(unique) > 1:
+                conflicts.append({
+                    "entity_id": eid,
+                    "traditions": sorted(unique),
+                    "basin_count": len(trads),
+                    "action": "Multi-observer tension detected — "
+                              "descriptions may conflict",
+                })
+
+        return {
+            "projectors": {k: len(v) for k, v in projectors.items()},
+            "observer_traditions": {k: len(v) for k, v in traditions.items()},
+            "entities_covered": len(entities),
+            "multi_observer_conflicts": conflicts,
+            "total_basins": len(manifest.basins),
+            "basins_with_provenance": sum(1 for b in manifest.basins if b.provenance),
+        }
+
     def breathe(self, streams: Iterable) -> dict:
         """
         One breath cycle: inhale, expand, resonate, exhale.
@@ -1281,7 +1332,20 @@ class SynthesisEngine:
 
     def __init__(self):
         self.rules: list = []
+        self._cayley = None
+        self._init_cayley()
         self._built_in_rules()
+
+    def _init_cayley(self):
+        """Load O_h group Cayley energy for geometric rule matching."""
+        try:
+            from geometric_state_algebra import OhGroup, CayleyEnergy, GeometricState
+            group = OhGroup()
+            self._cayley = CayleyEnergy(group)
+            self._oh_group = group
+            self._GeometricState = GeometricState
+        except ImportError:
+            pass
 
     def _built_in_rules(self):
         self.rules.extend([
@@ -1420,6 +1484,15 @@ class SynthesisEngine:
         max_depth = max((b.depth for b in source_basins), default=0.5)
         new_depth = min(1.0, max_depth * 0.8)
 
+        # Geometric grounding: if Cayley energy available, use algebraic
+        # distance between source basins to weight the synthesis depth.
+        # Basins that are geometrically close produce stronger synthesis;
+        # basins far apart in the Cayley graph produce weaker synthesis.
+        cayley_factor = 1.0
+        if self._cayley is not None and len(source_basins) >= 2:
+            cayley_factor = self._cayley_coupling(source_basins)
+            new_depth *= cayley_factor
+
         # Epistemological verification: validate the synthesis claim
         verification = self._verify_claim(rule.why)
         if verification and verification["concern"] > 0.7:
@@ -1440,6 +1513,9 @@ class SynthesisEngine:
                 "why": rule.why, "priority": rule.priority,
                 "verified": verification is not None,
                 "concern": verification["concern"] if verification else None,
+                "grounding_score": (verification.get("grounding_score")
+                                    if verification else None),
+                "cayley_factor": round(cayley_factor, 4),
             },
             source_capability=cap,
         )
@@ -1450,17 +1526,81 @@ class SynthesisEngine:
             verification=verification,
         )
 
+    def _cayley_coupling(self, basins: list) -> float:
+        """
+        Compute geometric coupling strength between basins using O_h Cayley energy.
+
+        Maps basin substrates to octahedral states (0-7) via hash, then
+        measures Cayley distance. Geometrically close states couple strongly
+        (factor near 1.0); distant states couple weakly (factor near 0.5).
+        """
+        try:
+            states = []
+            for b in basins[:2]:
+                sk = substrate_key(b.substrate)
+                state_idx = hash(sk) % 8
+                states.append(self._GeometricState.from_classical_state(
+                    self._oh_group, state_idx))
+            if len(states) < 2:
+                return 1.0
+            residual = self._cayley.cancellation_residual(states[0], states[1])
+            if residual == 0.0:
+                return 1.0
+            max_spread = self._oh_group.max_distance()
+            normalized = min(1.0, residual / max(max_spread, 1))
+            return max(0.5, 1.0 - 0.5 * normalized)
+        except Exception:
+            return 1.0
+
     @staticmethod
     def _verify_claim(claim_text: str) -> Optional[dict]:
-        """Run claim through epistemological validator if available."""
+        """
+        Run claim through epistemological validator with physics grounding.
+
+        Checks:
+          1. Standard claim_validator (entropy, falsifiability, consistency)
+          2. Physics grounding: does the claim reference measurable quantities,
+             physical units, or testable predictions?
+          3. Tier hierarchy: does it violate thermodynamics?
+        """
         try:
             from claim_validator import validate_claim
             report = validate_claim(claim_text)
+
+            # Physics grounding check: look for concrete measurements
+            import re
+            units = re.findall(
+                r'\b\d+\.?\d*\s*(?:Hz|eV|nm|mm|cm|m|s|kg|K|Pa|V|A|W|J|N|T|mol'
+                r'|dB|pC|MHz|GHz|kHz)\b', claim_text, re.IGNORECASE)
+            numbers = re.findall(r'\b\d+\.?\d*\b', claim_text)
+            comparatives = re.findall(
+                r'\b(?:greater|less|more|fewer|higher|lower|faster|slower'
+                r'|increases|decreases|reduces|amplifies)\s+(?:than|by)\b',
+                claim_text, re.IGNORECASE)
+
+            grounding_score = min(1.0, (
+                0.3 * min(len(units), 3) / 3
+                + 0.3 * min(len(numbers), 5) / 5
+                + 0.2 * min(len(comparatives), 2) / 2
+                + 0.2 * report.falsifiability.measurability
+            ))
+
+            # Tier hierarchy: T1 (physics) violations dominate
+            tier_scores = {d.name: d.score for d in report.domain_scores}
+            t1_score = tier_scores.get("physics_thermodynamics",
+                                       tier_scores.get("T1", 0))
+            if t1_score > 0.5:
+                grounding_score *= 0.5
+
             return {
                 "concern": report.overall_concern,
                 "interpretation": report.interpretation,
                 "falsifiability": report.falsifiability.score,
-                "tier_scores": {d.name: d.score for d in report.domain_scores},
+                "measurability": report.falsifiability.measurability,
+                "grounding_score": grounding_score,
+                "physics_units_found": len(units),
+                "numeric_values_found": len(numbers),
+                "tier_scores": tier_scores,
             }
         except ImportError:
             return None
@@ -1856,14 +1996,39 @@ class AnimalProjector(DynamicsProjector):
             return super().project(entity, environment)
         prov = self._make_provenance(entity)
         prov["projector"] = "AnimalProjector"
-        # Measurable collectivity: multiple patterns with coordination/swarm types
-        coordination_patterns = [p for p in (dyn.get("patterns", []))
-                                 if isinstance(p, dict)
-                                 and p.get("type", "") in ("distributed_processing",
-                                     "energy_efficiency", "swarm_coordination")]
-        prov["is_collective"] = len(coordination_patterns) >= 1
-        prov["collectivity_evidence"] = (f"{len(coordination_patterns)} coordination "
-                                         f"patterns (measured, not string-matched)")
+
+        # Measurable collectivity — grounded in data, not descriptions:
+        #   1. Count patterns with coordination-type dynamics
+        #   2. Check if efficiency_factor exceeds collective threshold (>0.8)
+        #   3. Check link count (collective = more relational links)
+        all_patterns = [p for p in (dyn.get("patterns", []))
+                        if isinstance(p, dict)]
+        coordination_types = {"distributed_processing", "energy_efficiency",
+                              "swarm_coordination", "collective_thermoregulation"}
+        coord_patterns = [p for p in all_patterns
+                          if p.get("type", "") in coordination_types]
+        high_eff_patterns = [p for p in all_patterns
+                             if p.get("efficiency_factor", 0) > 0.8]
+        link_count = len(entity.physics_couplings)
+        swarm_size = dyn.get("swarm_size", 1)
+
+        collectivity_score = (
+            min(1.0, len(coord_patterns) * 0.3)
+            + min(1.0, len(high_eff_patterns) * 0.2)
+            + min(1.0, link_count * 0.1)
+            + (0.3 if swarm_size > 1 else 0.0)
+        )
+        is_collective = collectivity_score >= 0.5
+
+        prov["is_collective"] = is_collective
+        prov["collectivity_score"] = round(collectivity_score, 3)
+        prov["collectivity_evidence"] = (
+            f"score={collectivity_score:.2f}: "
+            f"{len(coord_patterns)} coordination patterns, "
+            f"{len(high_eff_patterns)} high-efficiency (>0.8), "
+            f"{link_count} physics couplings, "
+            f"swarm_size={swarm_size}"
+        )
         for b in basins:
             b.provenance = prov
         return basins

@@ -3595,12 +3595,15 @@ def test_crystal_projector_provenance():
 
 
 def test_animal_projector_measurable_collectivity():
-    """AnimalProjector uses pattern types, not string matching, for collectivity."""
+    """AnimalProjector grounds collectivity in measurable dynamics."""
     proj = AnimalProjector()
     basins = proj.project(BEE_SWARM_LID)
     prov = basins[0].provenance
     assert "is_collective" in prov
-    assert "measured" in prov["collectivity_evidence"]
+    assert "collectivity_score" in prov
+    assert prov["collectivity_score"] > 0
+    assert "score=" in prov["collectivity_evidence"]
+    assert "physics couplings" in prov["collectivity_evidence"]
 
 
 def test_multi_observer_tension():
@@ -3645,6 +3648,126 @@ def test_synthesis_basin_carries_verified_flag():
     for r in results:
         assert r.new_basin.signature["verified"] is True
         assert r.new_basin.signature["concern"] is not None
+
+
+# ---------------------------------------------------------------------------
+# Risk mitigation gap closure tests
+# ---------------------------------------------------------------------------
+
+
+def test_verification_grounding_score():
+    """Verification includes physics grounding score."""
+    engine = SynthesisEngine()
+    cap = StreamCapability("test", "swarm.bee", 0.7, 0.6)
+    basins = [
+        Basin("animal", "swarm.bee", None, 0.8,
+              {"mode": "gradient_following"}, cap),
+        Basin("crystal", "crystal.quartz", None, 0.8,
+              {"mode": "lattice_modes"}, cap),
+    ]
+    results = engine.synthesize(basins, {})
+    for r in results:
+        assert "grounding_score" in r.verification
+        assert 0.0 <= r.verification["grounding_score"] <= 1.0
+
+
+def test_verification_physics_units_counted():
+    """Verification counts physics units when present."""
+    engine = SynthesisEngine()
+    engine.add_rule(SynthesisRule(
+        op="EXPAND", args=["test_unit"],
+        then="unit_test_cap", priority=5,
+        why="This resonance occurs at 32768 Hz with d33 = 2.3 pC/N coupling"))
+    cap = StreamCapability("test", "test_unit", 0.7, 0.6)
+    basins = [Basin("test", "test_unit", None, 0.5, {"mode": "test_unit"}, cap)]
+    results = engine.synthesize(basins, {})
+    assert len(results) > 0
+    assert results[-1].verification["physics_units_found"] > 0
+
+
+def test_collectivity_score_numeric():
+    """Collectivity is a numeric score, not a boolean from string matching."""
+    proj = AnimalProjector()
+    basins = proj.project(BEE_SWARM_LID)
+    prov = basins[0].provenance
+    assert isinstance(prov["collectivity_score"], float)
+    assert 0 <= prov["collectivity_score"] <= 2.0
+
+
+def test_collectivity_uses_swarm_size():
+    """Large swarm_size contributes to collectivity score."""
+    from mandala_runtime import LIDEntity
+    entity_large = LIDEntity(
+        entity_id="TEST_LARGE", name="Large Swarm",
+        substrate_type="swarm.large", category="animal_intelligence",
+        dynamics={"swarm_size": 50000,
+                  "gradient_field": {"strength": 0.5}})
+    entity_solo = LIDEntity(
+        entity_id="TEST_SOLO", name="Solo Animal",
+        substrate_type="animal.solo", category="animal_intelligence",
+        dynamics={"swarm_size": 1,
+                  "gradient_field": {"strength": 0.5}})
+    proj = AnimalProjector()
+    large_prov = proj.project(entity_large)[0].provenance
+    solo_prov = proj.project(entity_solo)[0].provenance
+    assert large_prov["collectivity_score"] > solo_prov["collectivity_score"]
+
+
+def test_provenance_report():
+    """provenance_report surfaces curation data."""
+    mandala = MandalaRuntime()
+    cap1 = StreamCapability("test", "swarm.bee", 0.7, 0.6)
+    cap2 = StreamCapability("test", "crystal.quartz", 0.7, 0.6)
+    b1 = Basin("test", "swarm.bee", None, 0.5, {},
+               source_capability=cap1,
+               provenance={"projector": "AnimalProjector",
+                           "entity_id": "BE",
+                           "observer_tradition": "default"})
+    b2 = Basin("test", "crystal.quartz", None, 0.5, {},
+               source_capability=cap2,
+               provenance={"projector": "CrystalProjector",
+                           "entity_id": "QU",
+                           "observer_tradition": "default"})
+    m = Manifest(basins=[b1, b2])
+    report = mandala.provenance_report(m)
+    assert report["total_basins"] == 2
+    assert report["basins_with_provenance"] == 2
+    assert report["entities_covered"] == 2
+    assert "AnimalProjector" in report["projectors"]
+
+
+def test_provenance_report_multi_observer():
+    """provenance_report detects multi-observer conflicts."""
+    mandala = MandalaRuntime()
+    cap = StreamCapability("test", "swarm.bee", 0.7, 0.6)
+    b1 = Basin("test", "swarm.bee", None, 0.5, {},
+               source_capability=cap,
+               provenance={"projector": "AP", "entity_id": "BE",
+                           "observer_tradition": "western"})
+    b2 = Basin("test", "swarm.bee", None, 0.5, {},
+               source_capability=cap,
+               provenance={"projector": "AP", "entity_id": "BE",
+                           "observer_tradition": "indigenous"})
+    m = Manifest(basins=[b1, b2])
+    report = mandala.provenance_report(m)
+    assert len(report["multi_observer_conflicts"]) == 1
+    assert "BE" in report["multi_observer_conflicts"][0]["entity_id"]
+
+
+def test_cayley_factor_in_synthesis():
+    """Synthesis basins carry cayley_factor in signature."""
+    engine = SynthesisEngine()
+    cap = StreamCapability("test", "swarm.bee", 0.7, 0.6)
+    basins = [
+        Basin("animal", "swarm.bee", None, 0.8,
+              {"mode": "gradient_following"}, cap),
+        Basin("crystal", "crystal.quartz", None, 0.8,
+              {"mode": "lattice_modes"}, cap),
+    ]
+    results = engine.synthesize(basins, {})
+    for r in results:
+        assert "cayley_factor" in r.new_basin.signature
+        assert 0.5 <= r.new_basin.signature["cayley_factor"] <= 1.0
 
 
 # Run all tests
