@@ -25,7 +25,7 @@ hierarchy (renormalization) connected by non-local correlations
 from __future__ import annotations
 
 import numpy as np
-from typing import List, Tuple, Dict, Optional, Callable
+from typing import List, Dict, Optional
 from dataclasses import dataclass, field
 import math
 import time

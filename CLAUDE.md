@@ -36,8 +36,8 @@ mandala-computing/
 ├── octahedral_session_cache.py# session caching with octahedral invalidation (~710 loc)
 ├── osl.py                     # Octahedral Symbolic Language v1.0 (~965 loc)
 ├── geis.py                    # Geometric Information Encoding System bridge (~695 loc)
-├── kt_annealer.py             # KT phase annealer + symmetry detector (~430 loc)
-├── mandala_runtime.py         # substrate-agnostic sensor fusion binding (~1900 loc)
+├── kt_annealer.py             # KT phase annealer + symmetry detector (~530 loc)
+├── mandala_runtime.py         # substrate-agnostic sensor fusion binding (~2640 loc)
 ├── membrane.py                # boundary computation primitive (~470 loc)
 ├── claim_validator.py         # epistemological claim validation (~500 loc)
 ├── glyph_convert.py           # human decimal-to-glyph converter (~355 loc)
@@ -49,8 +49,8 @@ mandala-computing/
 ├── README.md                  # project overview
 ├── PROJECTS.md                # connected repos
 ├── LICENSE                    # MIT
-├── examples/                  # 20 runnable example scripts + benchmark
-├── tests/test_core.py         # 326-test suite
+├── examples/                  # 18 runnable example scripts + benchmark
+├── tests/test_core.py         # 336-test suite
 └── [17 .md files]             # theory, hardware, integration, proofs, notes
 ```
 
@@ -76,6 +76,13 @@ mandala-computing/
 | Representation | `octahedral_arithmetic.py`, `glyph_convert.py` | stdlib only | Meaning lives in glyph space, no numeric assumptions |
 | Classical solving | `mandala_computer.py`, `holographic_mandala.py` | numpy | Random sampling, fast arrays — convenience, not necessity |
 | Quantum solving | `quantum_mandala.py` | numpy + scipy | Matrix expm, eigendecomposition — fundamentally linear algebra |
+| Bridge / Encoding | `geis.py`, `kt_annealer.py` | numpy | Tensor operations, phase annealing |
+| Sensor Fusion | `mandala_runtime.py` | stdlib only | Substrate-agnostic binding, no external deps |
+| Infrastructure | `octahedral_resilience.py`, `octahedral_session_cache.py` | stdlib only | Self-healing, caching — no external deps |
+| Algebra / Language | `geometric_state_algebra.py`, `osl.py`, `sovereign_mesh.py` | stdlib only | O_h group, symbolic language, mesh — no external deps |
+| Agents / Integration | `constraint_agent.py`, `sovereign_integration.py` | stdlib only | Agent framework, sovereignty bridge |
+| Validation | `claim_validator.py`, `membrane.py` | stdlib only (membrane: numpy optional) | Epistemology, boundary computation |
+| Entry point | `mandala_simulator.py` | stdlib only (delegates to engines when available) | Lightweight wrapper |
 
 ---
 
@@ -186,7 +193,7 @@ Full O_h octahedral symmetry group (order 48), Cayley graph, and group ring
 algebra. Provides geometric states, prime vertices, null-space detection,
 scent-trail search, and a geometric adapter for MandalaComputer relaxation.
 
-**key classes:** `OhElement`, `OhGroup`, `CayleyGraph`, `GroupRingElement`,
+**key classes:** `OhElement`, `OhGroup`, `CayleyEnergy`, `GroupRingElement`,
 `GeometricState`, `PrimeVertex`, `GeometricMandalaAdapter`
 
 ### sovereign-mesh (`sovereign_mesh.py`)
@@ -215,7 +222,7 @@ mapped to octahedral vertices; invalidating one vertex cascades to neighbors
 along axes. Supports TTL expiry, LRU eviction, persistence, and state-distance
 metrics.
 
-**key classes:** `OctahedralSessionCache`
+**key classes:** `SessionCache`, `CacheEntry`, `InvalidationGraph`, `OctState`
 
 ### osl (`osl.py`)
 
@@ -224,8 +231,8 @@ octahedral geometry operations. Includes a registry of vertex glyphs and animal
 macros, a tokenizer, parity verifier, macro expander, transpiler (OSL to Python),
 and a bridge mapping OSL trajectories to O_h group elements.
 
-**key classes:** `OSLRegistry`, `OSLTokenizer`, `OSLParityVerifier`,
-`OSLMacroExpander`, `OSLTranspiler`, `OSLGroupBridge`
+**key classes:** `GlyphRegistry`, `OSLTokenizer`, `ParityVerifier`,
+`MacroExpander`, `OSLTranspiler`
 
 ### geis (`geis.py`)
 
@@ -434,7 +441,7 @@ large systems.
 
 ## build-test-run
 
-Test suite: `python tests/test_core.py` (326 tests across all modules).
+Test suite: `python tests/test_core.py` (336 tests across all modules).
 No formal build system, CI/CD, or linting is configured.
 
 ### run-demos
@@ -617,7 +624,7 @@ Is your task about...
 
 ```bash
 pip install numpy scipy          # only external deps
-python tests/test_core.py        # should report 297 passed, 0 failed
+python tests/test_core.py        # should report 336 passed, 0 failed
 python mandala_computer.py       # runs all classical demos
 python mandala_runtime.py        # runs sensor fusion + LID demos
 ```
@@ -689,7 +696,7 @@ Adding a new feature?
 - **`OctahedralState`** exists in both `geis.py` (3D cubic coordinates, tokens)
   and implicitly in `octahedral_arithmetic.py` (glyph-space). Use GEIS for
   binary bridging, use octahedral_arithmetic for exact glyph math
-- **test suite:** `python tests/test_core.py` runs 326 tests across all modules
+- **test suite:** `python tests/test_core.py` runs 336 tests across all modules
 - **`.gitignore`** excludes `__pycache__/`, `.pyc`, `.env`, `.pytest_cache/`, etc.
 - **`requirements.txt`** at repo root lists numpy and scipy
 - **flat layout:** all code at root level, no package hierarchy

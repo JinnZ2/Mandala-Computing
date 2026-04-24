@@ -34,15 +34,14 @@ Usage:
 """
 
 from __future__ import annotations
-from typing import List, Dict, Optional, Tuple, Set
+from typing import List, Dict, Optional
 from dataclasses import dataclass, field
 from enum import Enum
 import json
-import math
 import time
 
 from octahedral_arithmetic import (
-    OctahedralNumber, GlyphFraction, GLYPHS, BASE, PHI,
+    OctahedralNumber, GlyphFraction, BASE,
 )
 
 
