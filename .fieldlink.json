@@ -32,8 +32,18 @@
             "experiments/number_theoretic_energy.py",
             "Mandala/theoretical_validator.py",
             "Mandala/physics_connections.py",
-            "GEIS/octahedral_state.py"
+            "GEIS/octahedral_state.py",
+            "GEIS/geometric_encoder.py",
+            "GEIS/state_tensor.py",
+            "GEIS/geometric_sensor_sim.py",
+            "GEIS/3D_cube_sim.py",
+            "Engine/kt_annealer.py",
+            "Engine/symmetry_detector.py"
           ],
+          "ported_to": {
+            "geis.py": "GEIS/* (OctahedralState, GeometricEncoder, StateTensor, sensor sim, cube ops)",
+            "kt_annealer.py": "Engine/kt_annealer.py + Engine/symmetry_detector.py"
+          },
           "status": "active"
         },
         {
@@ -78,7 +88,7 @@
       "strategy": "pull_on_change",
       "conflict_resolution": "source_wins",
       "shared_entities": ["SHAPE.OCTA", "CONST.PHI", "CAP.SEED_EXPANSION", "PROTO.MANDALA_COMPUTE"],
-      "last_synced": null
+      "last_synced": "2026-04-24"
     },
     "local_manifests": [
       "glyphs/**",
