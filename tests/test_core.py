@@ -2763,6 +2763,209 @@ def test_runtime_projector_digital():
 
 
 # ---------------------------------------------------------------------------
+# Mandala Runtime — expanded alternative computing tests
+# ---------------------------------------------------------------------------
+
+from mandala_runtime import (
+    TernaryClassifier, QuantumSuperpositionModel, StochasticNoiseModel,
+    GravityIntersectionRule, ElectricIntersectionRule,
+    AlternativeParadigm, ParadigmMapping, PARADIGM_REGISTRY,
+    get_paradigms_for_domain, get_paradigm_matrix,
+)
+
+
+def test_ternary_classifier_basic():
+    """TernaryClassifier returns -1, 0, +1 correctly."""
+    tc = TernaryClassifier(null_threshold=0.5)
+    assert tc.classify(9.81) == 1
+    assert tc.classify(-1.62) == -1
+    assert tc.classify(0.0) == 0
+    assert tc.classify(0.3) == 0  # within threshold
+
+
+def test_ternary_classifier_distribution():
+    """distribution returns counts, fractions, symmetry."""
+    tc = TernaryClassifier(null_threshold=0.5)
+    dist = tc.distribution([5.0, -3.0, 0.0, 0.1, -0.2, 10.0])
+    assert dist["total"] == 6
+    assert sum(dist["counts"].values()) == 6
+    assert 0 <= dist["symmetry"] <= 1
+    assert 0 <= dist["null_fraction"] <= 1
+
+
+def test_ternary_classifier_vector():
+    """classify_vector works on multi-component vectors."""
+    tc = TernaryClassifier(null_threshold=0.01)
+    assert tc.classify_vector([0.0, -9.81, 0.0], component=1) == -1
+    assert tc.classify_vector([0.0, 0.0, 0.0]) == 0
+
+
+def test_ternary_classifier_labels():
+    """Custom labels returned correctly."""
+    tc = TernaryClassifier(positive_label="attract", null_label="null",
+                           negative_label="repel")
+    assert tc.label(1) == "attract"
+    assert tc.label(0) == "null"
+    assert tc.label(-1) == "repel"
+
+
+def test_quantum_superposition_classify():
+    """QuantumSuperpositionModel classifies above/below/indeterminate."""
+    qm = QuantumSuperpositionModel(threshold=0.5, uncertainty=0.1)
+    assert qm.classify(0.9)["state"] == "above"
+    assert qm.classify(0.1)["state"] == "below"
+    assert qm.classify(0.5)["state"] == "indeterminate"
+
+
+def test_quantum_superposition_entropy():
+    """Entropy is positive for mixed populations."""
+    qm = QuantumSuperpositionModel(threshold=0.5, uncertainty=0.1)
+    values = [0.9, 0.1, 0.5, 0.48, 0.52]
+    entropy = qm.superposition_entropy(values)
+    assert entropy > 0
+
+
+def test_quantum_superposition_indeterminate():
+    """indeterminate_fraction detects values near threshold."""
+    qm = QuantumSuperpositionModel(threshold=0.5, uncertainty=0.1)
+    values = [0.48, 0.52, 0.5, 0.9, 0.1]
+    frac = qm.indeterminate_fraction(values)
+    assert frac > 0  # some values near 0.5
+
+
+def test_quantum_superposition_zero_uncertainty():
+    """Zero uncertainty gives hard binary classification."""
+    qm = QuantumSuperpositionModel(threshold=0.5, uncertainty=0.0)
+    assert qm.classify(0.6)["state"] == "above"
+    assert qm.classify(0.4)["state"] == "below"
+
+
+def test_stochastic_noise_model():
+    """StochasticNoiseModel computes jitter statistics."""
+    nm = StochasticNoiseModel([0.3, 1.8, 3.5, 0.8, 2.1])
+    s = nm.summary()
+    assert s["jitter_rms"] > 0
+    assert s["samples"] == 5
+
+
+def test_stochastic_noise_short():
+    """Single-sample input has zero jitter."""
+    nm = StochasticNoiseModel([1.0])
+    assert nm.jitter_rms == 0
+
+
+def test_gravity_intersection_rule_agreement():
+    """Gravity rule finds agreement between ternary nulls and quantum indeterminate."""
+    rule = GravityIntersectionRule()
+    cap_t = StreamCapability("gravity", Substrate.TERNARY, 0.8, 0.7)
+    cap_q = StreamCapability("gravity", Substrate.QUANTUM, 0.6, 0.8)
+    basins = [
+        Basin("gravity", Substrate.TERNARY, None, 0.6,
+              {"null_fraction": 0.3, "symmetry": 0.9}, cap_t),
+        Basin("gravity", Substrate.QUANTUM, None, 0.7,
+              {"indeterminate_fraction": 0.4, "entropy": 1.5}, cap_q),
+    ]
+    geom = rule.intersect(basins)
+    assert len(geom.agreement_regions) > 0
+    assert geom.agreement_regions[0][0] == "lagrange_corroborated"
+
+
+def test_gravity_intersection_rule_tension():
+    """Gravity rule detects binary/quantum stability overclaim."""
+    rule = GravityIntersectionRule()
+    cap_b = StreamCapability("gravity", Substrate.BINARY, 0.7, 0.5)
+    cap_q = StreamCapability("gravity", Substrate.QUANTUM, 0.6, 0.8)
+    basins = [
+        Basin("gravity", Substrate.BINARY, None, 0.3,
+              {"stable_fraction": 0.95}, cap_b),
+        Basin("gravity", Substrate.QUANTUM, None, 0.7,
+              {"indeterminate_fraction": 0.5}, cap_q),
+    ]
+    geom = rule.intersect(basins)
+    assert len(geom.tension_regions) > 0
+    assert "overclaimed" in geom.tension_regions[0][0]
+
+
+def test_electric_intersection_rule_tension():
+    """Electric rule detects conducting overclaim."""
+    rule = ElectricIntersectionRule()
+    cap_b = StreamCapability("electric", Substrate.BINARY, 0.7, 0.5)
+    cap_s = StreamCapability("electric", Substrate.STOCHASTIC, 0.5, 0.6)
+    basins = [
+        Basin("electric", Substrate.BINARY, None, 0.3,
+              {"conducting": True}, cap_b),
+        Basin("electric", Substrate.STOCHASTIC, None, 0.5,
+              {"conducting_probability": 0.4}, cap_s),
+    ]
+    geom = rule.intersect(basins)
+    assert len(geom.tension_regions) > 0
+
+
+def test_electric_intersection_zero_erased():
+    """Electric rule detects when binary erases ternary zero-crossings."""
+    rule = ElectricIntersectionRule()
+    cap_t = StreamCapability("electric", Substrate.TERNARY, 0.7, 0.7)
+    cap_b = StreamCapability("electric", Substrate.BINARY, 0.7, 0.5)
+    basins = [
+        Basin("electric", Substrate.TERNARY, None, 0.6,
+              {"zero_fraction": 0.15}, cap_t),
+        Basin("electric", Substrate.BINARY, None, 0.3,
+              {"conducting": True}, cap_b),
+    ]
+    geom = rule.intersect(basins)
+    assert any("erased" in t[0] for t in geom.tension_regions)
+
+
+def test_paradigm_registry_complete():
+    """All 7 paradigms present in registry."""
+    paradigm_names = {p.paradigm for p in PARADIGM_REGISTRY}
+    assert len(paradigm_names) == 7
+    for p in AlternativeParadigm:
+        assert p in paradigm_names
+
+
+def test_paradigms_for_domain():
+    """get_paradigms_for_domain returns applicable paradigms."""
+    sound_paradigms = get_paradigms_for_domain("sound")
+    assert len(sound_paradigms) >= 3  # ternary, quantum, stochastic at minimum
+    electric_paradigms = get_paradigms_for_domain("electric")
+    assert any(p.paradigm == AlternativeParadigm.MEMRISTIVE for p in electric_paradigms)
+
+
+def test_paradigm_matrix():
+    """get_paradigm_matrix returns dict of dicts."""
+    matrix = get_paradigm_matrix()
+    assert "ternary" in matrix
+    assert matrix["ternary"]["sound"] is True
+    assert matrix["memristive"]["sound"] is False
+    assert matrix["memristive"]["electric"] is True
+
+
+def test_multi_domain_breathing():
+    """MandalaRuntime handles 3 domains simultaneously."""
+    mandala = MandalaRuntime()
+    mandala.register(SoundIntersectionRule())
+    mandala.register(GravityIntersectionRule())
+    mandala.register(ElectricIntersectionRule())
+
+    cap_s = StreamCapability("sound", Substrate.BINARY, 0.7, 0.6)
+    cap_g = StreamCapability("gravity", Substrate.TERNARY, 0.8, 0.7)
+    cap_e = StreamCapability("electric", Substrate.TERNARY, 0.7, 0.7)
+
+    basins = [
+        Basin("sound", Substrate.BINARY, None, 0.3,
+              {"onsets": 3, "frames": 8}, cap_s),
+        Basin("gravity", Substrate.TERNARY, None, 0.6,
+              {"null_fraction": 0.1, "symmetry": 0.9}, cap_g),
+        Basin("electric", Substrate.TERNARY, None, 0.6,
+              {"zero_fraction": 0.05, "symmetry": 0.95}, cap_e),
+    ]
+    manifest = Manifest(basins=basins)
+    assert manifest.total_information_axes == 3
+    assert set(manifest.domain_coverage.keys()) == {"sound", "gravity", "electric"}
+
+
+# ---------------------------------------------------------------------------
 # Run all tests
 # ---------------------------------------------------------------------------
 
