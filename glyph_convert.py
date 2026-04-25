@@ -15,10 +15,9 @@ Usage:
 
 from __future__ import annotations
 import sys
-import math
 
 from octahedral_arithmetic import (
-    OctahedralNumber, GlyphFraction, GLYPHS, BASE, PHI,
+    OctahedralNumber, GlyphFraction, GLYPHS, BASE,
     factor_pair_glyphs,
 )
 

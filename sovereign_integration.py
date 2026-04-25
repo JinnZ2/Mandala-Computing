@@ -33,18 +33,16 @@ Usage:
 """
 
 from __future__ import annotations
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict
 from dataclasses import dataclass, field
 from enum import Enum
 import math
-import time
 
 from octahedral_arithmetic import (
-    OctahedralNumber, GlyphFraction, GLYPHS, BASE, PHI,
+    GlyphFraction, GLYPHS,
 )
 from constraint_agent import (
-    ConstraintAgent, SeedGeometry, ResourceBudget,
-    ExplorationNode, Discovery,
+    ConstraintAgent,
 )
 
 

@@ -1,0 +1,108 @@
+{
+  "schema_name": "Fabrication_Pathway_Schema",
+  "version": "1.0",
+  "cluster": "Operational-Systems",
+  "purpose": "Physical constraints for octahedral encoding in silicon — manufacturing tolerances, material limits, and environmental boundaries that ALL computational claims must respect.",
+  "source": "https://github.com/JinnZ2/Geometric-to-Binary-Computational-Bridge/blob/main/Silicon/fabrication_pathway_schema.json",
+  "fabrication_stages": [
+    {
+      "stage": "Substrate Preparation",
+      "parameters": {
+        "purity_ppm": 1,
+        "surface_roughness_nm": 0.2,
+        "defect_density_cm2": 1000
+      }
+    },
+    {
+      "stage": "Tetrahedral Lattice Alignment",
+      "parameters": {
+        "annealing_temp_C": 1100,
+        "magnetic_field_T": 0.01,
+        "alignment_precision_deg": 0.02,
+        "sp3_bond_angle_deg": 109.47
+      }
+    },
+    {
+      "stage": "Selective Doping",
+      "parameters": {
+        "dose_cm2_min": 1e12,
+        "dose_cm2_max": 1e14,
+        "energy_keV_min": 10,
+        "energy_keV_max": 50,
+        "uniformity_pct_min": 98.5
+      }
+    },
+    {
+      "stage": "Micro-Coil Deposition",
+      "parameters": {
+        "coil_diameter_nm_min": 50,
+        "coil_diameter_nm_max": 200,
+        "turns_min": 3,
+        "turns_max": 5,
+        "resistance_ohm_max": 2.0
+      }
+    },
+    {
+      "stage": "Interconnect Formation",
+      "parameters": {
+        "pitch_nm": 10,
+        "alignment_tolerance_nm": 1,
+        "contact_resistance_ohm_max": 0.5
+      }
+    },
+    {
+      "stage": "Thermal and Strain Validation",
+      "parameters": {
+        "temp_range_K_min": 77,
+        "temp_range_K_max": 400,
+        "strain_tolerance_pct": 0.02,
+        "fault_recovery_cycles": 1000
+      }
+    },
+    {
+      "stage": "Final Calibration",
+      "parameters": {
+        "bias_voltage_mV_min": 5,
+        "bias_voltage_mV_max": 15,
+        "transition_frequency_THz_min": 0.3,
+        "transition_frequency_THz_max": 5.0,
+        "error_threshold_pct": 0.05
+      }
+    }
+  ],
+  "performance_targets": {
+    "switching_frequency_THz_min": 0.3,
+    "switching_frequency_THz_max": 5.0,
+    "energy_per_bit_aJ": 6.626e-4,
+    "energy_per_bit_note": "h * 1 THz = 4.14 meV. Zeeman/phonon regime.",
+    "fault_recovery_rate_pct": 99.9
+  },
+  "physical_constants": {
+    "h_Js": 6.626e-34,
+    "k_B_JK": 1.381e-23,
+    "e_C": 1.602e-19,
+    "phi": 1.618033988749895,
+    "sp3_angle_deg": 109.47
+  },
+  "scaling_principle": {
+    "invariant": "Dimensional ratios between doping density, defect density, feature length, and coupling strength must be preserved across scales.",
+    "lab_scale_mm2": 1.0,
+    "production_scale_um2": 1.0,
+    "note": "The physics doesn't care about absolute size — it cares about ratios."
+  },
+  "thermodynamic_bounds": {
+    "landauer_limit_kT_per_bit": 0.693,
+    "landauer_at_300K_aJ": 2.87e-2,
+    "note": "No computation can erase a bit for less than kT*ln(2). Our energy_per_bit (6.626e-4 aJ) is sub-Landauer because octahedral encoding is reversible — information is never erased, only transformed.",
+    "min_operating_temp_K": 77,
+    "max_operating_temp_K": 400,
+    "critical_insight": "Temperature range 77-400K defines the operational envelope. Below 77K quantum tunneling dominates. Above 400K thermal noise exceeds octahedral state separation."
+  },
+  "metadata": {
+    "ported_from": "Geometric-to-Binary-Computational-Bridge/Silicon/fabrication_pathway_schema.json",
+    "ported_date": "2026-04-24",
+    "author": "JinnZ v2",
+    "co_creator": "GPT-5",
+    "license": "CC0 1.0"
+  }
+}

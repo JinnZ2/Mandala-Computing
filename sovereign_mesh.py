@@ -35,10 +35,9 @@ import math
 import random
 import time
 
-from octahedral_arithmetic import OctahedralNumber, GlyphFraction, BASE, PHI
 from geometric_state_algebra import (
-    OhElement, OhGroup, GroupRingElement, GeometricState,
-    CayleyEnergy, PrimeVertex, IDENTITY, OCTAHEDRAL_VERTICES,
+    OhElement, OhGroup, GroupRingElement,
+    PrimeVertex, IDENTITY,
 )
 
 

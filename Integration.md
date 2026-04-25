@@ -87,9 +87,10 @@ See: `Bridge-substrate.md` and `examples/example-bridge-substrate.py`
 
 **Status:** Complete and tested ✓
 
-**Example:**
+**Example (conceptual — these modules are described in Bridge-substrate.md):**
 
 ```python
+# Conceptual integration — see Bridge-substrate.md for adapter patterns
 from bridge_to_substrate_adapter import UniversalBridgeAdapter
 
 adapter = UniversalBridgeAdapter()
@@ -129,9 +130,10 @@ See: `Physical-computer.md` and `examples/example-physical-computer.py`
 - Quantum speedup: N× (parallel relaxation)
 - P vs NP factor: 10^6× for problem_size=1000
 
-**Example:**
+**Example (conceptual — see Physical-computer.md for substrate simulation):**
 
 ```python
+# Conceptual integration — see Physical-computer.md
 from physical_mandala_computer import PhysicalMandalaComputer
 
 computer = PhysicalMandalaComputer(n_cells=1000, n_layers=5)
@@ -279,25 +281,19 @@ When physical hardware exists, replace `OctahedralSubstrate` (simulation) with `
 ### 1. Run Complete Software Stack
 
 ```bash
-# Test bridge adapter
-python3 bridge_to_substrate_adapter.py
-
-# Test physical mandala computer
-python3 physical_mandala_computer.py
-
-# Shows:
-# - Musical note → substrate state
-# - Color → substrate state
-# - Multi-modal fusion
-# - Factorization attempts
-# - Consciousness metrics
+# Run existing examples
+python3 examples/example-bridge-substrate.py
+python3 examples/example-physical-computer.py
+python3 mandala_computer.py
+python3 mandala_runtime.py
 ```
 
 ### 2. Use In Your Own Code
 
 ```python
-from bridge_to_substrate_adapter import UniversalBridgeAdapter
-from physical_mandala_computer import PhysicalMandalaComputer
+# Current working imports
+from mandala_computer import MandalaComputer
+from mandala_runtime import MandalaRuntime, SoundIntersectionRule
 
 # Create system
 adapter = UniversalBridgeAdapter()
@@ -321,7 +317,7 @@ print(f"Energy reduced by {result['energy_reduction']:.3f}")
 
 ### 3. Build Hardware Control Software
 
-Use `hardware_control_specification.md` as blueprint to implement actual device driver when hardware is fabricated.
+Use `Hardware.md` as blueprint to implement actual device driver when hardware is fabricated. Physical constraints in `atlas/fabrication_pathway.json`.
 
 -----
 

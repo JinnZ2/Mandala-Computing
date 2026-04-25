@@ -25,7 +25,6 @@ import numpy as np
 from typing import List, Tuple, Dict, Optional
 from collections import defaultdict
 from itertools import combinations
-from dataclasses import dataclass
 
 # ---------------------------------------------------------------------------
 # Constants

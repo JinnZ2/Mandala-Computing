@@ -1607,6 +1607,94 @@ class SynthesisEngine:
 
 
 # =========================================================================
+# 13c. PHYSICAL FABRICATION CONSTRAINTS
+# =========================================================================
+
+@dataclass
+class FabricationConstraints:
+    """
+    Physical constraints from the silicon fabrication pathway.
+
+    These are T1 (thermodynamic) constraints — the hardest limits in the
+    system. No computational claim, synthesis product, or domain coupling
+    can violate these without being flagged.
+
+    Loaded from atlas/fabrication_pathway.json (ported from the Bridge
+    repo's Silicon/fabrication_pathway_schema.json).
+    """
+    energy_per_bit_aJ: float = 6.626e-4
+    landauer_limit_aJ_300K: float = 2.87e-2
+    min_temp_K: float = 77
+    max_temp_K: float = 400
+    switching_freq_THz_min: float = 0.3
+    switching_freq_THz_max: float = 5.0
+    fault_recovery_pct: float = 99.9
+    sp3_angle_deg: float = 109.47
+    error_threshold_pct: float = 0.05
+    stages: list = field(default_factory=list)
+
+    @classmethod
+    def load(cls, path: str = None) -> FabricationConstraints:
+        """Load from fabrication_pathway.json."""
+        if path is None:
+            path = str(pathlib.Path(__file__).parent / "atlas" / "fabrication_pathway.json")
+        p = pathlib.Path(path)
+        if not p.exists():
+            return cls()
+        data = json.loads(p.read_text(encoding="utf-8"))
+        perf = data.get("performance_targets", {})
+        thermo = data.get("thermodynamic_bounds", {})
+        stages = data.get("fabrication_stages", [])
+        return cls(
+            energy_per_bit_aJ=perf.get("energy_per_bit_aJ", 6.626e-4),
+            landauer_limit_aJ_300K=thermo.get("landauer_at_300K_aJ", 2.87e-2),
+            min_temp_K=thermo.get("min_operating_temp_K", 77),
+            max_temp_K=thermo.get("max_operating_temp_K", 400),
+            switching_freq_THz_min=perf.get("switching_frequency_THz_min", 0.3),
+            switching_freq_THz_max=perf.get("switching_frequency_THz_max", 5.0),
+            fault_recovery_pct=perf.get("fault_recovery_rate_pct", 99.9),
+            error_threshold_pct=0.05,
+            stages=[s.get("stage", "") for s in stages],
+        )
+
+    def validate_temperature(self, temp_K: float) -> dict:
+        """Check if temperature is within operational envelope."""
+        in_range = self.min_temp_K <= temp_K <= self.max_temp_K
+        return {
+            "valid": in_range,
+            "temp_K": temp_K,
+            "range": (self.min_temp_K, self.max_temp_K),
+            "note": ("Within operational envelope" if in_range else
+                     f"OUTSIDE envelope: {'below quantum tunneling regime' if temp_K < self.min_temp_K else 'above thermal noise limit'}"),
+        }
+
+    def validate_energy(self, energy_aJ: float) -> dict:
+        """Check energy claim against Landauer and device limits."""
+        above_landauer = energy_aJ >= self.landauer_limit_aJ_300K
+        reversible = energy_aJ < self.landauer_limit_aJ_300K
+        return {
+            "valid": True,
+            "energy_aJ": energy_aJ,
+            "landauer_limit_aJ": self.landauer_limit_aJ_300K,
+            "above_landauer": above_landauer,
+            "reversible_regime": reversible,
+            "device_energy_aJ": self.energy_per_bit_aJ,
+            "note": ("Reversible regime — sub-Landauer because information is transformed, not erased"
+                     if reversible else "Irreversible regime — above Landauer limit"),
+        }
+
+    def summary(self) -> dict:
+        return {
+            "energy_per_bit_aJ": self.energy_per_bit_aJ,
+            "landauer_limit_aJ_300K": self.landauer_limit_aJ_300K,
+            "temp_range_K": (self.min_temp_K, self.max_temp_K),
+            "switching_THz": (self.switching_freq_THz_min, self.switching_freq_THz_max),
+            "fault_recovery_pct": self.fault_recovery_pct,
+            "stages": self.stages,
+        }
+
+
+# =========================================================================
 # 14. UNIFIED ALTERNATIVE PARADIGM REGISTRY
 # =========================================================================
 
