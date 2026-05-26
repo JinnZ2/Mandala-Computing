@@ -1,0 +1,12 @@
+oct_encode|dS/dt=phi^depth*coupling|octahedral_lattice,8_states,0-7|phi>0,depth>=1,coupling>0|energy_min,factor_reg|states<2,coupling=0|cell_state_histogram,energy_trace,glyph_trace|0
+energy_min|dE/dt=-J*sin(|si-sj|*pi/4)^2|cell_pair,metropolis,T>0|J>0,T>0,neighbors_connected|oct_encode,anneal_conv|T=0_frozen,disconnected_graph|energy_history,acceptance_rate,ground_state|0
+anneal_conv|dT/dt=-T*cooling_rate|T_start>T_KT,T_end<<T_KT,exp_schedule|steps>100,cooling_rate<1|energy_min,kt_phase|T_start<T_end,steps<10|final_energy,convergence_step,temperature_trace|0
+kt_phase|dV/dt=-vortex_binding_rate(T)|XY_model,phi_lattice,T_KT=pi*phi/2|J=phi,adjacency_connected|anneal_conv,coherence|T>5*T_KT,isolated_nodes|vortex_count,phase_coherence,kt_transition_step|0
+coherence|dR/dt=alignment_torque(phases)|unit_circle,R_in_0_1,XY_order_param|T<T_KT,connected_lattice|kt_phase,energy_min|T>>T_KT,R<0|phase_coherence_R,mean_exp_i_theta|0
+factor_reg|dE_fact/dt=-(fa*fb-N)^2*gradient|base8_register,sqrt_N_cells,bipartite|N>1,N_composite,cells>=2|oct_encode,energy_min|N_prime,register_overflow|residual,best_pair,verified_bool|0
+substrate_eq|dGeometry/dt=sum(Basin_i*depth_i)|all_substrates,no_privilege,breathing|>=1_stream,intersection_rule_registered|breathing,tension_signal|zero_streams,no_rules|information_axes,domain_coverage,confidence_field|0
+breathing|dMandala/dt=expand(streams)-contract(dropouts)|runtime,per_breath_cycle,never_fails|mandala_initialized|substrate_eq,resonate|mandala_not_initialized|total_axes_before_after,domains_active,basins_count|0
+resonate|dCoupling/dt=sum(rule_fires)*synthesis_depth|cross_domain,EXPAND_ALIGN_STRUCTURE,RSC_rules|>=2_domains,synthesis_enabled|breathing,substrate_eq,verify_asym|single_domain,no_synthesis_engine|synthesis_products,coupling_strength,cayley_factor|0
+verify_asym|dConcern/dt=claim_validator(synthesis_why)|T1_floor,tier_hierarchy,physics_grounded|claim_validator_available|resonate,fabrication|no_validator|concern_score,grounding_score,falsifiability|0
+fabrication|dDevice/dt=stage_sequence(7_stages)|77-400K,sub_Landauer,sp3_109.47deg|silicon_substrate,ratio_invariant|verify_asym,oct_encode|T<77K,T>400K,non_reversible_erase|energy_per_bit_aJ,fault_recovery_pct,switching_THz|0
+lid_bridge|dBasin/dt=DynamicsProjector(LID_entity)|Layer3_to_Layer4,open_substrate,any_ontology|projector_registered,entity_has_patterns|substrate_eq,resonate|no_projector,empty_entity|basins_emitted,provenance_attached,collectivity_score|0
