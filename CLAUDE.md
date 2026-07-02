@@ -50,6 +50,7 @@ mandala-computing/
 ├── PROJECTS.md                # connected repos
 ├── LICENSE                    # MIT
 ├── examples/                  # 18 runnable example scripts + benchmark
+├── experiments/                # WIP playgrounds, not yet wired to the core engine — see experiments/README.md
 ├── tests/test_core.py         # 336-test suite
 └── [17 .md files]             # theory, hardware, integration, proofs, notes
 ```
@@ -726,4 +727,8 @@ Adding a new feature?
 - **`PHI`** is defined in `octahedral_arithmetic.py` and imported by most modules.
   `mandala_computer.py` loads from atlas JSON. `quantum_mandala.py` and `geis.py`
   define independently for standalone operation
+- **`experiments/` and root-level playgrounds** (`experiments/constant_swapping_simulator.py`,
+  `geometric_computation_selector.py`, `mandala_computing_explorer.py`) are intentionally
+  not wired to the core engine yet — see `experiments/README.md` for the integration plan
+  before assuming they're dead/orphaned code
 
