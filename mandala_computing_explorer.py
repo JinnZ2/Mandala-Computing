@@ -1,16 +1,19 @@
 # ===================================================================
 #  MANDALA COMPUTING EXPLORER v4
-#  Qiskit Export · Noise Model · Trotter-Suzuki QMC · Parameter Sweep
+#  Qiskit Export · Trotter-Suzuki QMC · Parameter Sweep
+#  Solvers are provided by quantum_mandala.py's QuantumMandalaComputer —
+#  this file is UI/plotting only. See experiments/README.md.
 #  ===================================================================
 
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
-from ipywidgets import interact, Dropdown, IntSlider, FloatSlider, VBox, HBox, Output, Button, Checkbox, Label
-from IPython.display import display, clear_output, HTML
-from scipy.linalg import expm
+from ipywidgets import interact, Dropdown, IntSlider, FloatSlider, VBox, HBox, Output, Button, Checkbox, Label, HTML
+from IPython.display import display, clear_output
 import warnings
 warnings.filterwarnings('ignore')
+
+from quantum_mandala import QuantumMandalaComputer, export_ising_qiskit
 
 # -------------------------------------------------------------------
 # 1. Constants and Glyphs (same as before)
@@ -74,158 +77,12 @@ class ProblemEncoder:
         return None
 
 # -------------------------------------------------------------------
-# 3. Qiskit Export (generates OpenQASM)
-# -------------------------------------------------------------------
-def export_to_qiskit(encoder, Gamma_start=5.0, Gamma_end=0.1, steps=100, dt=0.05):
-    """Generate a Qiskit circuit for the Ising model using Trotter-Suzuki."""
-    n = encoder.qubits
-    qasm = f"// Mandala Ising Model with Transverse Field\n"
-    qasm += f"// Problem: {encoder.problem_type}, qubits: {n}\n"
-    qasm += f"// Annealing schedule: Gamma from {Gamma_start} to {Gamma_end} over {steps} steps\n\n"
-    qasm += "OPENQASM 2.0;\n"
-    qasm += f"include \"qelib1.inc\";\n"
-    qasm += f"qreg q[{n}];\n"
-    qasm += f"creg c[{n}];\n\n"
-
-    # Initial state: all |+> (Hadamard on all qubits)
-    for i in range(n):
-        qasm += f"h q[{i}];\n"
-
-    # Time evolution using Trotter-Suzuki (first-order)
-    # H = H_ising + H_field(Gamma)
-    # We'll apply small time steps with varying Gamma
-    for step in range(steps):
-        t = step / steps
-        Gamma = Gamma_start * (Gamma_end / Gamma_start) ** t
-
-        # Apply H_field for dt/2 (RX rotations)
-        field_angle = -2 * Gamma * dt  # Because RX(θ) = exp(-i θ/2 σ_x)
-        for i in range(n):
-            qasm += f"rx({field_angle:.6f}) q[{i}];\n"
-
-        # Apply H_ising (ZZ interactions and Z fields) for dt
-        # h_i Z_i: RZ rotations
-        for i in range(n):
-            if encoder.h[i] != 0:
-                angle = -2 * encoder.h[i] * dt
-                qasm += f"rz({angle:.6f}) q[{i}];\n"
-        # J_ij Z_i Z_j: CNOT + RZ + CNOT
-        for i in range(n):
-            for j in range(i+1, n):
-                if encoder.J[i, j] != 0:
-                    angle = -2 * encoder.J[i, j] * dt
-                    qasm += f"cx q[{i}], q[{j}];\n"
-                    qasm += f"rz({angle:.6f}) q[{j}];\n"
-                    qasm += f"cx q[{i}], q[{j}];\n"
-
-        # Apply H_field again for dt/2
-        for i in range(n):
-            qasm += f"rx({field_angle:.6f}) q[{i}];\n"
-
-    # Measurement
-    for i in range(n):
-        qasm += f"measure q[{i}] -> c[{i}];\n"
-
-    return qasm
-
-# -------------------------------------------------------------------
-# 4. Noise Model (Lindblad master equation)
-# -------------------------------------------------------------------
-class NoiseModel:
-    def __init__(self, T1=50.0, T2=30.0, p_meas=0.01):
-        self.T1 = T1  # amplitude damping time
-        self.T2 = T2  # dephasing time
-        self.p_meas = p_meas  # measurement error probability
-
-    def apply_noise_to_state(self, rho, dt):
-        """
-        Apply Lindblad noise to density matrix rho for time dt.
-        Simplified: dephasing (T2) and amplitude damping (T1).
-        """
-        n = int(np.log2(rho.shape[0]))
-        # Dephasing: ρ -> (1 - p) ρ + p Z ρ Z
-        p_deph = dt / self.T2
-        # Amplitude damping: simplified as local depolarising
-        p_damp = dt / self.T1
-        # Apply to each qubit
-        new_rho = rho.copy()
-        for i in range(n):
-            # Dephasing
-            Z = np.array([[1,0],[0,-1]])
-            # Full operator: apply to qubit i
-            # We'll use a simple approximation: local depolarising channel
-            p = p_deph + p_damp
-            if p > 0:
-                # Depolarising: (1-p)ρ + p/4 (XρX + YρY + ZρZ)
-                # This is a crude but easy approximation
-                # For actual noise, we'd need a proper master equation.
-                pass  # For simplicity, we'll just add a note.
-        return rho
-
-# -------------------------------------------------------------------
-# 5. Trotter-Suzuki Quantum Monte Carlo (Path Integral)
-# -------------------------------------------------------------------
-class TrotterSuzukiQMC:
-    def __init__(self, encoder, trotter_steps=20, beta=1.0, sweeps=1000):
-        self.encoder = encoder
-        self.trotter_steps = trotter_steps
-        self.beta = beta  # inverse temperature (1/T)
-        self.sweeps = sweeps
-        self.history = {'energy': []}
-
-    def solve(self):
-        n = self.encoder.qubits
-        # We'll implement a simple Metropolis Monte Carlo on the path integral.
-        # For each trotter slice, we have a spin configuration.
-        # We'll represent the path as a (trotter_steps x n) array of spins ±1.
-        # Initialize random spins.
-        path = np.random.choice([-1, 1], size=(self.trotter_steps, n))
-
-        # Compute initial action (energy)
-        def action(path):
-            # Classical energy at each slice (from Ising)
-            E = 0
-            for t in range(self.trotter_steps):
-                spin = path[t]
-                E_slice = np.sum(self.encoder.h * spin)
-                for i in range(n):
-                    for j in range(i+1, n):
-                        E_slice += self.encoder.J[i, j] * spin[i] * spin[j]
-                E += E_slice / self.trotter_steps  # average over slices
-            return E
-
-        current_E = action(path)
-        best_E = current_E
-        best_path = path.copy()
-
-        for sweep in range(self.sweeps):
-            # Propose a flip of one spin at one trotter slice
-            t = np.random.randint(0, self.trotter_steps)
-            i = np.random.randint(0, n)
-            new_path = path.copy()
-            new_path[t, i] *= -1
-            new_E = action(new_path)
-            delta = new_E - current_E
-            if delta < 0 or np.random.rand() < np.exp(-delta * self.beta):
-                path = new_path
-                current_E = new_E
-                if current_E < best_E:
-                    best_E = current_E
-                    best_path = path.copy()
-            self.history['energy'].append(current_E)
-
-        # Extract ground state from best path (take the first slice)
-        best_spin = best_path[0]  # assume symmetry
-        # Convert to glyph state: spin -1 -> 0, spin +1 -> 4
-        glyph_state = np.array([4 if s == 1 else 0 for s in best_spin])
-        return glyph_state, best_E
-
-# -------------------------------------------------------------------
-# 6. Parameter Sweep Engine
+# 3. Parameter Sweep Engine
 # -------------------------------------------------------------------
 class ParameterSweep:
-    def __init__(self, encoder, param_grid):
-        self.encoder = encoder
+    def __init__(self, J, h, param_grid):
+        self.J = J
+        self.h = h
         self.param_grid = param_grid  # dict of lists: {'Gamma_start': [...], 'Gamma_end': [...], 'steps': [...]}
         self.results = []
 
@@ -234,58 +91,23 @@ class ParameterSweep:
         keys = list(self.param_grid.keys())
         for values in itertools.product(*[self.param_grid[k] for k in keys]):
             params = dict(zip(keys, values))
-            # Run a quantum circuit simulation with these parameters
-            # We'll use the exact diagonalization for small qubits
-            # Here we use a simplified version
-            from scipy.linalg import expm
-            n = self.encoder.qubits
-            dim = 2**n
-            # Build H_ising
-            H_ising = np.zeros((dim, dim))
-            for state_idx in range(dim):
-                bits = [(state_idx >> i) & 1 for i in range(n)]
-                spin = np.array([1 if b == 0 else -1 for b in bits])
-                E = np.sum(self.encoder.h * spin)
-                for i in range(n):
-                    for j in range(i+1, n):
-                        E += self.encoder.J[i, j] * spin[i] * spin[j]
-                H_ising[state_idx, state_idx] = E
-            # Build field matrix
-            def build_field(Gamma):
-                Hf = np.zeros((dim, dim))
-                for i in range(n):
-                    for state_idx in range(dim):
-                        flipped = state_idx ^ (1 << i)
-                        Hf[state_idx, flipped] -= Gamma
-                return Hf
-            # Time evolution
-            psi = np.ones(dim) / np.sqrt(dim)
-            dt = 0.05
-            steps = params.get('steps', 100)
-            Gamma_start = params.get('Gamma_start', 5.0)
-            Gamma_end = params.get('Gamma_end', 0.1)
-            for step in range(steps):
-                t = step / steps
-                Gamma = Gamma_start * (Gamma_end / Gamma_start) ** t
-                H_total = H_ising + build_field(Gamma)
-                U = expm(-1j * H_total * dt)
-                psi = U @ psi
-            # Compute final energy and ground state prob
-            probs = np.abs(psi)**2
-            eigvals, eigvecs = np.linalg.eigh(H_ising)
-            ground_state = eigvecs[:, 0]
-            prob_ground = np.abs(np.conj(ground_state).T @ psi)**2
-            E_exp = np.real(np.conj(psi).T @ H_ising @ psi)
+            qc = QuantumMandalaComputer(golden_depth=1, sacred_geometry=8)
+            result = qc.transverse_field_ising_anneal(
+                self.J, self.h,
+                Gamma_start=params.get('Gamma_start', 5.0),
+                Gamma_end=params.get('Gamma_end', 0.1),
+                steps=params.get('steps', 100),
+            )
             self.results.append({
                 'params': params,
-                'energy': E_exp,
-                'prob_ground': prob_ground,
-                'best_state': np.argmax(probs)
+                'energy': result['final_energy'],
+                'prob_ground': result['history']['ground_prob'][-1],
+                'best_state': result['measured_state'],
             })
         return self.results
 
 # -------------------------------------------------------------------
-# 7. Unified Explorer v4
+# 4. Unified Explorer v4
 # -------------------------------------------------------------------
 class MandalaExplorerV4:
     def __init__(self):
@@ -302,77 +124,31 @@ class MandalaExplorerV4:
         self.encoder._init_problem()
 
         if solver == 'quantum_circuit':
-            # Use exact diagonalization
-            from scipy.linalg import expm
-            n = qubits
-            dim = 2**n
-            # Build H_ising
-            H_ising = np.zeros((dim, dim))
-            for state_idx in range(dim):
-                bits = [(state_idx >> i) & 1 for i in range(n)]
-                spin = np.array([1 if b == 0 else -1 for b in bits])
-                E = np.sum(self.encoder.h * spin)
-                for i in range(n):
-                    for j in range(i+1, n):
-                        E += self.encoder.J[i, j] * spin[i] * spin[j]
-                H_ising[state_idx, state_idx] = E
-            # Build field
-            def build_field(Gamma):
-                Hf = np.zeros((dim, dim))
-                for i in range(n):
-                    for state_idx in range(dim):
-                        flipped = state_idx ^ (1 << i)
-                        Hf[state_idx, flipped] -= Gamma
-                return Hf
-            # Time evolution
-            psi = np.ones(dim) / np.sqrt(dim)
-            dt = 0.05
-            self.history = {'energy': [], 'ground_prob': [], 'Gamma': [], 'noise': []}
-            for step in range(steps):
-                t = step / steps
-                Gamma = Gamma_start * (Gamma_end / Gamma_start) ** t
-                H_total = H_ising + build_field(Gamma)
-                U = expm(-1j * H_total * dt)
-                psi = U @ psi
-                # Apply noise if requested
-                if use_noise:
-                    # Simplified noise: dephase probability proportional to dt
-                    p = dt * 0.01  # small noise
-                    if p > 0:
-                        # Add random phase to each amplitude (dephasing)
-                        noise = np.exp(1j * 2 * np.pi * np.random.randn(dim) * np.sqrt(p))
-                        psi = psi * noise
-                        # Renormalize
-                        psi = psi / np.linalg.norm(psi)
-                # Record
-                E_exp = np.real(np.conj(psi).T @ H_ising @ psi)
-                # Ground state probability
-                eigvals, eigvecs = np.linalg.eigh(H_ising)
-                ground_state = eigvecs[:, 0]
-                prob_ground = np.abs(np.conj(ground_state).T @ psi)**2
-                self.history['energy'].append(E_exp)
-                self.history['ground_prob'].append(prob_ground)
-                self.history['Gamma'].append(Gamma)
-                self.history['noise'].append(use_noise)
-            # Final measurement
-            probs = np.abs(psi)**2
-            most_likely = np.argmax(probs)
-            # Convert to glyph state
-            spin = np.array([1 if (most_likely >> i) & 1 == 0 else -1 for i in range(n)])
-            glyph_state = np.array([4 if s == 1 else 0 for s in spin])
+            qc = QuantumMandalaComputer(golden_depth=1, sacred_geometry=8)
+            result = qc.transverse_field_ising_anneal(
+                self.encoder.J, self.encoder.h,
+                Gamma_start=Gamma_start, Gamma_end=Gamma_end, steps=steps,
+                use_noise=use_noise,
+            )
+            self.history = result['history']
+            self.probs = result['probs']
+            self.ground_energy = result['ground_energy']
+            glyph_state = np.array([4 if s == 1 else 0 for s in result['spin_config']])
             self.best_state = glyph_state
             self.best_energy = self.encoder.energy(glyph_state)
             self.result = self.encoder.decode_solution(glyph_state)
-            self.probs = probs
-            self.ground_energy = eigvals[0]
 
         elif solver == 'trotter_suzuki_qmc':
-            qmc = TrotterSuzukiQMC(self.encoder, trotter_steps, beta, sweeps=steps)
-            glyph_state, best_E = qmc.solve()
+            qc = QuantumMandalaComputer(golden_depth=1, sacred_geometry=8)
+            result = qc.trotter_suzuki_qmc(
+                self.encoder.J, self.encoder.h,
+                trotter_steps=trotter_steps, beta=beta, sweeps=steps,
+            )
+            glyph_state = np.array([4 if s == 1 else 0 for s in result['spin_config']])
             self.best_state = glyph_state
-            self.best_energy = best_E
+            self.best_energy = result['final_energy']
             self.result = self.encoder.decode_solution(glyph_state)
-            self.history = qmc.history
+            self.history = result['history']
 
         elif solver == 'parameter_sweep':
             if not sweep:
@@ -385,7 +161,7 @@ class MandalaExplorerV4:
                 'Gamma_end': np.linspace(0.01, 1, 5),
                 'steps': [50, 100, 200]
             }
-            sweeper = ParameterSweep(self.encoder, param_grid)
+            sweeper = ParameterSweep(self.encoder.J, self.encoder.h, param_grid)
             results = sweeper.run()
             self.sweep_results = results
             # Find best
@@ -399,7 +175,7 @@ class MandalaExplorerV4:
 
         # Qiskit export
         if export_qiskit and problem_type == 'ising':
-            qasm = export_to_qiskit(self.encoder, Gamma_start, Gamma_end, steps)
+            qasm = export_ising_qiskit(self.encoder.J, self.encoder.h, Gamma_start, Gamma_end, steps)
             self.qasm = qasm
             print("Generated Qiskit OpenQASM:")
             print(qasm)
@@ -530,7 +306,7 @@ class MandalaExplorerV4:
         return fig
 
 # -------------------------------------------------------------------
-# 8. Interactive UI (updated for v4)
+# 5. Interactive UI (updated for v4)
 # -------------------------------------------------------------------
 explorer = MandalaExplorerV4()
 output = Output()
@@ -587,7 +363,7 @@ reset_button.on_click(on_reset_clicked)
 
 ui = VBox([
     HTML("<h2>🧘 Mandala Computing Explorer v4</h2>"),
-    HTML("<i>Qiskit Export · Noise Model · Trotter-Suzuki QMC · Parameter Sweep</i>"),
+    HTML("<i>Qiskit Export · Trotter-Suzuki QMC · Parameter Sweep</i>"),
     HBox([problem_dropdown, qubits_slider]),
     HBox([solver_dropdown, Gamma_start_slider, Gamma_end_slider]),
     HBox([steps_slider, trotter_slider, beta_slider]),
@@ -600,7 +376,7 @@ display(ui)
 print("🚀 Mandala Explorer v4 loaded. Click 'Run Simulation' to start.")
 
 # -------------------------------------------------------------------
-# 9. Default demo: 4-qubit Ising with noise and export
+# 6. Default demo: 4-qubit Ising with noise and export
 # -------------------------------------------------------------------
 print("\n🧪 Running default: 4-qubit Ising with quantum circuit, noise, and Qiskit export...")
 run_interactive('ising', 4, 'quantum_circuit', 5.0, 0.1, 100, 20, 1.0, True, True, False)
