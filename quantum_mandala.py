@@ -897,6 +897,156 @@ class QuantumMandalaComputer:
         }
 
     # ------------------------------------------------------------------
+    # Ising spin-glass annealing (native qubit space)
+    #
+    # The octahedral Hamiltonian builders above operate on 8-level cells
+    # (8^num_cells dim), which is the wrong Hilbert space for a spin-glass
+    # Ising model — that's natively 2-level per site (2^n dim). These
+    # methods give Ising problems their own exact home in the quantum
+    # engine instead of forcing them into unused octahedral states.
+    # ------------------------------------------------------------------
+
+    def _build_ising_hamiltonian(self, J: np.ndarray, h: np.ndarray) -> np.ndarray:
+        """Diagonal Ising Hamiltonian over n qubits (2^n dim). bit=0 -> spin +1."""
+        n = len(h)
+        dim = 2 ** n
+        H = np.zeros(dim)
+        for state_idx in range(dim):
+            bits = [(state_idx >> i) & 1 for i in range(n)]
+            spin = np.array([1 if b == 0 else -1 for b in bits])
+            E = np.sum(h * spin)
+            for i in range(n):
+                for j in range(i + 1, n):
+                    E += J[i, j] * spin[i] * spin[j]
+            H[state_idx] = E
+        return np.diag(H).astype(complex)
+
+    def _build_transverse_field(self, n: int, Gamma: float) -> np.ndarray:
+        """Sum-of-X transverse field over n qubits (2^n dim)."""
+        dim = 2 ** n
+        Hf = np.zeros((dim, dim))
+        for i in range(n):
+            for state_idx in range(dim):
+                flipped = state_idx ^ (1 << i)
+                Hf[state_idx, flipped] -= Gamma
+        return Hf.astype(complex)
+
+    def transverse_field_ising_anneal(self, J: np.ndarray, h: np.ndarray,
+                                      Gamma_start: float = 5.0, Gamma_end: float = 0.1,
+                                      steps: int = 100, dt: float = 0.05,
+                                      use_noise: bool = False,
+                                      noise_strength: float = 0.01) -> Dict:
+        """
+        Adiabatic transverse-field annealing of a spin-glass Ising model.
+
+        H(t) = H_ising - Gamma(t) * sum_i X_i, Gamma log-interpolated from
+        Gamma_start to Gamma_end. Exact diagonalization/evolution over the
+        full 2^n qubit Hilbert space (n = len(h)).
+        """
+        n = len(h)
+        print(f"\n   Transverse-field Ising anneal: {n} qubits, {steps} steps")
+        H_ising = self._build_ising_hamiltonian(J, h)
+        dim = 2 ** n
+        eigvals, eigvecs = np.linalg.eigh(H_ising)
+        ground_state = eigvecs[:, 0]
+
+        psi = np.ones(dim, dtype=complex) / np.sqrt(dim)
+        history = {"energy": [], "ground_prob": [], "Gamma": []}
+
+        for step in range(steps):
+            t = step / max(steps - 1, 1)
+            Gamma = Gamma_start * (Gamma_end / Gamma_start) ** t
+            H_total = H_ising + self._build_transverse_field(n, Gamma)
+            U = self._matrix_exponential(-1j * H_total * dt)
+            psi = U @ psi
+            psi /= np.linalg.norm(psi)
+
+            if use_noise:
+                p = dt * noise_strength
+                if p > 0:
+                    noise = np.exp(1j * 2 * np.pi * np.random.randn(dim) * np.sqrt(p))
+                    psi = psi * noise
+                    psi /= np.linalg.norm(psi)
+
+            energy = float(np.real(np.conj(psi) @ H_ising @ psi))
+            prob_ground = float(np.abs(np.conj(ground_state) @ psi) ** 2)
+            history["energy"].append(energy)
+            history["ground_prob"].append(prob_ground)
+            history["Gamma"].append(Gamma)
+            if step % 20 == 0:
+                self._emit_sensor("energy.total", step, energy)
+                self._emit_sensor("quantum.ground_prob", step, prob_ground)
+                self.energy_history.append(energy)
+                print(f"   Step {step:>4d}: E={energy:.4f}  ground_prob={prob_ground:.4f}  Gamma={Gamma:.3f}")
+
+        probs = np.abs(psi) ** 2
+        measured = int(np.argmax(probs))
+        spin = np.array([1 if (measured >> i) & 1 == 0 else -1 for i in range(n)])
+        print(f"   Final energy: {history['energy'][-1]:.4f}  ground energy: {float(eigvals[0]):.4f}")
+        return {
+            "measured_state": measured,
+            "spin_config": spin.tolist(),
+            "probs": probs,
+            "history": history,
+            "ground_energy": float(eigvals[0]),
+            "final_energy": history["energy"][-1],
+        }
+
+    def trotter_suzuki_qmc(self, J: np.ndarray, h: np.ndarray,
+                           trotter_steps: int = 20, beta: float = 1.0,
+                           sweeps: int = 1000) -> Dict:
+        """
+        Trotter-Suzuki path-integral quantum Monte Carlo for the same Ising
+        model: imaginary-time slices of classical spin configurations,
+        Metropolis-sampled. Alternate route to the ground state compared to
+        real-time transverse-field annealing above.
+        """
+        n = len(h)
+        print(f"\n   Trotter-Suzuki QMC: {n} qubits, {trotter_steps} slices, {sweeps} sweeps")
+        path = np.random.choice([-1, 1], size=(trotter_steps, n))
+
+        def action(path):
+            E = 0.0
+            for t in range(trotter_steps):
+                spin = path[t]
+                E_slice = np.sum(h * spin)
+                for i in range(n):
+                    for j in range(i + 1, n):
+                        E_slice += J[i, j] * spin[i] * spin[j]
+                E += E_slice / trotter_steps
+            return E
+
+        current_E = action(path)
+        best_E = current_E
+        best_path = path.copy()
+        history = {"energy": []}
+
+        for sweep in range(sweeps):
+            t = np.random.randint(0, trotter_steps)
+            i = np.random.randint(0, n)
+            new_path = path.copy()
+            new_path[t, i] *= -1
+            new_E = action(new_path)
+            delta = new_E - current_E
+            if delta < 0 or np.random.rand() < np.exp(-delta * beta):
+                path = new_path
+                current_E = new_E
+                if current_E < best_E:
+                    best_E = current_E
+                    best_path = path.copy()
+            history["energy"].append(current_E)
+            if sweep % max(sweeps // 10, 1) == 0:
+                self._emit_sensor("energy.total", sweep, current_E)
+
+        best_spin = best_path[0]
+        print(f"   Final energy: {best_E:.4f}")
+        return {
+            "spin_config": best_spin.tolist(),
+            "history": history,
+            "final_energy": best_E,
+        }
+
+    # ------------------------------------------------------------------
     # Solution extraction
     # ------------------------------------------------------------------
 
@@ -941,6 +1091,56 @@ class QuantumMandalaComputer:
         if self.num_cells > max_cells:
             parts.append("...")
         return "".join(parts)
+
+
+# ---------------------------------------------------------------------------
+# Ising -> Qiskit export (module-level: pure code generation, no quantum state)
+# ---------------------------------------------------------------------------
+
+def export_ising_qiskit(J: np.ndarray, h: np.ndarray,
+                        Gamma_start: float = 5.0, Gamma_end: float = 0.1,
+                        steps: int = 100, dt: float = 0.05) -> str:
+    """Generate an OpenQASM 2.0 circuit for transverse-field Ising annealing
+    via first-order Trotter-Suzuki decomposition."""
+    n = len(h)
+    qasm = "// Mandala Ising Model with Transverse Field\n"
+    qasm += f"// qubits: {n}\n"
+    qasm += f"// Annealing schedule: Gamma from {Gamma_start} to {Gamma_end} over {steps} steps\n\n"
+    qasm += "OPENQASM 2.0;\n"
+    qasm += "include \"qelib1.inc\";\n"
+    qasm += f"qreg q[{n}];\n"
+    qasm += f"creg c[{n}];\n\n"
+
+    for i in range(n):
+        qasm += f"h q[{i}];\n"
+
+    for step in range(steps):
+        t = step / steps
+        Gamma = Gamma_start * (Gamma_end / Gamma_start) ** t
+
+        field_angle = -2 * Gamma * dt  # RX(theta) = exp(-i theta/2 sigma_x)
+        for i in range(n):
+            qasm += f"rx({field_angle:.6f}) q[{i}];\n"
+
+        for i in range(n):
+            if h[i] != 0:
+                angle = -2 * h[i] * dt
+                qasm += f"rz({angle:.6f}) q[{i}];\n"
+        for i in range(n):
+            for j in range(i + 1, n):
+                if J[i, j] != 0:
+                    angle = -2 * J[i, j] * dt
+                    qasm += f"cx q[{i}], q[{j}];\n"
+                    qasm += f"rz({angle:.6f}) q[{j}];\n"
+                    qasm += f"cx q[{i}], q[{j}];\n"
+
+        for i in range(n):
+            qasm += f"rx({field_angle:.6f}) q[{i}];\n"
+
+    for i in range(n):
+        qasm += f"measure q[{i}] -> c[{i}];\n"
+
+    return qasm
 
 
 # ============================================================================
@@ -1084,6 +1284,25 @@ def demo_fret_coupling():
     return H_fret
 
 
+def demo_ising_annealing():
+    """Transverse-field Ising annealing over native qubit space."""
+    print("\n" + "=" * 60)
+    print("QUANTUM DEMO: TRANSVERSE-FIELD ISING ANNEALING")
+    print("=" * 60)
+    np.random.seed(42)
+    n = 4
+    J = np.random.randn(n, n) * 2
+    J = (J + J.T) / 2
+    np.fill_diagonal(J, 0)
+    h = np.random.randn(n) * 2
+
+    qc = QuantumMandalaComputer(golden_depth=1, sacred_geometry=8)
+    result = qc.transverse_field_ising_anneal(J, h, steps=100)
+    print(f"\n   Spin config: {result['spin_config']}")
+    print(f"   Final energy: {result['final_energy']:.4f}, ground energy: {result['ground_energy']:.4f}")
+    return result
+
+
 if __name__ == "__main__":
     print("=" * 60)
     print("QUANTUM MANDALA COMPUTING v2.0")
@@ -1097,6 +1316,7 @@ if __name__ == "__main__":
     demo_entangled_annealing()
     demo_fret_coupling()
     demo_thermal_bridge()
+    demo_ising_annealing()
 
     print("\n" + "=" * 60)
     print("ALL QUANTUM DEMONSTRATIONS COMPLETE")
