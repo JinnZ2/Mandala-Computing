@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """
-Adaptive Geometric Computation Selector with LLM Interface
-===========================================================
+Geometric Computation Selector (adaptive, with LLM interface)
+===============================================================
+Supersedes geometric_computation_selector_v2.py:
 - Selects optimal method based on problem characteristics + learned benchmarks.
 - Learns from actual runtimes (adaptive scoring).
 - Provides LLM harness with natural language ↔ compact grammar translation.
+- Includes the 3D Bloom Cube probabilistic geometric cancellation method.
 """
 
 import json
@@ -94,6 +96,66 @@ METHODS = [
 ]
 
 # ----------------------------------------------------------------------
+# 3D Bloom Cube Implementation (sketch, ported from v2)
+# ----------------------------------------------------------------------
+class BloomCube3D:
+    """
+    A 3D cube where each cell contains a Bloom filter of octahedral state hashes.
+    """
+    def __init__(self, side=16, filter_bits=1024, num_hashes=3):
+        self.side = side
+        self.filter_bits = filter_bits
+        self.num_hashes = num_hashes
+        # 3D array of bit arrays
+        self.cells = [[[[0] * ((filter_bits + 63) // 64) for _ in range(side)]
+                       for _ in range(side)] for _ in range(side)]
+
+    def _hash(self, key, seed):
+        h = hashlib.sha256(f"{key}{seed}".encode()).hexdigest()
+        return int(h[:8], 16) % self.filter_bits
+
+    def _set_bit(self, cell, bit):
+        idx = bit // 64
+        mask = 1 << (bit % 64)
+        self.cells[cell[0]][cell[1]][cell[2]][idx] |= mask
+
+    def _get_bit(self, cell, bit):
+        idx = bit // 64
+        mask = 1 << (bit % 64)
+        return (self.cells[cell[0]][cell[1]][cell[2]][idx] & mask) != 0
+
+    def add(self, state_vector, relation_index):
+        """
+        state_vector: tuple of octahedral state integers (0-7)
+        We map the state vector to a set of cells using a space-filling curve (e.g., Hilbert).
+        Simplified: use 3 consecutive states as coordinates.
+        """
+        for i in range(0, len(state_vector)-2, 3):
+            x = state_vector[i] % self.side
+            y = state_vector[i+1] % self.side
+            z = state_vector[i+2] % self.side
+            cell = (x, y, z)
+            # For each hash, set bits in this cell
+            for seed in range(self.num_hashes):
+                bit = self._hash(relation_index, seed)
+                self._set_bit(cell, bit)
+
+    def query(self, state_vector, relation_index):
+        """
+        Returns True if relation_index already present (likely duplicate/cancel).
+        """
+        for i in range(0, len(state_vector)-2, 3):
+            x = state_vector[i] % self.side
+            y = state_vector[i+1] % self.side
+            z = state_vector[i+2] % self.side
+            cell = (x, y, z)
+            for seed in range(self.num_hashes):
+                bit = self._hash(relation_index, seed)
+                if not self._get_bit(cell, bit):
+                    return False
+        return True
+
+# ----------------------------------------------------------------------
 # Benchmark collector & adaptive scorer
 # ----------------------------------------------------------------------
 class BenchmarkCollector:
@@ -179,7 +241,9 @@ class AdaptiveScorer:
             score = math.sqrt(problem.size)
         else:
             score = problem.size ** 2
-        # Adjust for sparsity and parallelism
+        # Adjust for sparsity, parallelism, and bloom_cube_3d's large-scale advantage
+        if method.name == "bloom_cube_3d" and problem.size > 10000:
+            score *= 0.5   # excellent for large scale
         if problem.sparsity < 0.05 and "sparse" in method.name.lower():
             score *= 0.6
         if method.parallel:

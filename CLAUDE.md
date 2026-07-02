@@ -298,6 +298,28 @@ Domain intersection rules (each registers with MandalaRuntime):
 (ternary, quantum, stochastic, neuromorphic, reservoir, memristive,
 approximate) across all encoder domains.
 
+### mandala-computing-module (`mandala_computing_module.py`)
+
+Cross-model schema module (CC0). Declares Mandala-Computing's compression
+mechanism — scale-tuning as compression over octahedral energy landscapes —
+in falsifiable, structured form so any AI assistant loading this module
+operates from the actual repo structure rather than an institutional
+reframe. Companion to `claim_schema.py` / `claim_validator.py`.
+
+**key classes:** `ScaleTuningApparatus` plus repo-identity constants
+(`REPO_URL`, `REPO_COMMITS`, `TEST_COUNT`, `MODULE_COUNT`)
+
+### mandala-scale-invariance-breakdown (`mandala_scale_invariance_breakdown.py`)
+
+Mandala-Computing-specific instantiation of the generic
+`scale_invariance_breakdown.py` epistemology pattern (CC0). Identifies
+candidate locations where genuine non-scale-invariance might appear in the
+framework (e.g. classical/quantum solver transitions), each paired with an
+experiment and a falsifier — applying the three-tier proof protocol to
+computational substrates.
+
+**key classes:** `CandidateBreakdown`, `REPO_CANDIDATES`
+
 ---
 
 ## mathematical-framework
