@@ -108,7 +108,7 @@ python examples/example-math.py
 # Quick factorization via simulator
 python -c "from mandala_simulator import MandalaSimulator; MandalaSimulator().factor(143)"
 
-# Full test suite (45 tests)
+# Full test suite (336 tests)
 python tests/test_core.py
 ```
 

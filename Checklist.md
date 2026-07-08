@@ -130,6 +130,7 @@ Based on reviewing the base components, here’s what needs to be verified/compl
 ### 1. Missing Code: Bridge → Substrate
 
 ```python
+# SKETCH — not implemented in this repo
 class BridgeToSubstrateAdapter:
     """
     MISSING: Convert bridge outputs to octahedral states
@@ -148,6 +149,7 @@ class BridgeToSubstrateAdapter:
 ### 2. Missing Code: Engine → Substrate Integration
 
 ```python
+# SKETCH — not implemented in this repo
 class GeometricEngineWithSubstrate(GeometricEngine):
     """
     MISSING: Engine that processes via physical substrate
@@ -166,6 +168,9 @@ class GeometricEngineWithSubstrate(GeometricEngine):
 ### 3. Missing Code: Mandala Simulator Upgrade
 
 ```python
+# SKETCH — a PhysicalMandalaComputer class does exist, but in
+# examples/example-physical-computer.py, not as a subclass of the real
+# MandalaComputer the way this sketch shows.
 class PhysicalMandalaComputer(MandalaComputer):
     """
     PARTIALLY DONE: Replace symbolic with physical
@@ -203,6 +208,7 @@ Need walkthrough:
 ### 6. Missing: Hardware Control Interface
 
 ```python
+# SKETCH — not implemented in this repo (no physical hardware exists to control)
 class OctahedralSubstrateController:
     """
     MISSING: Low-level hardware control
@@ -307,6 +313,7 @@ class OctahedralSubstrateController:
 ### Step 4: Create Reference Implementation (2-3 weeks)
 
 ```python
+# SKETCH — not implemented in this repo
 # Software simulator that behaves like real hardware:
 class OctahedralSubstrateSimulator:
     """

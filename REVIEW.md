@@ -18,6 +18,35 @@ descriptions.
 
 ---
 
+## Resolution Log
+
+All Section 1 (Inconsistencies) findings, and the related Section 2 findings that had a
+concrete fix, have been addressed in a follow-up pass. Decisions that required a judgment
+call were resolved by asking the repo owner; every item below reached a resolution — none
+were left unresolved.
+
+| Finding | Resolution |
+|---|---|
+| 1.1 Glyph set inconsistency (`mandala_computing_explorer.py:21`) | Fixed: now imports canonical `GLYPHS` from `octahedral_arithmetic.py` instead of redefining an unrelated set. |
+| 1.2 Stale "45 tests / 10 modules" claims | Owner chose "update to current numbers." Fixed in `README.md` (4 spots), `Integration.md`, `Mandala-octahedral.md`, `P=np-hypothesis.md`, plus two instances the original grep missed because it only checked `.md` files: `mandala_computing_module.py:458` (now reads live `TEST_COUNT`/`MODULE_COUNT` constants instead of a hardcoded string) and `mandala_scale_invariance_breakdown.py:311` (also fixed an adjacent "six classes" vs. five-generic-classes mismatch found while editing). |
+| 1.3 `ONBOARDING.md` stale module count | Fixed: heading reworded to "Modules on This Learning Path" with an explicit pointer to `CLAUDE.md` for the full list. |
+| 1.4 `Integration.md` conceptual/real contradiction | Owner chose "relabel as conceptual." Fixed: the "What You Can Do RIGHT NOW" block now separates the two real imports from the conceptual `UniversalBridgeAdapter`/`PhysicalMandalaComputer` example, which is now explicitly marked conceptual with a pointer to where `PhysicalMandalaComputer` actually lives (`examples/example-physical-computer.py`). |
+| 1.5 / 2.1 `consciousness_metrics.py` contradiction | Fixed in both `Mandala_integration.md` and `Quantum_integration.md`: relabeled "Built into simulator" as "Illustrative only — not implemented in this repo," pointing to `README.md`'s "What This Does NOT Do." |
+| 1.6 `PROJECTS.md` missing BioGrid2.0 | Fixed: added an entry noting it consumes `glyphs/mandala.json` / `atlas/shapes.json` directly. |
+| 2.2 Unattributed `scale_invariance_breakdown.py` reference | Owner chose to write the generic pattern file rather than just attribute it externally. Added `scale_invariance_breakdown.py` (CC0) at repo root, defining the five generic breakdown classes, the three-tier proof protocol, and the shared `CandidateBreakdown`/`FalsifiableClaim`/`AuditGate` dataclasses. `mandala_scale_invariance_breakdown.py` now imports these instead of redefining them locally. |
+| 2.3 `Checklist.md`/`Integration.md` contradictory completion % | Fixed: added a one-line note at the top of `Integration.md` stating it supersedes `Checklist.md`'s roadmap. |
+| 2.4 No `CHANGELOG.md` | Owner chose full scope. Added `CHANGELOG.md`, grounded in actual git history (dates and themes derived from `git log`, not invented). |
+| 2.5 `README.md` Quick Start missing `experiments/` | Fixed: added a pointer line after the Quick Start code block. |
+| 2.6 Unlabeled speculative code blocks | Owner chose full scope. Added `# SKETCH — not implemented in this repo` labels to the class/import-bearing code blocks in `Checklist.md`, and a single explanatory note at the top of `Questions.md` (its blocks are illustrative companions to real, differently-named code in `examples/example-questions.py`, not missing features — a more precise label than a blanket "not implemented"). |
+| 2.7 No `CONTRIBUTING.md` | Owner chose full scope. Added `CONTRIBUTING.md` covering test running, coding conventions, where new files belong, the claim-schema registration process, and the SKETCH-labeling convention. |
+
+Sections 3–6 (Code Audit, Organizational Structure, Limitations Checklist, Discoverability)
+were left as findings/recommendations rather than applied — the request that produced this
+log was scoped to inconsistencies and the markdown gaps with concrete fixes. They remain
+open follow-up items below.
+
+---
+
 ## 1. Inconsistencies
 
 ### 1.1 Two unrelated glyph sets both claim to represent the 8 octahedral states

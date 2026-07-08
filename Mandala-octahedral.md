@@ -19,7 +19,7 @@ not built). The mapping is architecturally coherent but physically unvalidated.
 - 8 octahedral states encode problems as energy landscapes
 - Simulated annealing finds ground states for small instances (N < 500)
 - Multi-cell registers extend factor range via base-8 positional encoding
-- 45 tests verify the software stack
+- 336 tests verify the software stack
 
 **What is hypothesized (not proven):**
 - Silicon can support 8 distinct tensor configurations at room temperature

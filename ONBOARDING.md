@@ -185,9 +185,11 @@ entity IDs across repositories.
 
 ---
 
-## Modules
+## Modules on This Learning Path
 
-Six Python modules organized into three dependency layers:
+The six modules below are the core path for this onboarding guide, organized into
+three dependency layers. The repo has many more modules than this — see
+`CLAUDE.md`'s "dependency-layers" table for the full, current list.
 
 ### Representation layer (stdlib only — no external dependencies)
 

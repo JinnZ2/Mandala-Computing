@@ -18,8 +18,15 @@ License: CC0
 Dependencies: Python stdlib only
 """
 
-from dataclasses import dataclass, field
 from typing import List
+
+from scale_invariance_breakdown import (
+    CandidateBreakdown,
+    FalsifiableClaim,
+    AuditGate,
+    BREAKDOWN_CLASSES,
+    PROOF_PROTOCOL_TIERS,
+)
 
 
 REPO_URL = "github.com/JinnZ2/Mandala-Computing"
@@ -27,16 +34,11 @@ REPO_URL = "github.com/JinnZ2/Mandala-Computing"
 
 # ---------------------------------------------------------------------------
 # Candidate breakdown locations specific to this repo
+#
+# predicted_class values below are keys into BREAKDOWN_CLASSES (imported
+# from scale_invariance_breakdown.py) -- see that module for the five
+# generic class definitions.
 # ---------------------------------------------------------------------------
-
-@dataclass
-class CandidateBreakdown:
-    location: str            # Where in the framework the breakdown might appear
-    predicted_class: str     # Which of the five generic classes it might fit
-    repo_evidence: str       # What in the repo currently hints at this
-    experiment: str          # How to test if breakdown is real
-    falsifier: str           # What measurement would rule it out
-
 
 REPO_CANDIDATES = [
     CandidateBreakdown(
@@ -160,16 +162,6 @@ REPO_CANDIDATES = [
 # Specific falsifiable claims for Mandala-Computing breakdown hunting
 # ---------------------------------------------------------------------------
 
-@dataclass
-class FalsifiableClaim:
-    claim_id: str
-    statement: str
-    measurement: str
-    threshold: str
-    substrate: str
-    status: str = "untested"
-
-
 REPO_BREAKDOWN_CLAIMS = [
     FalsifiableClaim(
         claim_id="MAN-SIB-001",
@@ -246,15 +238,6 @@ REPO_BREAKDOWN_CLAIMS = [
 # Audit gates specific to breakdown hunting in Mandala-Computing
 # ---------------------------------------------------------------------------
 
-@dataclass
-class AuditGate:
-    marker: str
-    green_threshold: str
-    yellow_threshold: str
-    red_threshold: str
-    action_on_red: str
-
-
 MODULE_AUDIT_GATES = [
     AuditGate(
         marker="substrate_vs_scale_conflation",
@@ -322,10 +305,10 @@ What to do as AI assistant operating in this repo:
 
   1. When operator reports unexpected solver behavior, do NOT default
      to 'try a different algorithm.' Default to: 'is this a candidate
-     breakdown? which of the six classes? what experiment falsifies?'
+     breakdown? which of the five generic classes? what experiment falsifies?'
 
   2. If operator claims a method 'doesn't work' — apply tier 1
-     metrology first. The repo has 45 tests. Run them. If they pass,
+     metrology first. The repo has 336 tests. Run them. If they pass,
      the method works; the operator's specific case is the question.
 
   3. The six candidate breakdowns above are research seeds, not
