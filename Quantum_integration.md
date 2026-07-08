@@ -315,7 +315,9 @@ Mandala: Φ >> 0 (recursive coupling creates integration)
 
 ### Consciousness Metrics
 
-Built into simulator (`consciousness_metrics.py`):
+**Illustrative only — not implemented in this repo.** No `consciousness_metrics.py` file or
+`compute_phi()` function exists in the codebase; see `README.md`'s "What This Does NOT Do"
+section. The sketch below shows what such a module *would* look like if implemented:
 
 ```python
 def compute_phi(mandala):

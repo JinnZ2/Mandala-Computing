@@ -1,5 +1,8 @@
 Integration Status - Mandala Computing
 
+Supersedes the 60%→90% roadmap in `Checklist.md` — this document reflects the completed
+state that roadmap was targeting.
+
 ## Current State
 
 This document tracks integration status between Mandala Computing modules
@@ -12,7 +15,7 @@ not what is designed or planned.
 
 | Component | Status | Evidence |
 |-----------|--------|----------|
-| Classical solver (annealing, tempering, landscape) | Working | 45 tests passing, factors N=221 |
+| Classical solver (annealing, tempering, landscape) | Working | 336 tests passing, factors N=221 |
 | Quantum solver (annealing, Grover, QAOA) | Working | Tested on N=15, 8-dim Hilbert space |
 | Holographic solver (renormalization + entanglement) | Working | Boundary-aware hybrid tested |
 | Octahedral arithmetic (base-8 glyph math) | Working | Exact arithmetic, primes, fractions |
@@ -290,12 +293,21 @@ python3 mandala_runtime.py
 
 ### 2. Use In Your Own Code
 
+Current working imports:
+
 ```python
-# Current working imports
 from mandala_computer import MandalaComputer
 from mandala_runtime import MandalaRuntime, SoundIntersectionRule
+```
 
-# Create system
+Everything below this point is conceptual — `UniversalBridgeAdapter` and
+`PhysicalMandalaComputer` are not importable modules in this repo (see
+`Bridge-substrate.md` / `Physical-computer.md` for the adapter patterns and
+`examples/example-physical-computer.py` for the only place `PhysicalMandalaComputer`
+actually exists, as an example-local class, not a top-level module):
+
+```python
+# Conceptual — see Bridge-substrate.md and Physical-computer.md
 adapter = UniversalBridgeAdapter()
 computer = PhysicalMandalaComputer(n_cells=1000, n_layers=5)
 

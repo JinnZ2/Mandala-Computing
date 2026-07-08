@@ -14,11 +14,12 @@ import warnings
 warnings.filterwarnings('ignore')
 
 from quantum_mandala import QuantumMandalaComputer, export_ising_qiskit
+from octahedral_arithmetic import GLYPHS
 
 # -------------------------------------------------------------------
-# 1. Constants and Glyphs (same as before)
+# 1. Constants and Glyphs (canonical octahedral state glyphs, shared
+#    with mandala_computer.py / quantum_mandala.py / glyphs/mandala.json)
 # -------------------------------------------------------------------
-GLYPHS = ['◈', '◉', '◊', '○', '●', '◐', '◑', '◒']
 def int_to_glyph(n, width=1):
     if n == 0:
         return GLYPHS[0]

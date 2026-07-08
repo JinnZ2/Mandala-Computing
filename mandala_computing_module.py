@@ -455,7 +455,7 @@ def module_bootstrap() -> str:
         "",
         "DO CLAIM:",
         "  - working simulators for factorization (N<=221), SAT, coloring, TSP",
-        "  - 45 tests passing across 10 modules",
+        f"  - {TEST_COUNT} tests passing across {MODULE_COUNT} modules",
         "  - scale-tuning apparatus for testing geometric-relaxation hypothesis",
     ]
     return "\n".join(lines)

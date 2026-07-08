@@ -1,5 +1,13 @@
 # Mandala-Octahedral Integration - Section 8: Limitations and Open Questions
 
+**Note on code in this document:** the classes below (`EncodingComplexityAnalyzer`,
+`GeometricEncodability`, `ThermalLimitAnalyzer`, `DecoherenceLimitAnalyzer`,
+`ValidationFramework`) are illustrative — they don't exist under these names in the
+shipped package. Equivalent, actually-runnable logic ships in
+`examples/example-questions.py` (`encoding_complexity()`, `thermal_error_rate()`,
+`bits_per_cell()`, `DecoherenceSpec`, `encodability_score()`) — run that file rather
+than copy-pasting from here.
+
 ## 8.1 Encoding Complexity Analysis
 
 ### The Encoding Bottleneck
