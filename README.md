@@ -27,7 +27,7 @@ print(result["solution"])
 
 ## What It Contains
 
-18 core Python modules, 336 tests (see `CLAUDE.md` for the full module list —
+19 core Python modules, 347 tests (see `CLAUDE.md` for the full module list —
 the table below is the essential subset for a first read):
 
 | Module | Role | Dependencies |
@@ -41,7 +41,8 @@ the table below is the essential subset for a first read):
 | `claim_validator.py` | Epistemological claim validation (4-tier) | stdlib |
 | `glyph_convert.py` | Human decimal-to-glyph converter | stdlib |
 | `mandala_simulator.py` | Lightweight entry point delegating to real engines | stdlib |
-| `tests/test_core.py` | 336-test suite across all modules | - |
+| `mandala_hook.py` | Expandable multi-ledger: residual-guided dimension expansion over the O_h lattice | numpy |
+| `tests/test_core.py` | 347-test suite across all modules | - |
 
 ---
 
@@ -167,7 +168,7 @@ python mandala_computer.py
 python quantum_mandala.py
 python holographic_mandala.py
 
-# Run tests (336 tests)
+# Run tests (347 tests)
 python tests/test_core.py
 
 # Benchmark all methods
@@ -212,7 +213,7 @@ MIT (JinnZ2). Open source. Contributions welcome.
 
 ## Status
 
-Research framework with working simulators. 18 core modules, 336 tests, all passing.
+Research framework with working simulators. 19 core modules, 347 tests, all passing.
 Classical and quantum solvers operational. Physical hardware: not built.
 The question is whether geometric relaxation offers computational advantage
 at scale. The framework exists to test that question.

@@ -308,7 +308,7 @@ What to do as AI assistant operating in this repo:
      breakdown? which of the five generic classes? what experiment falsifies?'
 
   2. If operator claims a method 'doesn't work' — apply tier 1
-     metrology first. The repo has 336 tests. Run them. If they pass,
+     metrology first. The repo has 347 tests. Run them. If they pass,
      the method works; the operator's specific case is the question.
 
   3. The six candidate breakdowns above are research seeds, not

@@ -3862,6 +3862,145 @@ def test_fabrication_summary():
     assert "stages" in s
 
 
+# ---------------------------------------------------------------------------
+# Mandala hook (ExpandableMultiLedger) tests
+# ---------------------------------------------------------------------------
+
+from mandala_hook import (MandalaConfig, SymmetryMandalaConfig,
+                          ExpandableMultiLedger, ResidualMonitor)
+
+
+def _leak_until_expanded(ledger, in_vec, out_vecs, max_windows=40):
+    """Feed identical leaky windows until the ledger expands; return record."""
+    for _ in range(max_windows):
+        ledger.post("in", in_vec, "injector")
+        for v in out_vecs:
+            ledger.post("out", v, "drain")
+        rec = ledger.close_window()
+        if rec["expanded"]:
+            return rec
+    return None
+
+
+def _spin_mandala():
+    return MandalaConfig(root_dim="charge",
+                         branches={"charge": ["spin", "valley"],
+                                   "spin": ["spin_x", "spin_y", "spin_z"]})
+
+
+def test_mandala_bfs_fallback_order():
+    """With no residual signal, expansion walks breadth-first from the root."""
+    m = _spin_mandala()
+    assert m.expand_dimension(["charge"], np.zeros(1), []) == "spin"
+    assert m.expand_dimension(["charge", "spin"], np.zeros(2), []) == "valley"
+    assert m.last_decision["strategy"] == "breadth_first"
+
+
+def test_mandala_residual_guided_selection():
+    """A residual concentrated in one component drills into that branch."""
+    m = _spin_mandala()
+    choice = m.expand_dimension(["charge", "spin"], np.array([0.0, 40.0]), [])
+    assert choice == "spin_x"
+    assert m.last_decision["strategy"] == "residual_guided"
+    assert m.last_decision["guided_by"] == "spin"
+
+
+def test_mandala_exhausted_returns_none():
+    m = _spin_mandala()
+    all_dims = ["charge", "spin", "valley", "spin_x", "spin_y", "spin_z"]
+    assert m.expand_dimension(all_dims, np.zeros(6), []) is None
+    assert m.last_decision["strategy"] == "exhausted"
+
+
+def test_monitor_phase_event_requires_persistence():
+    """One bad window must not fire the phase detector; a run of them must."""
+    mon = ResidualMonitor(tau=10.0, threshold=1.0, cusum_threshold=4.0)
+    _, phase = mon.feed(t=0.0, rel_residual=0.33, n_e_net=50.0)
+    assert phase is None, "single window fired the phase detector"
+    fired = False
+    for k in range(1, 30):
+        _, phase = mon.feed(t=float(k), rel_residual=0.33, n_e_net=50.0)
+        if phase is not None:
+            fired = True
+            break
+    assert fired, "persistent residual never fired the phase detector"
+
+
+def test_ledger_leak_expands_into_spin():
+    ledger = ExpandableMultiLedger(mandala=_spin_mandala(), initial_dim=1)
+    rec = _leak_until_expanded(ledger, [100.0], [[50.0]])
+    assert rec is not None and rec["new_dimension"] == "spin"
+    assert ledger.dim == 2 and ledger.labels == ["charge", "spin"]
+    # Retro-debt absorbed into the new environment dimension
+    assert ledger.env_balance[-1] == -50.0
+
+
+def test_ledger_reconciliation_closes():
+    ledger = ExpandableMultiLedger(mandala=_spin_mandala(), initial_dim=1)
+    _leak_until_expanded(ledger, [100.0], [[50.0]])
+    ledger.post("in", [100.0, 0.0], "injector")
+    ledger.post("out", [50.0, 0.0], "drain")
+    ledger.post("out", [50.0, 0.0], "spin_flip_channel")
+    ledger.post("in", [0.0, 50.0], "spin_reservoir_audit")
+    rec = ledger.close_window()
+    assert rec["closes"]
+    assert max(abs(r) for r in rec["residual"]) < 1e-9
+
+
+def test_ledger_guided_drill_prefers_leaky_branch():
+    """After charge->spin, a spin-component leak expands spin_x, not valley."""
+    ledger = ExpandableMultiLedger(mandala=_spin_mandala(), initial_dim=1)
+    _leak_until_expanded(ledger, [100.0], [[50.0]])
+    ledger.post("in", [100.0, 0.0], "injector")
+    ledger.post("out", [50.0, 0.0], "drain")
+    ledger.post("out", [50.0, 0.0], "spin_flip_channel")
+    ledger.post("in", [0.0, 50.0], "spin_reservoir_audit")
+    assert ledger.close_window()["closes"]
+    rec = _leak_until_expanded(ledger, [100.0, 40.0],
+                               [[50.0, 0.0], [50.0, 0.0]])
+    assert rec is not None and rec["new_dimension"] == "spin_x"
+    assert rec["expansion_reason"]["guided_by"] == "spin"
+
+
+def test_ledger_post_validates_dimension_and_direction():
+    ledger = ExpandableMultiLedger(mandala=_spin_mandala(), initial_dim=1)
+    try:
+        ledger.post("in", [1.0, 2.0], "bad")
+        assert False, "wrong-length vector accepted"
+    except ValueError:
+        pass
+    try:
+        ledger.post("sideways", [1.0], "bad")
+        assert False, "bad direction accepted"
+    except ValueError:
+        pass
+
+
+def test_symmetry_mandala_ten_classes():
+    """O_h-derived lattice has one dimension per conjugacy class (10)."""
+    m = SymmetryMandalaConfig(root_dim="charge")
+    all_dims = [m.root] + [d for kids in m.branches.values() for d in kids]
+    assert len(all_dims) == 10
+    assert len(set(all_dims)) == 10
+    assert set(m.branches["charge"]) == {"C4^2", "C2", "C3", "C4", "i"}
+
+
+def test_symmetry_mandala_parity_partners():
+    """Each proper rotation class branches to its inversion partner i.C."""
+    m = SymmetryMandalaConfig(root_dim="charge")
+    assert m.branches["C4"] == ["S4"]
+    assert m.branches["C4^2"] == ["sigma_h"]
+    assert m.branches["C3"] == ["S6"]
+    assert m.branches["C2"] == ["sigma_d"]
+
+
+def test_symmetry_mandala_covers_group():
+    """Class members across all 10 dimensions cover all 48 O_h elements."""
+    m = SymmetryMandalaConfig(root_dim="charge")
+    covered = sorted(i for members in m.class_members.values() for i in members)
+    assert covered == list(range(48))
+
+
 # Run all tests
 # ---------------------------------------------------------------------------
 

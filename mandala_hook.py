@@ -110,6 +110,8 @@ class MandalaConfig:
         for parent, children in self.branches.items():
             for child in children:
                 self.parent[child] = parent
+        # Provenance of the most recent expand_dimension decision
+        self.last_decision: Dict[str, Any] = {}
 
     def get_children(self, dim: str) -> List[str]:
         return self.branches.get(dim, [])
@@ -120,23 +122,142 @@ class MandalaConfig:
     def expand_dimension(self, current_labels: List[str], residual_vector: np.ndarray,
                          monitor_events: List[Dict]) -> Optional[str]:
         """Given the current set of dimension labels and a persistent residual,
-        decide which new dimension to add next. Default strategy:
-        start at the root and expand breadth-first. If a phase change is detected
-        in a particular component, follow that path.
+        decide which new dimension to add next.
 
-        Returns the label of the new dimension, or None if no expansion is possible."""
-        # Take the first missing child of the root or its descendants,
-        # breadth-first. A more sophisticated version would use the residual
-        # vector's largest component to pick which branch to follow.
+        Strategy, in order:
+        1. RESIDUAL-GUIDED: rank the currently monitored dimensions by the
+           magnitude of their residual component and drill into the first
+           unexplored child of the leakiest one. The leak tells you where
+           the hidden degree of freedom hangs off the lattice.
+        2. BREADTH-FIRST fallback: if no leaky dimension has unexplored
+           children, take the first missing child walking out from the root.
+
+        The reasoning behind the choice is recorded in self.last_decision.
+        Returns the label of the new dimension, or None if no expansion is
+        possible."""
+        # --- 1. residual-guided drill into the leakiest branch ---
+        if residual_vector is not None and len(residual_vector) == len(current_labels):
+            ranked = sorted(range(len(current_labels)),
+                            key=lambda i: -abs(float(residual_vector[i])))
+            for i in ranked:
+                component = float(residual_vector[i])
+                if component == 0.0:
+                    break  # remaining components carry no signal
+                label = current_labels[i]
+                for child in self.get_children(label):
+                    if child not in current_labels:
+                        self.last_decision = {
+                            "strategy": "residual_guided",
+                            "guided_by": label,
+                            "component_index": i,
+                            "component_residual": component,
+                        }
+                        return child
+
+        # --- 2. breadth-first fallback from the root ---
         frontier = [self.root]
         while frontier:
             parent = frontier.pop(0)
             for child in self.get_children(parent):
                 if child not in current_labels:
+                    self.last_decision = {
+                        "strategy": "breadth_first",
+                        "guided_by": parent,
+                    }
                     return child
                 else:
                     frontier.append(child)
+        self.last_decision = {"strategy": "exhausted"}
         return None  # no more dimensions known to mandala
+
+
+# ---------------------------------------------------------------
+# Symmetry-grounded mandala: lattice derived from the O_h group
+# ---------------------------------------------------------------
+
+# Standard crystallographic names for the 10 conjugacy classes of O_h,
+# keyed by conjugacy_signature() = (determinant, trace, order, fixed_vertices).
+_OH_CLASS_NAMES: Dict[Tuple[int, int, int, int], str] = {
+    (1, 3, 1, 6):   "E",        # identity
+    (1, 1, 4, 2):   "C4",       # 6 x 90-degree rotations (face axes)
+    (1, -1, 2, 2):  "C4^2",     # 3 x 180-degree rotations (face axes)
+    (1, 0, 3, 0):   "C3",       # 8 x 120-degree rotations (body diagonals)
+    (1, -1, 2, 0):  "C2",       # 6 x 180-degree rotations (edge axes)
+    (-1, -3, 2, 0): "i",        # spatial inversion
+    (-1, -1, 4, 0): "S4",       # 6 x improper 90-degree rotations
+    (-1, 1, 2, 4):  "sigma_h",  # 3 x horizontal mirror planes
+    (-1, 0, 6, 0):  "S6",       # 8 x improper 60-degree rotations
+    (-1, 1, 2, 2):  "sigma_d",  # 6 x diagonal mirror planes
+}
+
+
+def _class_name(sig: Tuple[int, int, int, int]) -> str:
+    if sig in _OH_CLASS_NAMES:
+        return _OH_CLASS_NAMES[sig]
+    kind = "C" if sig[0] == 1 else "S"
+    return f"{kind}{sig[2]}_t{sig[1]}f{sig[3]}"
+
+
+class SymmetryMandalaConfig(MandalaConfig):
+    """Mandala lattice derived from the O_h octahedral symmetry group
+    (geometric_state_algebra.OhGroup) instead of hand-written branching rules.
+
+    Noether-flavoured reading: each conserved quantity corresponds to a
+    symmetry channel. The lattice is the conjugacy-class structure of O_h:
+
+        root (identity class E — the always-monitored quantity)
+        ├── C4^2 ── sigma_h     (each proper rotation class branches to
+        ├── C2   ── sigma_d      its parity partner: the improper class
+        ├── C3   ── S6           obtained by composing with inversion,
+        ├── C4   ── S4           i . C)
+        └── i                   (inversion itself: parity partner of E)
+
+    That gives root + 9 channels = 10 dimensions, one per conjugacy class.
+    Level 1 = rotational symmetry channels; level 2 = their parity-inverted
+    partners — you only look for parity violation in a channel after the
+    rotational channel itself failed to close the books.
+
+    class_members maps each dimension label to the O_h element indices in
+    its class (root maps to the identity class), so an expansion can be
+    traced back to concrete group elements.
+    """
+
+    def __init__(self, root_dim: str = "charge", group=None):
+        from geometric_state_algebra import OhGroup, GENERATOR_INV
+
+        self.group = group if group is not None else OhGroup()
+        inv_idx = self.group.index(GENERATOR_INV)
+
+        identity_sig = (1, 3, 1, 6)
+        sigs = list(self.group.conjugacy_classes.keys())
+        proper_sigs = [s for s in sigs if s[0] == 1 and s != identity_sig]
+        # Deterministic order: cheapest symmetry channels first
+        # (low element order, then more fixed vertices).
+        proper_sigs.sort(key=lambda s: (s[2], -s[3]))
+
+        branches: Dict[str, List[str]] = {root_dim: []}
+        self.class_members: Dict[str, List[int]] = {
+            root_dim: list(self.group.conjugacy_classes[identity_sig]),
+        }
+        for sig in proper_sigs:
+            name = _class_name(sig)
+            branches[root_dim].append(name)
+            self.class_members[name] = list(self.group.conjugacy_classes[sig])
+            # Parity partner: class of (inversion . representative)
+            rep = self.group.conjugacy_classes[sig][0]
+            partner_idx = self.group.multiply(inv_idx, rep)
+            partner_sig = self.group.elements[partner_idx].conjugacy_signature()
+            partner = _class_name(partner_sig)
+            branches[name] = [partner]
+            self.class_members[partner] = list(
+                self.group.conjugacy_classes[partner_sig])
+        # Inversion class: parity partner of the identity, child of root
+        inv_sig = self.group.elements[inv_idx].conjugacy_signature()
+        inv_name = _class_name(inv_sig)
+        branches[root_dim].append(inv_name)
+        self.class_members[inv_name] = list(self.group.conjugacy_classes[inv_sig])
+
+        super().__init__(root_dim=root_dim, branches=branches)
 
 
 # ---------------------------------------------------------------
@@ -249,6 +370,7 @@ class ExpandableMultiLedger:
                 self._expand(new_dim_label, residual)
                 record["expanded"] = True
                 record["new_dimension"] = new_dim_label
+                record["expansion_reason"] = dict(self.mandala.last_decision)
             else:
                 record["expanded"] = False
         else:
@@ -383,5 +505,142 @@ def run_self_test(verbose: bool = True) -> bool:
     return True
 
 
+def run_guided_drill_test(verbose: bool = True) -> bool:
+    """Residual-guided selection: when the leak shows up in a specific
+    component, the mandala drills into THAT branch instead of walking
+    breadth-first.
+
+    After the first expansion (charge -> spin), the spin channel itself
+    starts leaking: 40 units of spin enter per window and never come out
+    (they decohere into an unmonitored spin_x sub-channel). Breadth-first
+    would propose 'valley' next; residual guidance must propose 'spin_x',
+    because the residual lives in the spin component.
+    """
+    def log(msg):
+        if verbose:
+            print(msg)
+
+    mandala = MandalaConfig(
+        root_dim="charge",
+        branches={
+            "charge": ["spin", "valley"],
+            "spin": ["spin_x", "spin_y", "spin_z"],
+        },
+    )
+    ledger = ExpandableMultiLedger(mandala=mandala, initial_dim=1)
+
+    log("=" * 64)
+    log("Guided-drill test: leak concentrated in the spin component")
+    log("=" * 64)
+
+    # Stage 1: reach ['charge', 'spin'] via the charge-leak scenario.
+    for _ in range(30):
+        ledger.post("in", [100.0], "injector")
+        ledger.post("out", [50.0], "drain")
+        rec = ledger.close_window()
+        if rec["expanded"]:
+            break
+    assert ledger.labels == ["charge", "spin"], f"stage 1 failed: {ledger.labels}"
+    # Reconcile so the retro-debt doesn't pollute stage 2.
+    ledger.post("in", [100.0, 0.0], "injector")
+    ledger.post("out", [50.0, 0.0], "drain")
+    ledger.post("out", [50.0, 0.0], "spin_flip_channel")
+    ledger.post("in", [0.0, 50.0], "spin_reservoir_audit")
+    rec = ledger.close_window()
+    assert rec["closes"]
+    log(f"stage 1: expanded to {ledger.labels}, reconciled")
+
+    # Stage 2: charge balances, spin leaks — residual = [0, 40] per window.
+    expansion_record = None
+    for w in range(1, 40):
+        ledger.post("in", [100.0, 40.0], "injector")
+        ledger.post("out", [50.0, 0.0], "drain")
+        ledger.post("out", [50.0, 0.0], "spin_flip_channel")
+        rec = ledger.close_window()
+        assert not rec["closes"], "spin-leaking window should NOT close"
+        if rec["expanded"]:
+            expansion_record = rec
+            log(f"stage 2: window {w} residual={rec['residual']}"
+                f" -> expanded into '{rec['new_dimension']}'")
+            break
+
+    assert expansion_record is not None, "stage 2 never expanded"
+    assert expansion_record["new_dimension"] == "spin_x", \
+        (f"guided expansion should drill into 'spin_x' (leak is in spin), "
+         f"got {expansion_record['new_dimension']}")
+    reason = expansion_record["expansion_reason"]
+    assert reason["strategy"] == "residual_guided", reason
+    assert reason["guided_by"] == "spin", reason
+    log(f"decision provenance: {reason}")
+    log("\nGUIDED DRILL PASSED — mandala followed the leak into spin_x,"
+        " not breadth-first valley.")
+    return True
+
+
+def run_symmetry_mandala_test(verbose: bool = True) -> bool:
+    """SymmetryMandalaConfig: the lattice is derived from the O_h group's
+    conjugacy-class structure, not hand-written. Checks the Noether-style
+    shape (proper rotation classes under the root, parity partners below
+    them), then runs a leaky ledger over it and watches expansion walk
+    the group lattice until exhaustion.
+    """
+    def log(msg):
+        if verbose:
+            print(msg)
+
+    mandala = SymmetryMandalaConfig(root_dim="charge")
+
+    log("=" * 64)
+    log("Symmetry mandala test: lattice from O_h conjugacy classes")
+    log("=" * 64)
+
+    # Structure: root + 9 channels = 10 conjugacy classes.
+    all_dims = [mandala.root] + [d for kids in mandala.branches.values()
+                                 for d in kids]
+    assert len(all_dims) == 10, f"expected 10 dimensions, got {len(all_dims)}"
+    assert set(mandala.branches[mandala.root]) == {"C4^2", "C2", "C3", "C4", "i"}
+    # Parity partners: i . C for each proper rotation class.
+    partners = {"C4": "S4", "C4^2": "sigma_h", "C3": "S6", "C2": "sigma_d"}
+    for proper, improper in partners.items():
+        assert mandala.branches[proper] == [improper], \
+            f"parity partner of {proper} should be {improper}"
+    # Class members cover the whole group: 48 elements across 10 classes.
+    covered = sum(len(v) for v in mandala.class_members.values())
+    assert covered == 48, f"class members cover {covered} of 48 elements"
+    log(f"lattice: root '{mandala.root}' -> {mandala.branches[mandala.root]}")
+    log(f"parity partners: {partners}")
+    log(f"class members cover all {covered} O_h elements")
+
+    # Run a leaky ledger over the group lattice: it should expand into the
+    # cheapest proper rotation channel first (C4^2: order 2, face axes).
+    ledger = ExpandableMultiLedger(mandala=mandala, initial_dim=1)
+    expansion_record = None
+    for _ in range(30):
+        ledger.post("in", [100.0], "injector")
+        ledger.post("out", [50.0], "drain")
+        rec = ledger.close_window()
+        if rec["expanded"]:
+            expansion_record = rec
+            break
+    assert expansion_record is not None, "symmetry ledger never expanded"
+    assert expansion_record["new_dimension"] == "C4^2", \
+        f"first channel should be C4^2, got {expansion_record['new_dimension']}"
+    assert ledger.labels == ["charge", "C4^2"]
+    log(f"\nledger expanded into '{expansion_record['new_dimension']}'"
+        f" ({len(mandala.class_members['C4^2'])} group elements in class)")
+
+    # Exhaustion: once every class channel is monitored, the mandala is done.
+    every_dim = list(all_dims)
+    assert mandala.expand_dimension(every_dim, np.zeros(len(every_dim)), []) is None
+    log("exhaustion check passed: full lattice -> no further expansion")
+    log("\nSYMMETRY MANDALA PASSED — branching rules derived from O_h,"
+        " not hand-written.")
+    return True
+
+
 if __name__ == "__main__":
     run_self_test()
+    print()
+    run_guided_drill_test()
+    print()
+    run_symmetry_mandala_test()
