@@ -4001,6 +4001,53 @@ def test_symmetry_mandala_covers_group():
     assert covered == list(range(48))
 
 
+def test_cayley_class_distance_metric():
+    """class_distance is the group's own metric: zero on the diagonal,
+    symmetric, and every parity partner i.C is one inversion step from C."""
+    m = SymmetryMandalaConfig(root_dim="charge")
+    assert m.class_distance("C4", "C4") == 0
+    assert m.class_distance("C3", "S6") == m.class_distance("S6", "C3")
+    for proper, improper in [("C4", "S4"), ("C4^2", "sigma_h"),
+                             ("C3", "S6"), ("C2", "sigma_d")]:
+        assert m.class_distance(proper, improper) == 1
+    # Generators are the nearest classes to the identity
+    assert m.class_distance("charge", "C4") == 1
+    assert m.class_distance("charge", "i") == 1
+    assert m.class_distance("charge", "C4^2") == 2
+
+
+def test_cayley_guided_expansion_from_root():
+    """A root leak expands into the Cayley-nearest channel (C4, a generator
+    class at distance 1) — not the first child in list order (C4^2)."""
+    m = SymmetryMandalaConfig(root_dim="charge")
+    ledger = ExpandableMultiLedger(mandala=m, initial_dim=1)
+    rec = _leak_until_expanded(ledger, [100.0], [[50.0]])
+    assert rec is not None and rec["new_dimension"] == "C4"
+    reason = rec["expansion_reason"]
+    assert reason["strategy"] == "cayley_guided"
+    assert reason["guided_by"] == "charge"
+    assert reason["cayley_distance"] == 1
+
+
+def test_cayley_guided_tie_breaks_to_leaky_branch():
+    """A leak in the C4 channel drills into its parity partner S4: ties at
+    distance 1 (S4, C4^2, C3) break toward the leaky dimension's child."""
+    m = SymmetryMandalaConfig(root_dim="charge")
+    ledger = ExpandableMultiLedger(mandala=m, initial_dim=1)
+    _leak_until_expanded(ledger, [100.0], [[50.0]])
+    assert ledger.labels == ["charge", "C4"]
+    ledger.post("in", [100.0, 0.0], "injector")
+    ledger.post("out", [50.0, 0.0], "drain")
+    ledger.post("out", [50.0, 0.0], "c4_channel")
+    ledger.post("in", [0.0, 50.0], "c4_reservoir_audit")
+    assert ledger.close_window()["closes"]
+    rec = _leak_until_expanded(ledger, [100.0, 40.0],
+                               [[50.0, 0.0], [50.0, 0.0]])
+    assert rec is not None and rec["new_dimension"] == "S4"
+    assert rec["expansion_reason"]["guided_by"] == "C4"
+    assert rec["expansion_reason"]["cayley_distance"] == 1
+
+
 # Run all tests
 # ---------------------------------------------------------------------------
 

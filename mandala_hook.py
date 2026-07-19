@@ -257,7 +257,73 @@ class SymmetryMandalaConfig(MandalaConfig):
         branches[root_dim].append(inv_name)
         self.class_members[inv_name] = list(self.group.conjugacy_classes[inv_sig])
 
+        self._distance_cache: Dict[Tuple[str, str], int] = {}
         super().__init__(root_dim=root_dim, branches=branches)
+
+    def class_distance(self, label_a: str, label_b: str) -> int:
+        """Cayley-graph distance between two dimension channels: the minimum
+        generator-word distance between any element of class A and any element
+        of class B. This is the group's own metric on the lattice — e.g. every
+        parity partner i.C sits exactly one step (one inversion) from C."""
+        if label_a == label_b:
+            return 0
+        key = (label_a, label_b) if label_a < label_b else (label_b, label_a)
+        if key not in self._distance_cache:
+            self._distance_cache[key] = min(
+                self.group.distance(i, j)
+                for i in self.class_members[label_a]
+                for j in self.class_members[label_b])
+        return self._distance_cache[key]
+
+    def expand_dimension(self, current_labels: List[str], residual_vector: np.ndarray,
+                         monitor_events: List[Dict]) -> Optional[str]:
+        """Cayley-guided expansion: candidates are the unexplored children of
+        every monitored dimension, and the winner is the one whose conjugacy
+        class is NEAREST (in the Cayley graph) to the class of the leakiest
+        dimension. The group metric — not component magnitude alone — steers
+        the drill: a leak in a symmetry channel points to the degrees of
+        freedom a single generator step away.
+
+        Ties break toward the leaky dimension's own children (candidates are
+        enumerated in descending residual order), so a parity partner at
+        distance 1 beats a sibling class at distance 1. Falls back to the
+        base residual-guided / breadth-first strategy when there is no usable
+        residual signal."""
+        usable = (residual_vector is not None
+                  and len(residual_vector) == len(current_labels)
+                  and float(np.max(np.abs(residual_vector))) > 0.0)
+        if not usable:
+            return super().expand_dimension(current_labels, residual_vector,
+                                            monitor_events)
+
+        ranked = sorted(range(len(current_labels)),
+                        key=lambda i: -abs(float(residual_vector[i])))
+        dominant = current_labels[ranked[0]]
+        if dominant not in self.class_members:
+            return super().expand_dimension(current_labels, residual_vector,
+                                            monitor_events)
+
+        # Frontier: unexplored children of monitored dims, leakiest dims first
+        candidates: List[str] = []
+        for i in ranked:
+            for child in self.get_children(current_labels[i]):
+                if child not in current_labels and child not in candidates:
+                    candidates.append(child)
+        if not candidates:
+            return super().expand_dimension(current_labels, residual_vector,
+                                            monitor_events)
+
+        scored = [(self.class_distance(dominant, c), idx, c)
+                  for idx, c in enumerate(candidates)]
+        dist, _, choice = min(scored)
+        self.last_decision = {
+            "strategy": "cayley_guided",
+            "guided_by": dominant,
+            "component_residual": float(residual_vector[ranked[0]]),
+            "cayley_distance": dist,
+            "candidate_distances": {c: d for d, _, c in sorted(scored)},
+        }
+        return choice
 
 
 # ---------------------------------------------------------------
@@ -611,8 +677,19 @@ def run_symmetry_mandala_test(verbose: bool = True) -> bool:
     log(f"parity partners: {partners}")
     log(f"class members cover all {covered} O_h elements")
 
-    # Run a leaky ledger over the group lattice: it should expand into the
-    # cheapest proper rotation channel first (C4^2: order 2, face axes).
+    # Cayley metric sanity: every parity partner is exactly one inversion
+    # step from its proper class.
+    for proper, improper in partners.items():
+        d = mandala.class_distance(proper, improper)
+        assert d == 1, f"d({proper},{improper}) should be 1, got {d}"
+    log("Cayley metric: every parity partner i.C sits at distance 1 from C")
+
+    # Run a leaky ledger over the group lattice. Expansion is CAYLEY-GUIDED:
+    # the winner is the frontier class nearest (in the Cayley graph) to the
+    # class of the leaking dimension. From the root (identity class E) the
+    # nearest channels are the generators themselves: C4 and i at distance 1.
+    # C4 is enumerated first, so the drill goes there — NOT to list-order
+    # C4^2, which sits two generator steps away.
     ledger = ExpandableMultiLedger(mandala=mandala, initial_dim=1)
     expansion_record = None
     for _ in range(30):
@@ -623,18 +700,47 @@ def run_symmetry_mandala_test(verbose: bool = True) -> bool:
             expansion_record = rec
             break
     assert expansion_record is not None, "symmetry ledger never expanded"
-    assert expansion_record["new_dimension"] == "C4^2", \
-        f"first channel should be C4^2, got {expansion_record['new_dimension']}"
-    assert ledger.labels == ["charge", "C4^2"]
-    log(f"\nledger expanded into '{expansion_record['new_dimension']}'"
-        f" ({len(mandala.class_members['C4^2'])} group elements in class)")
+    assert expansion_record["new_dimension"] == "C4", \
+        f"nearest channel to E is C4 (distance 1), got {expansion_record['new_dimension']}"
+    reason = expansion_record["expansion_reason"]
+    assert reason["strategy"] == "cayley_guided" and reason["cayley_distance"] == 1
+    assert ledger.labels == ["charge", "C4"]
+    log(f"\nroot leak -> expanded into '{expansion_record['new_dimension']}'"
+        f" (Cayley distance 1 from E)")
+    log(f"candidate distances: {reason['candidate_distances']}")
+
+    # Reconcile, then leak in the C4 channel itself. Ties at distance 1
+    # (S4, C4^2, C3) break toward the leaky dimension's own child: the
+    # parity partner S4 — one inversion away from C4.
+    ledger.post("in", [100.0, 0.0], "injector")
+    ledger.post("out", [50.0, 0.0], "drain")
+    ledger.post("out", [50.0, 0.0], "c4_channel")
+    ledger.post("in", [0.0, 50.0], "c4_reservoir_audit")
+    assert ledger.close_window()["closes"], "symmetry reconciliation failed"
+
+    expansion_record = None
+    for _ in range(40):
+        ledger.post("in", [100.0, 40.0], "injector")
+        ledger.post("out", [50.0, 0.0], "drain")
+        ledger.post("out", [50.0, 0.0], "c4_channel")
+        rec = ledger.close_window()
+        if rec["expanded"]:
+            expansion_record = rec
+            break
+    assert expansion_record is not None, "C4-leak never expanded"
+    assert expansion_record["new_dimension"] == "S4", \
+        f"C4 leak should drill into parity partner S4, got {expansion_record['new_dimension']}"
+    reason = expansion_record["expansion_reason"]
+    assert reason["guided_by"] == "C4" and reason["cayley_distance"] == 1
+    log(f"C4 leak -> expanded into parity partner"
+        f" '{expansion_record['new_dimension']}' (one inversion step)")
 
     # Exhaustion: once every class channel is monitored, the mandala is done.
     every_dim = list(all_dims)
     assert mandala.expand_dimension(every_dim, np.zeros(len(every_dim)), []) is None
     log("exhaustion check passed: full lattice -> no further expansion")
-    log("\nSYMMETRY MANDALA PASSED — branching rules derived from O_h,"
-        " not hand-written.")
+    log("\nSYMMETRY MANDALA PASSED — branching derived from O_h and the"
+        " drill steered by its Cayley metric.")
     return True
 
 

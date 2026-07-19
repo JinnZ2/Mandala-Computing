@@ -38,7 +38,7 @@ from typing import List, Optional
 REPO_URL = "github.com/JinnZ2/Mandala-Computing"
 REPO_LICENSE = "MIT"
 REPO_COMMITS = 107
-TEST_COUNT = 347
+TEST_COUNT = 350
 MODULE_COUNT = 19
 
 

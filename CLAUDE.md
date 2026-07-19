@@ -37,7 +37,7 @@ mandala-computing/
 ├── osl.py                     # Octahedral Symbolic Language v1.0 (~965 loc)
 ├── geis.py                    # Geometric Information Encoding System bridge (~695 loc)
 ├── kt_annealer.py             # KT phase annealer + symmetry detector (~530 loc)
-├── mandala_hook.py            # expandable multi-ledger, guided dimension expansion (~590 loc)
+├── mandala_hook.py            # expandable multi-ledger, guided dimension expansion (~750 loc)
 ├── mandala_runtime.py         # substrate-agnostic sensor fusion binding (~2640 loc)
 ├── membrane.py                # boundary computation primitive (~470 loc)
 ├── claim_validator.py         # epistemological claim validation (~500 loc)
@@ -52,7 +52,7 @@ mandala-computing/
 ├── LICENSE                    # MIT
 ├── examples/                  # 18 runnable example scripts + benchmark
 ├── experiments/                # playgrounds wired to the core engine — see experiments/README.md
-├── tests/test_core.py         # 347-test suite
+├── tests/test_core.py         # 350-test suite
 └── [17 .md files]             # theory, hardware, integration, proofs, notes
 ```
 
@@ -283,14 +283,18 @@ into a retroactive environment balance so the expanded space closes.
 branch selection with breadth-first fallback), `SymmetryMandalaConfig` (lattice
 derived from the O_h conjugacy-class structure via `geometric_state_algebra` —
 proper rotation classes under the root, parity partners `i.C` below them; 10
-dimensions, one per conjugacy class), `ResidualMonitor` (EWMA leak events +
+dimensions, one per conjugacy class; expansion is Cayley-guided: the frontier
+class nearest in the Cayley graph to the leaking channel wins, with ties
+breaking toward the leaky dimension's own child, so a parity partner one
+inversion step away beats a sibling), `ResidualMonitor` (EWMA leak events +
 one-sided CUSUM phase events), `ExpandableMultiLedger`
 
 **self-tests:** `python mandala_hook.py` runs three scenarios: spin-leaking
 device (charge-only ledger expands into `spin`, reconciles, closes),
 residual-guided drill (leak in the spin component expands `spin_x`, not
-breadth-first `valley`), and the O_h-derived lattice (expansion walks the
-group structure until exhaustion).
+breadth-first `valley`), and the O_h-derived lattice (root leak expands into
+generator class `C4` at Cayley distance 1, a `C4` leak drills into parity
+partner `S4`, then the lattice walks to exhaustion).
 
 ### mandala-runtime (`mandala_runtime.py`)
 
@@ -490,7 +494,7 @@ large systems.
 
 ## build-test-run
 
-Test suite: `python tests/test_core.py` (347 tests across all modules).
+Test suite: `python tests/test_core.py` (350 tests across all modules).
 No formal build system, CI/CD, or linting is configured.
 
 ### run-demos
@@ -673,7 +677,7 @@ Is your task about...
 
 ```bash
 pip install numpy scipy          # only external deps
-python tests/test_core.py        # should report 347 passed, 0 failed
+python tests/test_core.py        # should report 350 passed, 0 failed
 python mandala_computer.py       # runs all classical demos
 python mandala_runtime.py        # runs sensor fusion + LID demos
 ```
@@ -745,7 +749,7 @@ Adding a new feature?
 - **`OctahedralState`** exists in both `geis.py` (3D cubic coordinates, tokens)
   and implicitly in `octahedral_arithmetic.py` (glyph-space). Use GEIS for
   binary bridging, use octahedral_arithmetic for exact glyph math
-- **test suite:** `python tests/test_core.py` runs 347 tests across all modules
+- **test suite:** `python tests/test_core.py` runs 350 tests across all modules
 - **`.gitignore`** excludes `__pycache__/`, `.pyc`, `.env`, `.pytest_cache/`, etc.
 - **`requirements.txt`** at repo root lists numpy and scipy
 - **flat layout:** all code at root level, no package hierarchy

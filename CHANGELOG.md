@@ -22,8 +22,16 @@ own). Dates are when each capability landed, derived from git history.
   `geometric_state_algebra.py` instead of hand-written rules: one dimension per
   conjugacy class (10 total) — proper rotation classes under the root, each
   branching to its parity partner `i.C`.
-- Three in-file self-test scenarios (`python mandala_hook.py`) plus 11 suite
-  tests (336 -> 347).
+- Expansion over the symmetry lattice is Cayley-guided: `SymmetryMandalaConfig`
+  scores every frontier channel by `class_distance` — the minimum
+  generator-word distance between conjugacy classes in the O_h Cayley graph —
+  and drills into the class nearest the leaking channel (ties break toward the
+  leaky dimension's own child). Physically: every parity partner `i.C` sits
+  exactly one inversion step from `C`, and the nearest channels to the
+  identity are the generator classes themselves, so a root leak expands into
+  `C4` and a `C4` leak into `S4`.
+- Three in-file self-test scenarios (`python mandala_hook.py`) plus 14 suite
+  tests (336 -> 350).
 
 ## 2026-07 — Playground integration, repo audit
 
