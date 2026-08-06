@@ -5,6 +5,34 @@ versioning (individual modules carry their own informal `v1.0`/`v2.0` markers in
 docstrings — this file is the repo-wide narrative those numbers don't capture on their
 own). Dates are when each capability landed, derived from git history.
 
+## 2026-07 — Expandable multi-ledger (mandala hook)
+
+- Added `mandala_hook.py` (CC0): an `ExpandableMultiLedger` whose dimension set
+  grows when conservation persistently fails to close. Window closure is a
+  chi-squared Mahalanobis test on vector residuals; a `ResidualMonitor` CUSUM
+  distinguishes persistent leaks (phase events) from fluctuations; on a phase
+  event the ledger consults a `MandalaConfig` lattice of conserved-quantity
+  dimensions, expands into the chosen one, and absorbs the historical imbalance
+  into a retroactive environment balance so the expanded space closes.
+- Branch selection is residual-guided: the mandala drills into the first
+  unexplored child of the leakiest currently monitored dimension (breadth-first
+  from the root as fallback), and records decision provenance on the window
+  record.
+- `SymmetryMandalaConfig` derives the lattice from the O_h group in
+  `geometric_state_algebra.py` instead of hand-written rules: one dimension per
+  conjugacy class (10 total) — proper rotation classes under the root, each
+  branching to its parity partner `i.C`.
+- Expansion over the symmetry lattice is Cayley-guided: `SymmetryMandalaConfig`
+  scores every frontier channel by `class_distance` — the minimum
+  generator-word distance between conjugacy classes in the O_h Cayley graph —
+  and drills into the class nearest the leaking channel (ties break toward the
+  leaky dimension's own child). Physically: every parity partner `i.C` sits
+  exactly one inversion step from `C`, and the nearest channels to the
+  identity are the generator classes themselves, so a root leak expands into
+  `C4` and a `C4` leak into `S4`.
+- Three in-file self-test scenarios (`python mandala_hook.py`) plus 14 suite
+  tests (336 -> 350).
+
 ## 2026-07 — Playground integration, repo audit
 
 - Wired the three `experiments/`-style playgrounds to the core engine instead of

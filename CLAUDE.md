@@ -37,6 +37,7 @@ mandala-computing/
 ├── osl.py                     # Octahedral Symbolic Language v1.0 (~965 loc)
 ├── geis.py                    # Geometric Information Encoding System bridge (~695 loc)
 ├── kt_annealer.py             # KT phase annealer + symmetry detector (~530 loc)
+├── mandala_hook.py            # expandable multi-ledger, guided dimension expansion (~750 loc)
 ├── mandala_runtime.py         # substrate-agnostic sensor fusion binding (~2640 loc)
 ├── membrane.py                # boundary computation primitive (~470 loc)
 ├── claim_validator.py         # epistemological claim validation (~500 loc)
@@ -51,7 +52,7 @@ mandala-computing/
 ├── LICENSE                    # MIT
 ├── examples/                  # 18 runnable example scripts + benchmark
 ├── experiments/                # playgrounds wired to the core engine — see experiments/README.md
-├── tests/test_core.py         # 336-test suite
+├── tests/test_core.py         # 350-test suite
 └── [17 .md files]             # theory, hardware, integration, proofs, notes
 ```
 
@@ -78,6 +79,7 @@ mandala-computing/
 | Classical solving | `mandala_computer.py`, `holographic_mandala.py` | numpy | Random sampling, fast arrays — convenience, not necessity |
 | Quantum solving | `quantum_mandala.py` | numpy + scipy | Matrix expm, eigendecomposition — fundamentally linear algebra |
 | Bridge / Encoding | `geis.py`, `kt_annealer.py` | numpy | Tensor operations, phase annealing |
+| Conservation ledger | `mandala_hook.py` | numpy | Vector residuals, chi-squared closure tests |
 | Sensor Fusion | `mandala_runtime.py` | stdlib only | Substrate-agnostic binding, no external deps |
 | Infrastructure | `octahedral_resilience.py`, `octahedral_session_cache.py` | stdlib only | Self-healing, caching — no external deps |
 | Algebra / Language | `geometric_state_algebra.py`, `osl.py`, `sovereign_mesh.py` | stdlib only | O_h group, symbolic language, mesh — no external deps |
@@ -265,6 +267,34 @@ quantises back. Also includes a 3-D symmetry detector (reflective/rotational).
 
 **key functions:** `kt_anneal_mandala()`, `detect_mandala_symmetries()`,
 `anneal_network_phases()`, `states_to_phases()`, `phases_to_states()`
+
+### mandala-hook (`mandala_hook.py`)
+
+Expandable multi-dimensional conservation ledger with guided dimension
+expansion (CC0). Core principle: every conservation violation is a transfer
+into an unmonitored dimension. Vector entries post against a set of
+conserved-quantity dimensions; window closure is a chi-squared Mahalanobis
+test. When a `ResidualMonitor` CUSUM detects a *persistent* residual (a phase
+event, not a fluctuation), the ledger consults a `MandalaConfig` lattice to
+decide which dimension to expand into, absorbing the historical imbalance
+into a retroactive environment balance so the expanded space closes.
+
+**key classes:** `MandalaConfig` (hand-written dimension lattice, residual-guided
+branch selection with breadth-first fallback), `SymmetryMandalaConfig` (lattice
+derived from the O_h conjugacy-class structure via `geometric_state_algebra` —
+proper rotation classes under the root, parity partners `i.C` below them; 10
+dimensions, one per conjugacy class; expansion is Cayley-guided: the frontier
+class nearest in the Cayley graph to the leaking channel wins, with ties
+breaking toward the leaky dimension's own child, so a parity partner one
+inversion step away beats a sibling), `ResidualMonitor` (EWMA leak events +
+one-sided CUSUM phase events), `ExpandableMultiLedger`
+
+**self-tests:** `python mandala_hook.py` runs three scenarios: spin-leaking
+device (charge-only ledger expands into `spin`, reconciles, closes),
+residual-guided drill (leak in the spin component expands `spin_x`, not
+breadth-first `valley`), and the O_h-derived lattice (root leak expands into
+generator class `C4` at Cayley distance 1, a `C4` leak drills into parity
+partner `S4`, then the lattice walks to exhaustion).
 
 ### mandala-runtime (`mandala_runtime.py`)
 
@@ -464,7 +494,7 @@ large systems.
 
 ## build-test-run
 
-Test suite: `python tests/test_core.py` (336 tests across all modules).
+Test suite: `python tests/test_core.py` (350 tests across all modules).
 No formal build system, CI/CD, or linting is configured.
 
 ### run-demos
@@ -647,7 +677,7 @@ Is your task about...
 
 ```bash
 pip install numpy scipy          # only external deps
-python tests/test_core.py        # should report 336 passed, 0 failed
+python tests/test_core.py        # should report 350 passed, 0 failed
 python mandala_computer.py       # runs all classical demos
 python mandala_runtime.py        # runs sensor fusion + LID demos
 ```
@@ -719,7 +749,7 @@ Adding a new feature?
 - **`OctahedralState`** exists in both `geis.py` (3D cubic coordinates, tokens)
   and implicitly in `octahedral_arithmetic.py` (glyph-space). Use GEIS for
   binary bridging, use octahedral_arithmetic for exact glyph math
-- **test suite:** `python tests/test_core.py` runs 336 tests across all modules
+- **test suite:** `python tests/test_core.py` runs 350 tests across all modules
 - **`.gitignore`** excludes `__pycache__/`, `.pyc`, `.env`, `.pytest_cache/`, etc.
 - **`requirements.txt`** at repo root lists numpy and scipy
 - **flat layout:** all code at root level, no package hierarchy
