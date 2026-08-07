@@ -27,8 +27,9 @@ print(result["solution"])
 
 ## What It Contains
 
-19 core Python modules, 350 tests (see `CLAUDE.md` for the full module list —
-the table below is the essential subset for a first read):
+19 core Python modules plus the `mandala_stack/` geometry layer, 387 tests
+(see `CLAUDE.md` for the full module list — the table below is the essential
+subset for a first read):
 
 | Module | Role | Dependencies |
 |--------|------|-------------|
@@ -42,7 +43,9 @@ the table below is the essential subset for a first read):
 | `glyph_convert.py` | Human decimal-to-glyph converter | stdlib |
 | `mandala_simulator.py` | Lightweight entry point delegating to real engines | stdlib |
 | `mandala_hook.py` | Expandable multi-ledger: residual-guided dimension expansion over the O_h lattice | numpy |
-| `tests/test_core.py` | 350-test suite across all modules | - |
+| `mandala_stack/` | Geometry-agnostic layer: the shape becomes an input, not a constant | numpy |
+| `mandala_cli.py` | One CLI over both halves | - |
+| `tests/test_core.py` | 387-test suite across all modules | - |
 
 ---
 
@@ -168,7 +171,14 @@ python mandala_computer.py
 python quantum_mandala.py
 python holographic_mandala.py
 
-# Run tests (350 tests)
+# Or everything through one CLI, both halves of the repo
+python mandala_cli.py --all
+
+# Solve on a shape that isn't the octahedron
+python mandala_stack/stack_cli.py --list-geometries
+python mandala_cli.py --geometry
+
+# Run tests (387 tests)
 python tests/test_core.py
 
 # Benchmark all methods
@@ -176,7 +186,9 @@ python examples/benchmark.py
 ```
 
 See `experiments/README.md` for interactive Jupyter playgrounds (Ising explorer, solver
-selector, constant-swap experiment search).
+selector, constant-swap experiment search), and `mandala_stack/README.md` for the
+geometry-agnostic stack — the same solver on any shape, including shapes learned
+from data, and the bridge that connects it to the engine above.
 
 ---
 
@@ -213,7 +225,8 @@ MIT (JinnZ2). Open source. Contributions welcome.
 
 ## Status
 
-Research framework with working simulators. 19 core modules, 350 tests, all passing.
+Research framework with working simulators. 19 core modules plus the
+`mandala_stack/` geometry layer, 387 tests, all passing.
 Classical and quantum solvers operational. Physical hardware: not built.
 The question is whether geometric relaxation offers computational advantage
 at scale. The framework exists to test that question.

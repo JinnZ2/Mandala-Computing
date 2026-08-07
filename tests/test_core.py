@@ -4048,6 +4048,433 @@ def test_cayley_guided_tie_breaks_to_leaky_branch():
     assert rec["expansion_reason"]["cayley_distance"] == 1
 
 
+# ---------------------------------------------------------------------------
+# mandala_stack/ — geometry-agnostic stack and its bridge to the root engine
+# ---------------------------------------------------------------------------
+
+import mandala_stack  # noqa: E402  (bootstraps sys.path for the stack modules)
+
+from geometry_core import (  # noqa: E402
+    Geometry, get_geometry, list_geometries, GEOMETRIES,
+    OctahedralGeometry, TetrahedralGeometry, DodecahedralGeometry,
+    HexagonalGeometry, HilbertGeometry,
+)
+from mandala_solver import MandalaSolver  # noqa: E402
+from stack_bridge import (  # noqa: E402
+    RootOctahedralGeometry, CayleyGeometry, register_bridge_geometries,
+    root_coupling_energy, states_from_computer, apply_states, geometric_relax,
+    states_to_glyphs, states_to_number, learn_root_geometry,
+)
+
+_GEOMETRY_PROTOCOL_METHODS = (
+    "position", "transitions", "transition_cost",
+    "eigenvalues", "glyph", "scale_position",
+)
+
+
+def _assert_satisfies_geometry_protocol(geo, sample_states):
+    """Every Geometry must expose the same surface, whatever its shape."""
+    assert isinstance(geo.name, str) and geo.name
+    assert geo.n_states > 0
+    assert geo.dimension > 0
+    for method in _GEOMETRY_PROTOCOL_METHODS:
+        assert callable(getattr(geo, method)), f"{geo.name} missing {method}"
+    for state in sample_states:
+        assert len(geo.position(state)) == geo.dimension
+        assert len(geo.scale_position(state, 2)) == geo.dimension
+        assert isinstance(geo.glyph(state), str)
+        assert len(geo.eigenvalues(state)) >= 1
+        for neighbor in geo.transitions(state):
+            assert 0 <= neighbor < geo.n_states
+            assert math.isfinite(geo.transition_cost(state, neighbor))
+
+
+def test_stack_package_bootstrap():
+    """Importing the package makes both directories importable, and the
+    submodule is the same object under both names."""
+    import geometry_core as flat
+    assert mandala_stack.geometry_core is flat
+    assert os.path.isdir(mandala_stack.HERE)
+    assert mandala_stack.REPO_ROOT in sys.path
+    assert mandala_stack.HERE in sys.path
+
+
+def test_stack_lazy_exports():
+    assert mandala_stack.MandalaSolver is MandalaSolver
+    assert mandala_stack.get_geometry is get_geometry
+    try:
+        mandala_stack.no_such_symbol
+    except AttributeError:
+        pass
+    else:
+        raise AssertionError("expected AttributeError for unknown attribute")
+
+
+def test_stack_does_not_shadow_root_modules():
+    """The folder must not carry duplicate copies of modules the repo owns."""
+    for name in ("quantum_mandala.py", "octahedral_arithmetic.py",
+                 "scale_invariance_breakdown.py", "mandala_computer.py"):
+        assert not os.path.exists(os.path.join(mandala_stack.HERE, name)), (
+            f"{name} duplicated in mandala_stack/ — import it from the root instead"
+        )
+    import octahedral_arithmetic as root_oct
+    assert os.path.dirname(os.path.abspath(root_oct.__file__)) == mandala_stack.REPO_ROOT
+
+
+def test_stack_modules_all_parse():
+    """Every stack module must at least be importable Python."""
+    import ast
+    import glob
+    for path in sorted(glob.glob(os.path.join(mandala_stack.HERE, "*.py"))):
+        with open(path, encoding="utf-8") as handle:
+            ast.parse(handle.read(), filename=path)
+
+
+def test_predefined_geometries_satisfy_protocol():
+    for name in list_geometries():
+        geo = get_geometry(name)
+        sample = list(range(min(geo.n_states, 8)))
+        _assert_satisfies_geometry_protocol(geo, sample)
+
+
+def test_geometry_state_counts():
+    assert OctahedralGeometry().n_states == 8
+    assert TetrahedralGeometry().n_states == 4
+    assert DodecahedralGeometry().n_states == 20
+    assert HexagonalGeometry().n_states == 6
+    assert HilbertGeometry(order=4).n_states == 2 ** 8
+
+
+def test_geometry_transitions_are_symmetric_where_declared():
+    """A declared neighbour must be reachable, and cost must be finite both
+    ways when both directions are declared."""
+    for name in ["octahedral-distorted", "octahedral-cube", "tetrahedral-right",
+                 "dodecahedral", "hexagonal"]:
+        geo = get_geometry(name)
+        for a in range(geo.n_states):
+            for b in geo.transitions(a):
+                assert math.isfinite(geo.transition_cost(a, b))
+                if a in geo.transitions(b):
+                    assert math.isfinite(geo.transition_cost(b, a))
+
+
+def test_disallowed_transition_costs_infinity():
+    geo = get_geometry("octahedral-cube")
+    for a in range(geo.n_states):
+        allowed = set(geo.transitions(a))
+        for b in range(geo.n_states):
+            if b not in allowed:
+                assert geo.transition_cost(a, b) == float("inf")
+
+
+def test_solver_is_shape_agnostic():
+    """Same solver, same call, every shape — factoring 15."""
+    for name in ["octahedral-distorted", "octahedral-cube", "tetrahedral-right",
+                 "dodecahedral", "hexagonal"]:
+        solver = MandalaSolver(geometry=get_geometry(name), seed=42)
+        result = solver.factor(15)
+        assert result.geometry_name == get_geometry(name).name
+        if result.correct:
+            assert result.factors[0] * result.factors[1] == 15
+
+
+def test_solver_anneal_is_deterministic_under_seed():
+    geo = get_geometry("octahedral-distorted")
+    a = MandalaSolver(geometry=geo, seed=11).anneal("random_landscape", {"seed": 3}, steps=80)
+    b = MandalaSolver(geometry=geo, seed=11).anneal("random_landscape", {"seed": 3}, steps=80)
+    assert a.best_state == b.best_state
+    assert a.best_energy == b.best_energy
+    assert a.energy_trace == b.energy_trace
+
+
+def test_solver_anneal_never_exceeds_initial_best():
+    geo = get_geometry("dodecahedral")
+    result = MandalaSolver(geometry=geo, seed=5).anneal(
+        "random_landscape", {"seed": 9}, steps=200)
+    assert result.best_energy <= result.energy_trace[0]
+    assert len(result.energy_trace) == result.steps + 1
+
+
+def test_solver_bloom_shells_are_disjoint():
+    geo = get_geometry("octahedral-cube")
+    bloom = MandalaSolver(geometry=geo, seed=1).bloom(center_state=0, expansion_layers=3)
+    seen = set()
+    for layer in bloom.layers:
+        states = set(layer["states"])
+        assert not (states & seen), "bloom shells overlap"
+        seen |= states
+    assert 0 not in seen
+
+
+def test_learned_geometry_satisfies_protocol():
+    """LearnedGeometry claims the Geometry protocol — including `dimension`."""
+    from geometry_learner import GeometryLearner
+
+    items = list(range(6))
+    geo = GeometryLearner(method="force_directed", dim=3, seed=7).learn(
+        items, lambda a, b: abs(a - b))
+    assert geo.dimension == 3
+    assert geo.n_states == 6
+    _assert_satisfies_geometry_protocol(geo, list(range(6)))
+
+
+# --- bridge: root physics <-> stack geometry -------------------------------
+
+def test_root_coupling_energy_matches_engine_law():
+    """E_coupling = J * sin(|s_i - s_j| * pi / 4)^2, the law in
+    MandalaComputer.compute_total_energy."""
+    assert root_coupling_energy(0, 0) == 0.0
+    assert abs(root_coupling_energy(0, 1) - math.sin(math.pi / 4) ** 2) < 1e-12
+    assert abs(root_coupling_energy(0, 2) - 1.0) < 1e-12
+    assert abs(root_coupling_energy(0, 4)) < 1e-12  # sin(pi)^2 = 0
+    assert abs(root_coupling_energy(0, 1, coupling_strength=3.0) - 1.5) < 1e-12
+
+
+def test_root_octahedral_geometry_protocol():
+    geo = RootOctahedralGeometry()
+    _assert_satisfies_geometry_protocol(geo, list(range(8)))
+    assert geo.n_states == 8
+    assert geo.dimension == 3
+
+
+def test_root_octahedral_geometry_uses_root_glyphs():
+    from octahedral_arithmetic import GLYPHS
+    geo = RootOctahedralGeometry()
+    assert [geo.glyph(s) for s in range(8)] == list(GLYPHS)
+
+
+def test_root_octahedral_geometry_cost_is_the_coupling_law():
+    geo = RootOctahedralGeometry()
+    for a in range(8):
+        for b in geo.transitions(a):
+            assert abs(geo.transition_cost(a, b) - root_coupling_energy(a, b)) < 1e-12
+
+
+def test_root_octahedral_eigenvalues_are_phi_scaled():
+    """lambda_i = phi^i / sum_k phi^k — normalised, monotone, sums to 1."""
+    geo = RootOctahedralGeometry(depth=5)
+    spectrum = geo._fibonacci_eigenvalues(5)
+    assert abs(sum(spectrum) - 1.0) < 1e-12
+    for i in range(len(spectrum) - 1):
+        assert spectrum[i] < spectrum[i + 1]
+    assert len(geo.eigenvalues(0)) == 3
+
+
+def test_root_octahedral_ring_width_widens_neighbourhood():
+    narrow = RootOctahedralGeometry(ring_width=1)
+    wide = RootOctahedralGeometry(ring_width=2)
+    assert narrow.transitions(0) == [1, 7]
+    assert set(narrow.transitions(0)) < set(wide.transitions(0))
+
+
+def test_cayley_geometry_is_the_full_group():
+    geo = CayleyGeometry()
+    assert geo.n_states == 48
+    _assert_satisfies_geometry_protocol(geo, [0, 1, 5, 20, 47])
+
+
+def test_cayley_geometry_transitions_match_group_generators():
+    from geometric_state_algebra import OhGroup
+    group = OhGroup()
+    geo = CayleyGeometry(group=group)
+    for state in [0, 3, 17, 44]:
+        for neighbor in geo.transitions(state):
+            assert group.distance(state, neighbor) == 1
+
+
+def test_cayley_geometry_is_connected():
+    """Every element must be reachable from the identity by generator moves."""
+    geo = CayleyGeometry()
+    seen = {0}
+    frontier = [0]
+    while frontier:
+        current = frontier.pop()
+        for neighbor in geo.transitions(current):
+            if neighbor not in seen:
+                seen.add(neighbor)
+                frontier.append(neighbor)
+    assert len(seen) == 48
+
+
+def test_cayley_geometry_parity_change_costs_more():
+    """A move that flips parity (a reflection/inversion step) is structurally
+    larger than one that stays within the proper rotations."""
+    geo = CayleyGeometry()
+    checked = 0
+    for state in range(geo.n_states):
+        state_proper = geo.group.elements[state].is_proper()
+        same = [geo.transition_cost(state, n) for n in geo.transitions(state)
+                if geo.group.elements[n].is_proper() == state_proper]
+        flip = [geo.transition_cost(state, n) for n in geo.transitions(state)
+                if geo.group.elements[n].is_proper() != state_proper]
+        if same and flip:
+            assert min(flip) > min(same)
+            checked += 1
+    assert checked == geo.n_states, "every element should have both move kinds"
+
+
+def test_register_bridge_geometries_is_idempotent():
+    before = set(GEOMETRIES)
+    names = register_bridge_geometries()
+    register_bridge_geometries()
+    assert set(names) <= set(GEOMETRIES)
+    assert set(GEOMETRIES) == before | set(names)
+    for name in names:
+        geo = get_geometry(name)
+        assert geo.n_states >= 8
+
+
+def test_bridge_geometries_run_the_stack_solver():
+    register_bridge_geometries()
+    for name in ["octahedral-root", "cayley-oh"]:
+        solver = MandalaSolver(geometry=get_geometry(name), seed=3)
+        result = solver.anneal("factorization", {"N": 143}, steps=120)
+        assert math.isfinite(result.best_energy)
+        assert 0 <= result.best_state < get_geometry(name).n_states
+
+
+# --- bridge: stack solver <-> live MandalaComputer -------------------------
+
+def _encoded_computer(N=143, depth=3):
+    from mandala_computer import MandalaComputer
+    mc = MandalaComputer(golden_depth=depth, temperature=1.0)
+    mc.encode_factorization(N)
+    return mc
+
+
+def test_states_roundtrip_through_computer():
+    mc = _encoded_computer()
+    original = states_from_computer(mc)
+    assert len(original) == len(mc.cells)
+    flipped = [(s + 3) % mc.sacred_geometry for s in original]
+    apply_states(mc, flipped)
+    assert states_from_computer(mc) == flipped
+    apply_states(mc, original)
+    assert states_from_computer(mc) == original
+
+
+def test_apply_states_rejects_wrong_length():
+    mc = _encoded_computer()
+    try:
+        apply_states(mc, [0] * (len(mc.cells) + 1))
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("expected ValueError on cell-count mismatch")
+
+
+def test_apply_states_wraps_into_state_range():
+    mc = _encoded_computer()
+    apply_states(mc, [mc.sacred_geometry + 2] * len(mc.cells))
+    assert all(0 <= cell.state < mc.sacred_geometry for cell in mc.cells)
+
+
+def test_geometric_relax_lowers_root_energy():
+    """Stack geometry proposes the moves; the root engine scores them."""
+    mc = _encoded_computer()
+    result = geometric_relax(mc, steps=300, seed=7)
+    assert result["best_energy"] <= result["initial_energy"]
+    assert len(result["energy_history"]) == result["steps"] + 1
+    assert 0.0 <= result["acceptance_rate"] <= 1.0
+    # The computer is left holding the best configuration found.
+    assert states_from_computer(mc) == result["best_states"]
+    assert abs(mc.compute_total_energy() - result["best_energy"]) < 1e-6
+
+
+def test_geometric_relax_is_deterministic_under_seed():
+    """Same start, same seed, same trajectory. (MandalaComputer blooms with
+    random cell states, so the start has to be pinned explicitly.)"""
+    first, second = _encoded_computer(), _encoded_computer()
+    start = [i % first.sacred_geometry for i in range(len(first.cells))]
+    apply_states(first, start)
+    apply_states(second, start)
+    a = geometric_relax(first, steps=150, seed=21)
+    b = geometric_relax(second, steps=150, seed=21)
+    assert a["best_states"] == b["best_states"]
+    assert abs(a["best_energy"] - b["best_energy"]) < 1e-9
+    assert a["energy_history"] == b["energy_history"]
+
+
+def test_geometric_relax_respects_geometry_transitions():
+    """Every accepted state must be reachable in the geometry — no move may
+    leave the shape."""
+    geo = RootOctahedralGeometry(ring_width=1)
+    mc = _encoded_computer()
+    start = states_from_computer(mc)
+    result = geometric_relax(mc, geometry=geo, steps=200, seed=4)
+    for before, after in zip(start, result["best_states"]):
+        assert after == before or after in _reachable(geo, before)
+
+
+def _reachable(geo, state, limit=64):
+    seen = {state}
+    frontier = [state]
+    while frontier and len(seen) < limit:
+        current = frontier.pop()
+        for neighbor in geo.transitions(current):
+            if neighbor not in seen:
+                seen.add(neighbor)
+                frontier.append(neighbor)
+    return seen
+
+
+def test_geometric_relax_rejects_too_small_geometry():
+    mc = _encoded_computer()
+    try:
+        geometric_relax(mc, geometry=get_geometry("tetrahedral-right"), steps=10)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("expected ValueError for a 4-state geometry on 8 states")
+
+
+def test_geometric_relax_requires_cells():
+    from mandala_computer import MandalaComputer
+    mc = MandalaComputer(golden_depth=3)
+    try:
+        geometric_relax(mc, steps=10)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("expected ValueError when no cells are bloomed")
+
+
+# --- bridge: stack states -> root arithmetic -------------------------------
+
+def test_states_to_glyphs_uses_root_alphabet():
+    from octahedral_arithmetic import GLYPHS
+    assert states_to_glyphs([0, 1, 2, 3]) == "".join(GLYPHS[:4])
+    assert states_to_glyphs([8, 9]) == GLYPHS[0] + GLYPHS[1]
+
+
+def test_states_to_number_is_exact_octahedral_number():
+    from octahedral_arithmetic import OctahedralNumber, states_to_number as root_stn
+    states = [3, 5, 1]
+    bridged = states_to_number(states)
+    assert isinstance(bridged, OctahedralNumber)
+    assert bridged.digits == root_stn(states).digits
+
+
+def test_learn_root_geometry_recovers_a_manifold():
+    """Hand only the coupling metric to the learner and see what it implies."""
+    geo = learn_root_geometry(num_states=8, dim=3, seed=42)
+    assert geo.n_states == 8
+    assert geo.dimension == 3
+    _assert_satisfies_geometry_protocol(geo, list(range(8)))
+    # sin^2 makes states 4 apart identical, so opposite states embed close
+    # together — the metric is not the octahedron the repo asserts.
+    assert geo._distance(0, 4) < geo._distance(0, 2)
+
+
+def test_learn_root_geometry_registers_when_asked():
+    learn_root_geometry(num_states=8, seed=1, register_as="test-learned-root")
+    try:
+        assert "test-learned-root" in list_geometries()
+        assert get_geometry("test-learned-root").n_states == 8
+    finally:
+        GEOMETRIES.pop("test-learned-root", None)
+
+
 # Run all tests
 # ---------------------------------------------------------------------------
 

@@ -5,6 +5,53 @@ versioning (individual modules carry their own informal `v1.0`/`v2.0` markers in
 docstrings — this file is the repo-wide narrative those numbers don't capture on their
 own). Dates are when each capability landed, derived from git history.
 
+## 2026-08 — Geometry-agnostic stack (`mandala_stack/`)
+
+- Added `mandala_stack/`, the repo's first code subdirectory. Where the root
+  engine commits to one shape — 8 states, O_h symmetry — the stack makes the
+  shape an input: `MandalaSolver` talks only to a `Geometry` protocol, so the
+  same anneal / bloom / factor code runs on octahedral, tetrahedral,
+  dodecahedral, hexagonal and Hilbert geometries, or on a manifold learned from
+  data by `GeometryLearner`. Also carries `GeometricSolver` (energy as a
+  functional of the embedding, relaxed by gradient flow rather than random walk)
+  and `GeodesicMemory` (associative memory as a basin of attraction).
+- The folder shares the root's namespace rather than nesting under it:
+  `_paths.bootstrap()` puts both directories on `sys.path`, so stack and root
+  modules import each other by plain module name. `quantum_mandala.py`,
+  `octahedral_arithmetic.py` and `scale_invariance_breakdown.py` arrived with
+  the stack byte-identical to the repo's copies and were not duplicated — they
+  are imported from the root, and a test enforces that no module is copied
+  across the boundary.
+- Added `mandala_stack/stack_bridge.py`, the connection layer, working both
+  directions. Root → stack: `RootOctahedralGeometry` exposes the engine's
+  `sin²` coupling law, φ-scaled Fibonacci eigenvalues and glyph alphabet as a
+  `Geometry`; `CayleyGeometry` turns the 48-element O_h group into a 48-state
+  geometry with generator moves and Cayley-distance costs. Stack → root:
+  `geometric_relax()` anneals a live `MandalaComputer` with the stack's geometry
+  proposing moves and the engine's own `compute_total_energy()` scoring them —
+  the same shape as `GeometricMandalaAdapter.geometric_relax`. Plus
+  `states_to_glyphs()` / `states_to_number()` into exact glyph-space arithmetic.
+- `learn_root_geometry()` hands the root coupling metric *alone* to the stack's
+  learner and asks what manifold it implies. Because `sin²(|Δs|·π/4)` vanishes
+  for states four apart, the metric treats opposite states as identical and the
+  learned embedding is not the octahedron the repo asserts. Recorded as a
+  measured result with a test, not smoothed over — either the metric or the
+  asserted geometry is wrong, and that is a question for
+  `mandala_scale_invariance_breakdown.py`.
+- `mandala_cli.py` now spans both halves: its existing `--consumer` and
+  `--fractal-map` flags resolve for the first time (`consumer_hardware.py` and
+  `fractal_address.py` live in the stack), and `--geometry` / `--bridge` were
+  added. The stack's own CLI is `mandala_stack/stack_cli.py`, renamed from
+  `mandala_cli.py` to keep the root's entry point.
+- Fixed on the way in: `fractal_address.py` did not import at all (a stray
+  filename line above the shebang, and unquoted prose after `main()` — the prose
+  is preserved as `USAGE_NOTES`); `LearnedGeometry` was missing the `dimension`
+  property the `Geometry` protocol requires.
+- Test suite grew from 350 to 387: protocol conformance for every registered
+  geometry, solver determinism and shape-agnosticism, Cayley graph connectivity
+  and parity weighting, state round-trips through a live `MandalaComputer`, and
+  the learned-geometry result above.
+
 ## 2026-07 — Expandable multi-ledger (mandala hook)
 
 - Added `mandala_hook.py` (CC0): an `ExpandableMultiLedger` whose dimension set

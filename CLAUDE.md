@@ -43,6 +43,7 @@ mandala-computing/
 ├── claim_validator.py         # epistemological claim validation (~500 loc)
 ├── glyph_convert.py           # human decimal-to-glyph converter (~355 loc)
 ├── mandala_simulator.py       # lightweight symbolic simulator (~250 loc)
+├── mandala_cli.py             # unified CLI, root engine + mandala_stack/ (~200 loc)
 ├── ONBOARDING.md              # agent learning path from Rosetta-Shape-Core
 ├── .fieldlink.json            # ecosystem metadata (v3.0, bidirectional)
 ├── .gitignore                 # excludes __pycache__/, *.pyc, .env, etc.
@@ -52,9 +53,13 @@ mandala-computing/
 ├── LICENSE                    # MIT
 ├── examples/                  # 18 runnable example scripts + benchmark
 ├── experiments/                # playgrounds wired to the core engine — see experiments/README.md
-├── tests/test_core.py         # 350-test suite
+├── mandala_stack/             # geometry-agnostic stack — see mandala_stack/README.md
+├── tests/test_core.py         # 387-test suite
 └── [17 .md files]             # theory, hardware, integration, proofs, notes
 ```
+
+The root is flat; `mandala_stack/` is the one code subdirectory, and it shares
+the root's namespace rather than nesting under it (see below).
 
 ---
 
@@ -351,6 +356,62 @@ computational substrates.
 
 **key classes:** `CandidateBreakdown`, `REPO_CANDIDATES`
 
+### mandala-stack (`mandala_stack/`) v3.0
+
+Geometry-agnostic stack. Where the root engine commits to one shape (8 states,
+O_h), this folder makes the shape an input: `MandalaSolver` talks only to a
+`Geometry` protocol, so the same anneal/bloom/factor code runs on octahedral,
+tetrahedral, dodecahedral, hexagonal, Hilbert — or a geometry *learned from
+data*. Full write-up, including the experiments that failed, is in
+`mandala_stack/README.md`.
+
+**namespace, not a nested package.** Importing anything here puts both
+`mandala_stack/` and the repo root on `sys.path` (`_paths.bootstrap()`), so
+stack modules and root modules import each other by plain module name. That is
+why the folder does **not** carry copies of `quantum_mandala.py`,
+`octahedral_arithmetic.py` or `scale_invariance_breakdown.py` — it imports the
+root's. `tests/test_core.py::test_stack_does_not_shadow_root_modules` enforces
+that. `__init__.py` resolves submodules lazily and registers each under both
+its flat and dotted name, so `mandala_stack.geometry_core is geometry_core`.
+
+| file | role |
+|------|------|
+| `geometry_core.py` | `Geometry` protocol + 10 pre-defined shapes + registry |
+| `geometry_learner.py` | learn a manifold from data (force-directed, MDS, spectral, Isomap) |
+| `mandala_solver.py` | shape-agnostic anneal / bloom / factor |
+| `geometric_solver.py` | energy as a functional of the embedding, gradient flow |
+| `geodesic_memory.py` | associative memory as a basin of attraction on a manifold |
+| `adapters.py` | DNA / RNA / protein → geometry |
+| `stack_bridge.py` | the connection layer to the root engine (below) |
+| `stack_cli.py` | stack CLI — named this because the root owns `mandala_cli.py` |
+| `consumer_hardware.py`, `fractal_address.py` | laptop compute layer, Hilbert file mapper (both used by the root `mandala_cli.py`) |
+
+**stack-bridge (`mandala_stack/stack_bridge.py`)** — the seam, both directions:
+
+| function / class | connects |
+|------------------|----------|
+| `RootOctahedralGeometry` | root's `sin²` coupling law + φ eigenvalues + glyph alphabet, as a stack `Geometry` |
+| `CayleyGeometry` | the 48-element O_h group as a 48-state geometry (transitions = generator moves, cost = Cayley distance, parity flips weighted by φ) |
+| `geometric_relax(mc, geometry)` | anneals a live `MandalaComputer` — stack geometry proposes moves, `compute_total_energy()` scores them. Same shape as `GeometricMandalaAdapter.geometric_relax` |
+| `states_from_computer` / `apply_states` | move cell states between the engines |
+| `states_to_glyphs` / `states_to_number` | stack results into exact glyph-space arithmetic |
+| `learn_root_geometry()` | hands the root coupling metric alone to `GeometryLearner` |
+| `register_bridge_geometries()` | adds `octahedral-root`, `octahedral-root-wide`, `cayley-oh` to the stack registry |
+
+**a measured result worth knowing:** `sin²(|Δs|·π/4)` is zero for states four
+apart, so the root metric treats opposite states as identical. Learning a
+manifold from that metric alone does not recover an octahedron — opposite
+states embed closer than adjacent ones. Asserted in
+`test_learn_root_geometry_recovers_a_manifold`. Either the metric or the
+asserted geometry is wrong; that is a falsifiable question for
+`mandala_scale_invariance_breakdown.py`, not a bug to paper over.
+
+**gotchas:** `CayleyGeometry` state 0 is *not* the identity (`OhGroup` sorts by
+conjugacy signature, det=-1 first) — use `group.index(group.identity())`. Two
+distinct `GeometryLearner` classes exist: `geometry_learner.GeometryLearner`
+(returns `LearnedGeometry`) and `geodesic_memory.GeometryLearner` (returns
+`Manifold`); `from mandala_stack import GeometryLearner` gives the first.
+
 ---
 
 ## mathematical-framework
@@ -494,7 +555,8 @@ large systems.
 
 ## build-test-run
 
-Test suite: `python tests/test_core.py` (350 tests across all modules).
+Test suite: `python tests/test_core.py` (387 tests across all modules,
+including `mandala_stack/` and its bridge).
 No formal build system, CI/CD, or linting is configured.
 
 ### run-demos
@@ -513,9 +575,21 @@ python -c "from quantum_mandala import demo_grover_search; demo_grover_search()"
 # simulator demos
 python -c "from mandala_simulator import test_p_equals_np; test_p_equals_np()"
 python -c "from mandala_simulator import test_unified_field; test_unified_field()"
+
+# unified CLI — root engine and mandala_stack/ together
+python mandala_cli.py --all
+python mandala_cli.py --geometry     # every registered shape, same solver
+python mandala_cli.py --bridge       # stack <-> root engine self-test
+
+# geometry-agnostic stack
+python mandala_stack/stack_bridge.py
+python mandala_stack/stack_cli.py --list-geometries
+python mandala_stack/stack_cli.py --demo all
+python mandala_stack/demo_learned_geometry.py
 ```
 
-Or run modules directly: `python mandala_computer.py`
+Or run modules directly: `python mandala_computer.py`,
+`python mandala_stack/geodesic_memory.py`
 
 ---
 
@@ -538,6 +612,8 @@ Or run modules directly: `python mandala_computer.py`
 | `Questions.md`             | limitations and open research questions   |
 | `Checklist.md`             | integration verification checklist        |
 | `ONBOARDING.md`            | agent learning path from Rosetta-Shape-Core |
+| `mandala_stack/README.md`  | geometry-agnostic stack: protocol, results, bridge |
+| `experiments/README.md`    | how each playground is wired to the core engine |
 | `Notes.md`                 | OSL design notes and symbolic language spec |
 
 ---
@@ -671,15 +747,30 @@ Is your task about...
 
   PHASE / TOPOLOGICAL OPTIMIZATION?
   └─> kt_annealer.py (Kosterlitz-Thouless, vortex detection)
+
+  SOLVING ON A SHAPE THAT ISN'T THE OCTAHEDRON?
+  └─> mandala_stack/ (Geometry protocol, shape-agnostic MandalaSolver)
+      Run: python mandala_stack/stack_cli.py --list-geometries
+      Key: the shape is an input, not a constant
+
+  LEARNING A GEOMETRY FROM DATA?
+  └─> mandala_stack/geometry_learner.py → GeometryLearner.learn(items, dist_fn)
+      Then: MandalaSolver(geometry=learned) — same solver, no changes
+
+  CONNECTING THE STACK TO THE ROOT ENGINE?
+  └─> mandala_stack/stack_bridge.py
+      Run: python mandala_stack/stack_bridge.py
+      Key: geometric_relax(mc) — stack geometry moves, root engine energy
 ```
 
 ### verify-your-environment
 
 ```bash
 pip install numpy scipy          # only external deps
-python tests/test_core.py        # should report 350 passed, 0 failed
+python tests/test_core.py        # should report 387 passed, 0 failed
 python mandala_computer.py       # runs all classical demos
 python mandala_runtime.py        # runs sensor fusion + LID demos
+python mandala_cli.py --all      # root engine + mandala_stack/ demos
 ```
 
 ### key-invariants-to-preserve
@@ -734,6 +825,15 @@ Adding a new feature?
 ├── Does it modify Substrate enum?
 │   └─> STOP. Add string substrates instead. The enum is for encoding
 │       substrates only (binary/ternary/quantum/stochastic/digital/analog).
+├── Does it add a new SHAPE (not a substrate)?
+│   └─> Implement the Geometry protocol in mandala_stack/geometry_core.py
+│       (name, n_states, dimension, position, transitions, transition_cost,
+│       eigenvalues, glyph, scale_position), register in GEOMETRIES.
+│       If the shape comes from data → GeometryLearner, not a hand-written table.
+│       If the shape comes from the root engine → mandala_stack/stack_bridge.py
+├── Does it copy a root module into mandala_stack/ (or vice versa)?
+│   └─> STOP. The two directories share one sys.path namespace — import it
+│       instead. test_stack_does_not_shadow_root_modules enforces this.
 └── Does it claim a scientific result?
     └─> Run through claim_validator.py first.
         Check: is the claim specific, measurable, and falsifiable?
@@ -749,10 +849,21 @@ Adding a new feature?
 - **`OctahedralState`** exists in both `geis.py` (3D cubic coordinates, tokens)
   and implicitly in `octahedral_arithmetic.py` (glyph-space). Use GEIS for
   binary bridging, use octahedral_arithmetic for exact glyph math
-- **test suite:** `python tests/test_core.py` runs 350 tests across all modules
+- **duplicate class name:** two `GeometryLearner` classes exist inside
+  `mandala_stack/` — `geometry_learner.GeometryLearner(method, dim, seed)`
+  returns a `LearnedGeometry`; `geodesic_memory.GeometryLearner(dim,
+  n_neighbors, seed)` returns a `Manifold`. `from mandala_stack import
+  GeometryLearner` gives the first
+- **test suite:** `python tests/test_core.py` runs 387 tests across all modules
 - **`.gitignore`** excludes `__pycache__/`, `.pyc`, `.env`, `.pytest_cache/`, etc.
 - **`requirements.txt`** at repo root lists numpy and scipy
-- **flat layout:** all code at root level, no package hierarchy
+- **flat layout:** all code at root level except `mandala_stack/`, which shares
+  the root's namespace via `sys.path` rather than nesting as a package — a stack
+  module and a root module import each other by plain name. Do not "fix" this
+  into relative imports, and do not copy modules across the boundary
+- **`mandala_stack/`** is where the shape stops being a constant. If a task is
+  about a geometry other than the octahedron, or about learning a geometry from
+  data, start at `mandala_stack/README.md`, not at `mandala_computer.py`
 - **research code:** not production software — expect exploratory patterns
 - **`PHI`** is defined in `octahedral_arithmetic.py` and imported by most modules.
   `mandala_computer.py` loads from atlas JSON. `quantum_mandala.py` and `geis.py`
