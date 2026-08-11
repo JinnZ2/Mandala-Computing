@@ -5,6 +5,59 @@ versioning (individual modules carry their own informal `v1.0`/`v2.0` markers in
 docstrings — this file is the repo-wide narrative those numbers don't capture on their
 own). Dates are when each capability landed, derived from git history.
 
+## 2026-08 — Seven bases of measurement (`mandala_bloom/`)
+
+- Added `mandala_bloom/`. Where `mandala_stack/` made the *shape* an input,
+  this makes the *measurement* an input: a distance is taken by an instrument
+  with its own sensitivity `I_ij(u)`, read against a calibration standard
+  `mu(u)`, traversed along one of several ways of knowing, through a space
+  carrying an explicit unknown density `kappa(u)`, by an observer whose
+  participation `omega(u)` softens the instrument toward the identity. Those,
+  with the Riemannian metric and the energy functional binding them, are the
+  seven bases.
+- Two levels, coupled. Each Atlas entry is a parent point; a hypernetwork turns
+  that point into the weights of a child manifold on which the entry's concept
+  path (🪨 → 🛡️ → 🧭 → 🕸️ → ∞ → 📡 → ⚖️) is a curve. A cross-scale term ties the
+  parent metric to the mean child metric, so where an entry sits in the large
+  space and what shape its own small space has are learned as one object.
+- **Torch is optional and stays that way.** `concept_atlas.py` (the semantics)
+  and `bloom_bridge.learn_atlas_geometry()` (embedding via the stack's own
+  learner) are numpy-only; `BloomResult` is plain floats, so a bloom trained
+  elsewhere loads and solves with no backend present. `mandala_bloom.has_torch()`
+  gates the rest and the ImportError names the fix. `requirements.txt` is
+  unchanged — the backend lives in `requirements-bloom.txt`.
+- `bloom_bridge.py` connects four ways: Atlas dissimilarity into
+  `mandala_stack.GeometryLearner`; a trained bloom into a stack `Geometry`
+  whose `transition_cost` uses the learned instrument tensor rather than
+  Euclidean distance; the concept atlas into the shape-agnostic `MandalaSolver`
+  unchanged; and concept paths into the root's exact base-8 glyph arithmetic.
+- Measured, with its limit stated. Over 8 seeds the full bloom correlates
+  +0.745 (sd 0.230) with the concept/glyph dissimilarity, the
+  instrument-ablated bloom +0.496 (sd 0.355), the stack learner +0.161
+  (sd 0.411). The instrument tensor appears to help and to stabilise — but
+  n = 4 entries is 12 pairs against thousands of parameters, and on 2 of 8
+  seeds the ablated version wins. Recorded in `mandala_bloom/README.md` as a
+  direction, not a result.
+- Six defects found in the source scripts, all verified by running them rather
+  than by reading. Five crash: an undefined `curvature_loss_manifold`; a
+  positional-after-keyword call that stops the file parsing; a guard testing
+  `↻` while indexing `🔄`; hypernetwork weights unpacked `(in, out)` when
+  `nn.Linear` stores `(out, in)`; and `jacrev` on a batched point giving a
+  rank-4 tensor that was then transposed. The sixth is silent and was the one
+  that mattered — building child manifolds with `layer.weight.data = W`
+  detaches the autograd graph, so the hypernetwork received exactly zero
+  gradient while the loss fell convincingly, leaving the parent→child
+  generation decorative and the cross-scale coupling inert. `_ChildManifold`
+  now applies generated tensors through `torch.func.functional_call`;
+  `test_bloom_hypernetwork_receives_gradient` fails if that regresses.
+- Three quieter fixes: `calibration_smoothness` called `requires_grad_(True)`
+  on a non-leaf tensor (a no-op, so the term differentiated the wrong thing);
+  `mode_alignment` masked a grad-carrying `cdist` diagonal with `inf`,
+  propagating NaN backward; and the traversal-mode labels disagreed between the
+  comment and the printout, now single-sourced from
+  `concept_atlas.KNOWING_MODES`.
+- `mandala_cli.py --bloom` runs the whole thing. Test suite 387 -> 422.
+
 ## 2026-08 — Geometry-agnostic stack (`mandala_stack/`)
 
 - Added `mandala_stack/`, the repo's first code subdirectory. Where the root

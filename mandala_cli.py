@@ -5,8 +5,9 @@ Runs without Jupyter. No ipywidgets required.
 
 Covers the root repo's demos (quantum, octahedral arithmetic, scale audit) plus
 the geometry-agnostic stack in mandala_stack/ (consumer hardware, fractal
-address mapping, and every registered geometry). Both directories are put on
-sys.path, so this file imports either side by plain module name.
+address mapping, every registered geometry) and the concept atlas in
+mandala_bloom/. All three directories are put on sys.path, so this file
+imports any side by plain module name.
 
 For the full geometry-agnostic surface — domain adapters, learned geometries,
 geodesic memory — use mandala_stack/stack_cli.py.
@@ -149,6 +150,13 @@ def run_bridge_demo():
     _self_test()
 
 
+def run_bloom_demo():
+    """Concept atlas + the seven bases of measurement (mandala_bloom/)."""
+    sys.path.insert(0, os.path.join(_ROOT, 'mandala_bloom'))
+    from bloom_bridge import _self_test
+    _self_test()
+
+
 def main():
     ap = argparse.ArgumentParser(
         description="Mandala Computing Unified CLI "
@@ -158,13 +166,15 @@ def main():
     ap.add_argument('--consumer', action='store_true', help='Run consumer hardware demos (mandala_stack/)')
     ap.add_argument('--geometry', action='store_true', help='Run geometry-agnostic stack demos (mandala_stack/)')
     ap.add_argument('--bridge', action='store_true', help='Run the stack <-> root engine bridge self-test')
+    ap.add_argument('--bloom', action='store_true', help='Run the concept atlas / seven-bases demos (mandala_bloom/)')
     ap.add_argument('--scale-audit', action='store_true', help='Run scale invariance audit')
     ap.add_argument('--fractal-map', nargs='+', metavar='DIR', help='Build fractal address map for directories')
     ap.add_argument('--all', action='store_true', help='Run all demos')
     args = ap.parse_args()
 
     if not any([args.quantum, args.octahedral, args.consumer, args.geometry,
-                args.bridge, args.scale_audit, args.fractal_map, args.all]):
+                args.bridge, args.bloom, args.scale_audit, args.fractal_map,
+                args.all]):
         ap.print_help()
         sys.exit(0)
 
@@ -178,6 +188,8 @@ def main():
         run_geometry_demos()
     if args.all or args.bridge:
         run_bridge_demo()
+    if args.all or args.bloom:
+        run_bloom_demo()
     if args.all or args.scale_audit:
         run_scale_audit()
     if args.fractal_map:

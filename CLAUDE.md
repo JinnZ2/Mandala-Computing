@@ -54,12 +54,15 @@ mandala-computing/
 ├── examples/                  # 18 runnable example scripts + benchmark
 ├── experiments/                # playgrounds wired to the core engine — see experiments/README.md
 ├── mandala_stack/             # geometry-agnostic stack — see mandala_stack/README.md
-├── tests/test_core.py         # 387-test suite
+├── mandala_bloom/             # seven bases of measurement — see mandala_bloom/README.md
+├── requirements-bloom.txt     # optional torch, for mandala_bloom/ training only
+├── tests/test_core.py         # 422-test suite
 └── [17 .md files]             # theory, hardware, integration, proofs, notes
 ```
 
-The root is flat; `mandala_stack/` is the one code subdirectory, and it shares
-the root's namespace rather than nesting under it (see below).
+The root is flat; `mandala_stack/` and `mandala_bloom/` are the two code
+subdirectories, and both share the root's namespace rather than nesting under
+it (see below).
 
 ---
 
@@ -91,6 +94,9 @@ the root's namespace rather than nesting under it (see below).
 | Agents / Integration | `constraint_agent.py`, `sovereign_integration.py` | stdlib only | Agent framework, sovereignty bridge |
 | Validation | `claim_validator.py`, `membrane.py` | stdlib only (membrane: numpy optional) | Epistemology, boundary computation |
 | Entry point | `mandala_simulator.py` | stdlib only (delegates to engines when available) | Lightweight wrapper |
+| Geometry protocol | `mandala_stack/` | numpy | Shape-agnostic solving, manifold learning |
+| Measurement | `mandala_bloom/concept_atlas.py`, `bloom_bridge.py` | numpy | Atlas semantics + geometry export must not need a training backend |
+| Measurement (training) | `mandala_bloom/bases.py`, `bloom.py` | **torch, optional** | Differentiable fields and the two-level coupling. `requirements-bloom.txt`, gated by `mandala_bloom.has_torch()` |
 
 ---
 
@@ -406,6 +412,73 @@ states embed closer than adjacent ones. Asserted in
 asserted geometry is wrong; that is a falsifiable question for
 `mandala_scale_invariance_breakdown.py`, not a bug to paper over.
 
+### mandala-bloom (`mandala_bloom/`) v1.0
+
+The seven bases of measurement. Where `mandala_stack/` makes the *shape* an
+input, this folder makes the *measurement* an input: a distance is taken by an
+instrument with its own sensitivity, read against a calibration standard,
+traversed in a way of knowing, through a space with blind spots, by an observer
+who may be inside the system.
+
+| basis | object |
+|-------|--------|
+| 1 Measurement | Riemannian metric `g_ij(u) = JᵀJ` |
+| 2 Instruments | symmetric-PD sensitivity tensor `I_ij(u)` |
+| 3 Metrology | calibration scalar `mu(u)`, gradient-penalised |
+| 4 Ways of knowing | one vector field per traversal mode (logic/analogy/intuition) |
+| 5 Unknowns | `kappa(u) >= 0`, amplifies allowed curvature |
+| 6 Physics | the energy functional over all of the above |
+| 7 Attunement | `omega(u)` in [0,1], softens the instrument toward identity |
+
+Two levels: each Atlas entry is a parent point; a hypernetwork turns that point
+into the weights of a *child* manifold on which the entry's concept path is a
+curve. A cross-scale term ties the parent metric to the mean child metric —
+that coupling is what makes it a bloom rather than two independent fits.
+
+| file | role | torch |
+|------|------|-------|
+| `concept_atlas.py` | emoji concept map, Atlas entries, blended similarity | no |
+| `bloom_bridge.py` | connection layer to `mandala_stack/` and the root | no |
+| `bases.py` | the seven bases as differentiable fields | yes |
+| `bloom.py` | two-level model, `MandalaBloom`, `BloomConfig`, `BloomResult` | yes |
+
+**torch is optional and must stay so.** `concept_atlas` and
+`bloom_bridge.learn_atlas_geometry()` are numpy-only; a `BloomResult` is plain
+floats, so a bloom trained elsewhere loads and solves without a backend.
+`mandala_bloom.has_torch()` gates the rest, and the ImportError names the fix.
+This is the repo's "breathing degrades, never fails" invariant applied to a
+dependency.
+
+**bridge (`mandala_bloom/bloom_bridge.py`):**
+
+| function / class | connects |
+|------------------|----------|
+| `learn_atlas_geometry()` | Atlas dissimilarity -> `mandala_stack.GeometryLearner`. No torch; doubles as the control |
+| `BloomGeometry` / `geometry_from_bloom()` | a `BloomResult` as a stack `Geometry` whose `transition_cost` uses the learned instrument tensor, not Euclidean distance |
+| `solve_on_atlas()` | the same `MandalaSolver` that anneals octahedra, annealing the concept atlas |
+| `path_to_glyphs` / `path_to_number` | a concept story projected onto the root glyph alphabet and into exact base-8 arithmetic (lossy mod-8, display/arithmetic only) |
+| `compare_embeddings()` | scores bloom vs ablated bloom vs stack learner against the dissimilarity all three fit |
+
+**measured result, and its limit:** over 8 seeds the full bloom correlates
++0.745 (sd 0.230) with the target dissimilarity, the instrument-ablated bloom
++0.496 (sd 0.355), the stack learner +0.161 (sd 0.411). Directionally the
+instrument tensor helps and stabilises — but **n = 4 entries, 12 pairs**, and
+the ranges overlap (on 2 of 8 seeds the ablated version wins). Do not quote the
+mean without the sd and the n. More Atlas entries is the single highest-value
+contribution to this folder.
+
+**defects found in the source scripts** (all verified by execution, recorded in
+`mandala_bloom/README.md`): five crashes, plus one silent — building child
+manifolds with `layer.weight.data = W` detaches the autograd graph, so the
+hypernetwork received *exactly zero* gradient while the loss fell convincingly.
+`_ChildManifold` uses `torch.func.functional_call` instead;
+`test_bloom_hypernetwork_receives_gradient` locks it.
+
+**gotchas:** `InstrumentField` hardcodes `d=2` (Cholesky packing) and raises
+otherwise. `attunement_coherence` couples omega to kappa *by construction*, so
+"omega tracks the unknowns" is not independent evidence — the loss put it
+there.
+
 **gotchas:** `CayleyGeometry` state 0 is *not* the identity (`OhGroup` sorts by
 conjugacy signature, det=-1 first) — use `group.index(group.identity())`. Two
 distinct `GeometryLearner` classes exist: `geometry_learner.GeometryLearner`
@@ -555,8 +628,8 @@ large systems.
 
 ## build-test-run
 
-Test suite: `python tests/test_core.py` (387 tests across all modules,
-including `mandala_stack/` and its bridge).
+Test suite: `python tests/test_core.py` (422 tests across all modules,
+including `mandala_stack/`, `mandala_bloom/` and both bridges).
 No formal build system, CI/CD, or linting is configured.
 
 ### run-demos
@@ -580,12 +653,18 @@ python -c "from mandala_simulator import test_unified_field; test_unified_field(
 python mandala_cli.py --all
 python mandala_cli.py --geometry     # every registered shape, same solver
 python mandala_cli.py --bridge       # stack <-> root engine self-test
+python mandala_cli.py --bloom        # concept atlas + seven bases
 
 # geometry-agnostic stack
 python mandala_stack/stack_bridge.py
 python mandala_stack/stack_cli.py --list-geometries
 python mandala_stack/stack_cli.py --demo all
 python mandala_stack/demo_learned_geometry.py
+
+# seven bases of measurement (torch optional — see requirements-bloom.txt)
+python mandala_bloom/concept_atlas.py    # numpy only
+python mandala_bloom/bloom_bridge.py     # numpy only, degrades without torch
+python mandala_bloom/bloom.py            # needs torch
 ```
 
 Or run modules directly: `python mandala_computer.py`,
@@ -613,6 +692,7 @@ Or run modules directly: `python mandala_computer.py`,
 | `Checklist.md`             | integration verification checklist        |
 | `ONBOARDING.md`            | agent learning path from Rosetta-Shape-Core |
 | `mandala_stack/README.md`  | geometry-agnostic stack: protocol, results, bridge |
+| `mandala_bloom/README.md`  | seven bases of measurement, two-level bloom, defects found |
 | `experiments/README.md`    | how each playground is wired to the core engine |
 | `Notes.md`                 | OSL design notes and symbolic language spec |
 
@@ -757,6 +837,11 @@ Is your task about...
   └─> mandala_stack/geometry_learner.py → GeometryLearner.learn(items, dist_fn)
       Then: MandalaSolver(geometry=learned) — same solver, no changes
 
+  MEASUREMENT ITSELF — INSTRUMENTS, CALIBRATION, UNKNOWNS, THE OBSERVER?
+  └─> mandala_bloom/ (seven bases; the metric is learned and position-dependent)
+      Run: python mandala_bloom/bloom_bridge.py
+      Key: torch is OPTIONAL — the atlas and its geometry are numpy-only
+
   CONNECTING THE STACK TO THE ROOT ENGINE?
   └─> mandala_stack/stack_bridge.py
       Run: python mandala_stack/stack_bridge.py
@@ -767,7 +852,7 @@ Is your task about...
 
 ```bash
 pip install numpy scipy          # only external deps
-python tests/test_core.py        # should report 387 passed, 0 failed
+python tests/test_core.py        # should report 422 passed, 0 failed
 python mandala_computer.py       # runs all classical demos
 python mandala_runtime.py        # runs sensor fusion + LID demos
 python mandala_cli.py --all      # root engine + mandala_stack/ demos
@@ -831,9 +916,18 @@ Adding a new feature?
 │       eigenvalues, glyph, scale_position), register in GEOMETRIES.
 │       If the shape comes from data → GeometryLearner, not a hand-written table.
 │       If the shape comes from the root engine → mandala_stack/stack_bridge.py
-├── Does it copy a root module into mandala_stack/ (or vice versa)?
-│   └─> STOP. The two directories share one sys.path namespace — import it
-│       instead. test_stack_does_not_shadow_root_modules enforces this.
+├── Does it copy a root module into mandala_stack/ or mandala_bloom/?
+│   └─> STOP. All three directories share one sys.path namespace — import it
+│       instead. test_stack_does_not_shadow_root_modules and
+│       test_bloom_does_not_shadow_root_or_stack_modules enforce this.
+├── Does it add a new MEASUREMENT basis (not a shape, not a substrate)?
+│   └─> mandala_bloom/bases.py — a field over the chart plus an energy term.
+│       Keep it opt-out via BloomConfig so the ablation stays runnable.
+│       Guard the torch import: the numpy path must keep working.
+├── Does it add a hard third-party dependency?
+│   └─> STOP. requirements.txt is numpy + scipy. Optional backends go in
+│       their own requirements-*.txt, gated behind a capability check
+│       (see mandala_bloom.has_torch), and the feature degrades without them.
 └── Does it claim a scientific result?
     └─> Run through claim_validator.py first.
         Check: is the claim specific, measurable, and falsifiable?
@@ -854,13 +948,17 @@ Adding a new feature?
   returns a `LearnedGeometry`; `geodesic_memory.GeometryLearner(dim,
   n_neighbors, seed)` returns a `Manifold`. `from mandala_stack import
   GeometryLearner` gives the first
-- **test suite:** `python tests/test_core.py` runs 387 tests across all modules
+- **test suite:** `python tests/test_core.py` runs 422 tests across all modules
 - **`.gitignore`** excludes `__pycache__/`, `.pyc`, `.env`, `.pytest_cache/`, etc.
 - **`requirements.txt`** at repo root lists numpy and scipy
 - **flat layout:** all code at root level except `mandala_stack/`, which shares
   the root's namespace via `sys.path` rather than nesting as a package — a stack
   module and a root module import each other by plain name. Do not "fix" this
   into relative imports, and do not copy modules across the boundary
+- **`mandala_bloom/`** is where the *measurement* stops being neutral: learned
+  instrument tensors, calibration, unknowns, observer attunement. Torch is
+  optional and must stay that way — `concept_atlas` and
+  `bloom_bridge.learn_atlas_geometry()` are numpy-only by design
 - **`mandala_stack/`** is where the shape stops being a constant. If a task is
   about a geometry other than the octahedron, or about learning a geometry from
   data, start at `mandala_stack/README.md`, not at `mandala_computer.py`

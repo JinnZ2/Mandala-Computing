@@ -27,7 +27,8 @@ print(result["solution"])
 
 ## What It Contains
 
-19 core Python modules plus the `mandala_stack/` geometry layer, 387 tests
+19 core Python modules plus the `mandala_stack/` geometry layer and the
+`mandala_bloom/` measurement layer, 422 tests
 (see `CLAUDE.md` for the full module list — the table below is the essential
 subset for a first read):
 
@@ -44,8 +45,9 @@ subset for a first read):
 | `mandala_simulator.py` | Lightweight entry point delegating to real engines | stdlib |
 | `mandala_hook.py` | Expandable multi-ledger: residual-guided dimension expansion over the O_h lattice | numpy |
 | `mandala_stack/` | Geometry-agnostic layer: the shape becomes an input, not a constant | numpy |
+| `mandala_bloom/` | Seven bases of measurement: the metric becomes an input too | numpy (torch optional) |
 | `mandala_cli.py` | One CLI over both halves | - |
-| `tests/test_core.py` | 387-test suite across all modules | - |
+| `tests/test_core.py` | 422-test suite across all modules | - |
 
 ---
 
@@ -178,7 +180,10 @@ python mandala_cli.py --all
 python mandala_stack/stack_cli.py --list-geometries
 python mandala_cli.py --geometry
 
-# Run tests (387 tests)
+# Measure with instruments, calibration, unknowns and an observer
+python mandala_cli.py --bloom
+
+# Run tests (422 tests)
 python tests/test_core.py
 
 # Benchmark all methods
@@ -188,7 +193,9 @@ python examples/benchmark.py
 See `experiments/README.md` for interactive Jupyter playgrounds (Ising explorer, solver
 selector, constant-swap experiment search), and `mandala_stack/README.md` for the
 geometry-agnostic stack — the same solver on any shape, including shapes learned
-from data, and the bridge that connects it to the engine above.
+from data, and the bridge that connects it to the engine above. See
+`mandala_bloom/README.md` for the seven bases of measurement, where the metric
+itself is learned and position-dependent.
 
 ---
 
@@ -226,7 +233,8 @@ MIT (JinnZ2). Open source. Contributions welcome.
 ## Status
 
 Research framework with working simulators. 19 core modules plus the
-`mandala_stack/` geometry layer, 387 tests, all passing.
+`mandala_stack/` geometry layer and the `mandala_bloom/` measurement layer,
+422 tests, all passing.
 Classical and quantum solvers operational. Physical hardware: not built.
 The question is whether geometric relaxation offers computational advantage
 at scale. The framework exists to test that question.
