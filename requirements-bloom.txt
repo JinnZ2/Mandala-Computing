@@ -1,0 +1,11 @@
+# Optional: training backend for mandala_bloom/.
+#
+# The repo core needs only numpy and scipy (see requirements.txt). PyTorch is
+# required solely to *train* a bloom — the seven differentiable bases and the
+# two-level parent/child coupling.
+#
+# Without it, mandala_bloom.concept_atlas and
+# mandala_bloom.bloom_bridge.learn_atlas_geometry() still work, and a bloom
+# trained elsewhere still loads via geometry_from_bloom(), because BloomResult
+# is plain floats.
+torch

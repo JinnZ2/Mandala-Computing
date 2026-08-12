@@ -5,6 +5,106 @@ versioning (individual modules carry their own informal `v1.0`/`v2.0` markers in
 docstrings — this file is the repo-wide narrative those numbers don't capture on their
 own). Dates are when each capability landed, derived from git history.
 
+## 2026-08 — Seven bases of measurement (`mandala_bloom/`)
+
+- Added `mandala_bloom/`. Where `mandala_stack/` made the *shape* an input,
+  this makes the *measurement* an input: a distance is taken by an instrument
+  with its own sensitivity `I_ij(u)`, read against a calibration standard
+  `mu(u)`, traversed along one of several ways of knowing, through a space
+  carrying an explicit unknown density `kappa(u)`, by an observer whose
+  participation `omega(u)` softens the instrument toward the identity. Those,
+  with the Riemannian metric and the energy functional binding them, are the
+  seven bases.
+- Two levels, coupled. Each Atlas entry is a parent point; a hypernetwork turns
+  that point into the weights of a child manifold on which the entry's concept
+  path (🪨 → 🛡️ → 🧭 → 🕸️ → ∞ → 📡 → ⚖️) is a curve. A cross-scale term ties the
+  parent metric to the mean child metric, so where an entry sits in the large
+  space and what shape its own small space has are learned as one object.
+- **Torch is optional and stays that way.** `concept_atlas.py` (the semantics)
+  and `bloom_bridge.learn_atlas_geometry()` (embedding via the stack's own
+  learner) are numpy-only; `BloomResult` is plain floats, so a bloom trained
+  elsewhere loads and solves with no backend present. `mandala_bloom.has_torch()`
+  gates the rest and the ImportError names the fix. `requirements.txt` is
+  unchanged — the backend lives in `requirements-bloom.txt`.
+- `bloom_bridge.py` connects four ways: Atlas dissimilarity into
+  `mandala_stack.GeometryLearner`; a trained bloom into a stack `Geometry`
+  whose `transition_cost` uses the learned instrument tensor rather than
+  Euclidean distance; the concept atlas into the shape-agnostic `MandalaSolver`
+  unchanged; and concept paths into the root's exact base-8 glyph arithmetic.
+- Measured, with its limit stated. Over 8 seeds the full bloom correlates
+  +0.745 (sd 0.230) with the concept/glyph dissimilarity, the
+  instrument-ablated bloom +0.496 (sd 0.355), the stack learner +0.161
+  (sd 0.411). The instrument tensor appears to help and to stabilise — but
+  n = 4 entries is 12 pairs against thousands of parameters, and on 2 of 8
+  seeds the ablated version wins. Recorded in `mandala_bloom/README.md` as a
+  direction, not a result.
+- Six defects found in the source scripts, all verified by running them rather
+  than by reading. Five crash: an undefined `curvature_loss_manifold`; a
+  positional-after-keyword call that stops the file parsing; a guard testing
+  `↻` while indexing `🔄`; hypernetwork weights unpacked `(in, out)` when
+  `nn.Linear` stores `(out, in)`; and `jacrev` on a batched point giving a
+  rank-4 tensor that was then transposed. The sixth is silent and was the one
+  that mattered — building child manifolds with `layer.weight.data = W`
+  detaches the autograd graph, so the hypernetwork received exactly zero
+  gradient while the loss fell convincingly, leaving the parent→child
+  generation decorative and the cross-scale coupling inert. `_ChildManifold`
+  now applies generated tensors through `torch.func.functional_call`;
+  `test_bloom_hypernetwork_receives_gradient` fails if that regresses.
+- Three quieter fixes: `calibration_smoothness` called `requires_grad_(True)`
+  on a non-leaf tensor (a no-op, so the term differentiated the wrong thing);
+  `mode_alignment` masked a grad-carrying `cdist` diagonal with `inf`,
+  propagating NaN backward; and the traversal-mode labels disagreed between the
+  comment and the printout, now single-sourced from
+  `concept_atlas.KNOWING_MODES`.
+- `mandala_cli.py --bloom` runs the whole thing. Test suite 387 -> 422.
+
+## 2026-08 — Geometry-agnostic stack (`mandala_stack/`)
+
+- Added `mandala_stack/`, the repo's first code subdirectory. Where the root
+  engine commits to one shape — 8 states, O_h symmetry — the stack makes the
+  shape an input: `MandalaSolver` talks only to a `Geometry` protocol, so the
+  same anneal / bloom / factor code runs on octahedral, tetrahedral,
+  dodecahedral, hexagonal and Hilbert geometries, or on a manifold learned from
+  data by `GeometryLearner`. Also carries `GeometricSolver` (energy as a
+  functional of the embedding, relaxed by gradient flow rather than random walk)
+  and `GeodesicMemory` (associative memory as a basin of attraction).
+- The folder shares the root's namespace rather than nesting under it:
+  `_paths.bootstrap()` puts both directories on `sys.path`, so stack and root
+  modules import each other by plain module name. `quantum_mandala.py`,
+  `octahedral_arithmetic.py` and `scale_invariance_breakdown.py` arrived with
+  the stack byte-identical to the repo's copies and were not duplicated — they
+  are imported from the root, and a test enforces that no module is copied
+  across the boundary.
+- Added `mandala_stack/stack_bridge.py`, the connection layer, working both
+  directions. Root → stack: `RootOctahedralGeometry` exposes the engine's
+  `sin²` coupling law, φ-scaled Fibonacci eigenvalues and glyph alphabet as a
+  `Geometry`; `CayleyGeometry` turns the 48-element O_h group into a 48-state
+  geometry with generator moves and Cayley-distance costs. Stack → root:
+  `geometric_relax()` anneals a live `MandalaComputer` with the stack's geometry
+  proposing moves and the engine's own `compute_total_energy()` scoring them —
+  the same shape as `GeometricMandalaAdapter.geometric_relax`. Plus
+  `states_to_glyphs()` / `states_to_number()` into exact glyph-space arithmetic.
+- `learn_root_geometry()` hands the root coupling metric *alone* to the stack's
+  learner and asks what manifold it implies. Because `sin²(|Δs|·π/4)` vanishes
+  for states four apart, the metric treats opposite states as identical and the
+  learned embedding is not the octahedron the repo asserts. Recorded as a
+  measured result with a test, not smoothed over — either the metric or the
+  asserted geometry is wrong, and that is a question for
+  `mandala_scale_invariance_breakdown.py`.
+- `mandala_cli.py` now spans both halves: its existing `--consumer` and
+  `--fractal-map` flags resolve for the first time (`consumer_hardware.py` and
+  `fractal_address.py` live in the stack), and `--geometry` / `--bridge` were
+  added. The stack's own CLI is `mandala_stack/stack_cli.py`, renamed from
+  `mandala_cli.py` to keep the root's entry point.
+- Fixed on the way in: `fractal_address.py` did not import at all (a stray
+  filename line above the shebang, and unquoted prose after `main()` — the prose
+  is preserved as `USAGE_NOTES`); `LearnedGeometry` was missing the `dimension`
+  property the `Geometry` protocol requires.
+- Test suite grew from 350 to 387: protocol conformance for every registered
+  geometry, solver determinism and shape-agnosticism, Cayley graph connectivity
+  and parity weighting, state round-trips through a live `MandalaComputer`, and
+  the learned-geometry result above.
+
 ## 2026-07 — Expandable multi-ledger (mandala hook)
 
 - Added `mandala_hook.py` (CC0): an `ExpandableMultiLedger` whose dimension set

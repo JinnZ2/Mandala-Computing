@@ -4048,6 +4048,881 @@ def test_cayley_guided_tie_breaks_to_leaky_branch():
     assert rec["expansion_reason"]["cayley_distance"] == 1
 
 
+# ---------------------------------------------------------------------------
+# mandala_stack/ — geometry-agnostic stack and its bridge to the root engine
+# ---------------------------------------------------------------------------
+
+import mandala_stack  # noqa: E402  (bootstraps sys.path for the stack modules)
+
+from geometry_core import (  # noqa: E402
+    Geometry, get_geometry, list_geometries, GEOMETRIES,
+    OctahedralGeometry, TetrahedralGeometry, DodecahedralGeometry,
+    HexagonalGeometry, HilbertGeometry,
+)
+from mandala_solver import MandalaSolver  # noqa: E402
+from stack_bridge import (  # noqa: E402
+    RootOctahedralGeometry, CayleyGeometry, register_bridge_geometries,
+    root_coupling_energy, states_from_computer, apply_states, geometric_relax,
+    states_to_glyphs, states_to_number, learn_root_geometry,
+)
+
+_GEOMETRY_PROTOCOL_METHODS = (
+    "position", "transitions", "transition_cost",
+    "eigenvalues", "glyph", "scale_position",
+)
+
+
+def _assert_satisfies_geometry_protocol(geo, sample_states):
+    """Every Geometry must expose the same surface, whatever its shape."""
+    assert isinstance(geo.name, str) and geo.name
+    assert geo.n_states > 0
+    assert geo.dimension > 0
+    for method in _GEOMETRY_PROTOCOL_METHODS:
+        assert callable(getattr(geo, method)), f"{geo.name} missing {method}"
+    for state in sample_states:
+        assert len(geo.position(state)) == geo.dimension
+        assert len(geo.scale_position(state, 2)) == geo.dimension
+        assert isinstance(geo.glyph(state), str)
+        assert len(geo.eigenvalues(state)) >= 1
+        for neighbor in geo.transitions(state):
+            assert 0 <= neighbor < geo.n_states
+            assert math.isfinite(geo.transition_cost(state, neighbor))
+
+
+def test_stack_package_bootstrap():
+    """Importing the package makes both directories importable, and the
+    submodule is the same object under both names."""
+    import geometry_core as flat
+    assert mandala_stack.geometry_core is flat
+    assert os.path.isdir(mandala_stack.HERE)
+    assert mandala_stack.REPO_ROOT in sys.path
+    assert mandala_stack.HERE in sys.path
+
+
+def test_stack_lazy_exports():
+    assert mandala_stack.MandalaSolver is MandalaSolver
+    assert mandala_stack.get_geometry is get_geometry
+    try:
+        mandala_stack.no_such_symbol
+    except AttributeError:
+        pass
+    else:
+        raise AssertionError("expected AttributeError for unknown attribute")
+
+
+def test_stack_does_not_shadow_root_modules():
+    """The folder must not carry duplicate copies of modules the repo owns."""
+    for name in ("quantum_mandala.py", "octahedral_arithmetic.py",
+                 "scale_invariance_breakdown.py", "mandala_computer.py"):
+        assert not os.path.exists(os.path.join(mandala_stack.HERE, name)), (
+            f"{name} duplicated in mandala_stack/ — import it from the root instead"
+        )
+    import octahedral_arithmetic as root_oct
+    assert os.path.dirname(os.path.abspath(root_oct.__file__)) == mandala_stack.REPO_ROOT
+
+
+def test_stack_modules_all_parse():
+    """Every stack module must at least be importable Python."""
+    import ast
+    import glob
+    for path in sorted(glob.glob(os.path.join(mandala_stack.HERE, "*.py"))):
+        with open(path, encoding="utf-8") as handle:
+            ast.parse(handle.read(), filename=path)
+
+
+def test_predefined_geometries_satisfy_protocol():
+    for name in list_geometries():
+        geo = get_geometry(name)
+        sample = list(range(min(geo.n_states, 8)))
+        _assert_satisfies_geometry_protocol(geo, sample)
+
+
+def test_geometry_state_counts():
+    assert OctahedralGeometry().n_states == 8
+    assert TetrahedralGeometry().n_states == 4
+    assert DodecahedralGeometry().n_states == 20
+    assert HexagonalGeometry().n_states == 6
+    assert HilbertGeometry(order=4).n_states == 2 ** 8
+
+
+def test_geometry_transitions_are_symmetric_where_declared():
+    """A declared neighbour must be reachable, and cost must be finite both
+    ways when both directions are declared."""
+    for name in ["octahedral-distorted", "octahedral-cube", "tetrahedral-right",
+                 "dodecahedral", "hexagonal"]:
+        geo = get_geometry(name)
+        for a in range(geo.n_states):
+            for b in geo.transitions(a):
+                assert math.isfinite(geo.transition_cost(a, b))
+                if a in geo.transitions(b):
+                    assert math.isfinite(geo.transition_cost(b, a))
+
+
+def test_disallowed_transition_costs_infinity():
+    geo = get_geometry("octahedral-cube")
+    for a in range(geo.n_states):
+        allowed = set(geo.transitions(a))
+        for b in range(geo.n_states):
+            if b not in allowed:
+                assert geo.transition_cost(a, b) == float("inf")
+
+
+def test_solver_is_shape_agnostic():
+    """Same solver, same call, every shape — factoring 15."""
+    for name in ["octahedral-distorted", "octahedral-cube", "tetrahedral-right",
+                 "dodecahedral", "hexagonal"]:
+        solver = MandalaSolver(geometry=get_geometry(name), seed=42)
+        result = solver.factor(15)
+        assert result.geometry_name == get_geometry(name).name
+        if result.correct:
+            assert result.factors[0] * result.factors[1] == 15
+
+
+def test_solver_anneal_is_deterministic_under_seed():
+    geo = get_geometry("octahedral-distorted")
+    a = MandalaSolver(geometry=geo, seed=11).anneal("random_landscape", {"seed": 3}, steps=80)
+    b = MandalaSolver(geometry=geo, seed=11).anneal("random_landscape", {"seed": 3}, steps=80)
+    assert a.best_state == b.best_state
+    assert a.best_energy == b.best_energy
+    assert a.energy_trace == b.energy_trace
+
+
+def test_solver_anneal_never_exceeds_initial_best():
+    geo = get_geometry("dodecahedral")
+    result = MandalaSolver(geometry=geo, seed=5).anneal(
+        "random_landscape", {"seed": 9}, steps=200)
+    assert result.best_energy <= result.energy_trace[0]
+    assert len(result.energy_trace) == result.steps + 1
+
+
+def test_solver_bloom_shells_are_disjoint():
+    geo = get_geometry("octahedral-cube")
+    bloom = MandalaSolver(geometry=geo, seed=1).bloom(center_state=0, expansion_layers=3)
+    seen = set()
+    for layer in bloom.layers:
+        states = set(layer["states"])
+        assert not (states & seen), "bloom shells overlap"
+        seen |= states
+    assert 0 not in seen
+
+
+def test_learned_geometry_satisfies_protocol():
+    """LearnedGeometry claims the Geometry protocol — including `dimension`."""
+    from geometry_learner import GeometryLearner
+
+    items = list(range(6))
+    geo = GeometryLearner(method="force_directed", dim=3, seed=7).learn(
+        items, lambda a, b: abs(a - b))
+    assert geo.dimension == 3
+    assert geo.n_states == 6
+    _assert_satisfies_geometry_protocol(geo, list(range(6)))
+
+
+# --- bridge: root physics <-> stack geometry -------------------------------
+
+def test_root_coupling_energy_matches_engine_law():
+    """E_coupling = J * sin(|s_i - s_j| * pi / 4)^2, the law in
+    MandalaComputer.compute_total_energy."""
+    assert root_coupling_energy(0, 0) == 0.0
+    assert abs(root_coupling_energy(0, 1) - math.sin(math.pi / 4) ** 2) < 1e-12
+    assert abs(root_coupling_energy(0, 2) - 1.0) < 1e-12
+    assert abs(root_coupling_energy(0, 4)) < 1e-12  # sin(pi)^2 = 0
+    assert abs(root_coupling_energy(0, 1, coupling_strength=3.0) - 1.5) < 1e-12
+
+
+def test_root_octahedral_geometry_protocol():
+    geo = RootOctahedralGeometry()
+    _assert_satisfies_geometry_protocol(geo, list(range(8)))
+    assert geo.n_states == 8
+    assert geo.dimension == 3
+
+
+def test_root_octahedral_geometry_uses_root_glyphs():
+    from octahedral_arithmetic import GLYPHS
+    geo = RootOctahedralGeometry()
+    assert [geo.glyph(s) for s in range(8)] == list(GLYPHS)
+
+
+def test_root_octahedral_geometry_cost_is_the_coupling_law():
+    geo = RootOctahedralGeometry()
+    for a in range(8):
+        for b in geo.transitions(a):
+            assert abs(geo.transition_cost(a, b) - root_coupling_energy(a, b)) < 1e-12
+
+
+def test_root_octahedral_eigenvalues_are_phi_scaled():
+    """lambda_i = phi^i / sum_k phi^k — normalised, monotone, sums to 1."""
+    geo = RootOctahedralGeometry(depth=5)
+    spectrum = geo._fibonacci_eigenvalues(5)
+    assert abs(sum(spectrum) - 1.0) < 1e-12
+    for i in range(len(spectrum) - 1):
+        assert spectrum[i] < spectrum[i + 1]
+    assert len(geo.eigenvalues(0)) == 3
+
+
+def test_root_octahedral_ring_width_widens_neighbourhood():
+    narrow = RootOctahedralGeometry(ring_width=1)
+    wide = RootOctahedralGeometry(ring_width=2)
+    assert narrow.transitions(0) == [1, 7]
+    assert set(narrow.transitions(0)) < set(wide.transitions(0))
+
+
+def test_cayley_geometry_is_the_full_group():
+    geo = CayleyGeometry()
+    assert geo.n_states == 48
+    _assert_satisfies_geometry_protocol(geo, [0, 1, 5, 20, 47])
+
+
+def test_cayley_geometry_transitions_match_group_generators():
+    from geometric_state_algebra import OhGroup
+    group = OhGroup()
+    geo = CayleyGeometry(group=group)
+    for state in [0, 3, 17, 44]:
+        for neighbor in geo.transitions(state):
+            assert group.distance(state, neighbor) == 1
+
+
+def test_cayley_geometry_is_connected():
+    """Every element must be reachable from the identity by generator moves."""
+    geo = CayleyGeometry()
+    seen = {0}
+    frontier = [0]
+    while frontier:
+        current = frontier.pop()
+        for neighbor in geo.transitions(current):
+            if neighbor not in seen:
+                seen.add(neighbor)
+                frontier.append(neighbor)
+    assert len(seen) == 48
+
+
+def test_cayley_geometry_parity_change_costs_more():
+    """A move that flips parity (a reflection/inversion step) is structurally
+    larger than one that stays within the proper rotations."""
+    geo = CayleyGeometry()
+    checked = 0
+    for state in range(geo.n_states):
+        state_proper = geo.group.elements[state].is_proper()
+        same = [geo.transition_cost(state, n) for n in geo.transitions(state)
+                if geo.group.elements[n].is_proper() == state_proper]
+        flip = [geo.transition_cost(state, n) for n in geo.transitions(state)
+                if geo.group.elements[n].is_proper() != state_proper]
+        if same and flip:
+            assert min(flip) > min(same)
+            checked += 1
+    assert checked == geo.n_states, "every element should have both move kinds"
+
+
+def test_register_bridge_geometries_is_idempotent():
+    before = set(GEOMETRIES)
+    names = register_bridge_geometries()
+    register_bridge_geometries()
+    assert set(names) <= set(GEOMETRIES)
+    assert set(GEOMETRIES) == before | set(names)
+    for name in names:
+        geo = get_geometry(name)
+        assert geo.n_states >= 8
+
+
+def test_bridge_geometries_run_the_stack_solver():
+    register_bridge_geometries()
+    for name in ["octahedral-root", "cayley-oh"]:
+        solver = MandalaSolver(geometry=get_geometry(name), seed=3)
+        result = solver.anneal("factorization", {"N": 143}, steps=120)
+        assert math.isfinite(result.best_energy)
+        assert 0 <= result.best_state < get_geometry(name).n_states
+
+
+# --- bridge: stack solver <-> live MandalaComputer -------------------------
+
+def _encoded_computer(N=143, depth=3):
+    from mandala_computer import MandalaComputer
+    mc = MandalaComputer(golden_depth=depth, temperature=1.0)
+    mc.encode_factorization(N)
+    return mc
+
+
+def test_states_roundtrip_through_computer():
+    mc = _encoded_computer()
+    original = states_from_computer(mc)
+    assert len(original) == len(mc.cells)
+    flipped = [(s + 3) % mc.sacred_geometry for s in original]
+    apply_states(mc, flipped)
+    assert states_from_computer(mc) == flipped
+    apply_states(mc, original)
+    assert states_from_computer(mc) == original
+
+
+def test_apply_states_rejects_wrong_length():
+    mc = _encoded_computer()
+    try:
+        apply_states(mc, [0] * (len(mc.cells) + 1))
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("expected ValueError on cell-count mismatch")
+
+
+def test_apply_states_wraps_into_state_range():
+    mc = _encoded_computer()
+    apply_states(mc, [mc.sacred_geometry + 2] * len(mc.cells))
+    assert all(0 <= cell.state < mc.sacred_geometry for cell in mc.cells)
+
+
+def test_geometric_relax_lowers_root_energy():
+    """Stack geometry proposes the moves; the root engine scores them."""
+    mc = _encoded_computer()
+    result = geometric_relax(mc, steps=300, seed=7)
+    assert result["best_energy"] <= result["initial_energy"]
+    assert len(result["energy_history"]) == result["steps"] + 1
+    assert 0.0 <= result["acceptance_rate"] <= 1.0
+    # The computer is left holding the best configuration found.
+    assert states_from_computer(mc) == result["best_states"]
+    assert abs(mc.compute_total_energy() - result["best_energy"]) < 1e-6
+
+
+def test_geometric_relax_is_deterministic_under_seed():
+    """Same start, same seed, same trajectory. (MandalaComputer blooms with
+    random cell states, so the start has to be pinned explicitly.)"""
+    first, second = _encoded_computer(), _encoded_computer()
+    start = [i % first.sacred_geometry for i in range(len(first.cells))]
+    apply_states(first, start)
+    apply_states(second, start)
+    a = geometric_relax(first, steps=150, seed=21)
+    b = geometric_relax(second, steps=150, seed=21)
+    assert a["best_states"] == b["best_states"]
+    assert abs(a["best_energy"] - b["best_energy"]) < 1e-9
+    assert a["energy_history"] == b["energy_history"]
+
+
+def test_geometric_relax_respects_geometry_transitions():
+    """Every accepted state must be reachable in the geometry — no move may
+    leave the shape."""
+    geo = RootOctahedralGeometry(ring_width=1)
+    mc = _encoded_computer()
+    start = states_from_computer(mc)
+    result = geometric_relax(mc, geometry=geo, steps=200, seed=4)
+    for before, after in zip(start, result["best_states"]):
+        assert after == before or after in _reachable(geo, before)
+
+
+def _reachable(geo, state, limit=64):
+    seen = {state}
+    frontier = [state]
+    while frontier and len(seen) < limit:
+        current = frontier.pop()
+        for neighbor in geo.transitions(current):
+            if neighbor not in seen:
+                seen.add(neighbor)
+                frontier.append(neighbor)
+    return seen
+
+
+def test_geometric_relax_rejects_too_small_geometry():
+    mc = _encoded_computer()
+    try:
+        geometric_relax(mc, geometry=get_geometry("tetrahedral-right"), steps=10)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("expected ValueError for a 4-state geometry on 8 states")
+
+
+def test_geometric_relax_requires_cells():
+    from mandala_computer import MandalaComputer
+    mc = MandalaComputer(golden_depth=3)
+    try:
+        geometric_relax(mc, steps=10)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("expected ValueError when no cells are bloomed")
+
+
+# --- bridge: stack states -> root arithmetic -------------------------------
+
+def test_states_to_glyphs_uses_root_alphabet():
+    from octahedral_arithmetic import GLYPHS
+    assert states_to_glyphs([0, 1, 2, 3]) == "".join(GLYPHS[:4])
+    assert states_to_glyphs([8, 9]) == GLYPHS[0] + GLYPHS[1]
+
+
+def test_states_to_number_is_exact_octahedral_number():
+    from octahedral_arithmetic import OctahedralNumber, states_to_number as root_stn
+    states = [3, 5, 1]
+    bridged = states_to_number(states)
+    assert isinstance(bridged, OctahedralNumber)
+    assert bridged.digits == root_stn(states).digits
+
+
+def test_learn_root_geometry_recovers_a_manifold():
+    """Hand only the coupling metric to the learner and see what it implies."""
+    geo = learn_root_geometry(num_states=8, dim=3, seed=42)
+    assert geo.n_states == 8
+    assert geo.dimension == 3
+    _assert_satisfies_geometry_protocol(geo, list(range(8)))
+    # sin^2 makes states 4 apart identical, so opposite states embed close
+    # together — the metric is not the octahedron the repo asserts.
+    assert geo._distance(0, 4) < geo._distance(0, 2)
+
+
+def test_learn_root_geometry_registers_when_asked():
+    learn_root_geometry(num_states=8, seed=1, register_as="test-learned-root")
+    try:
+        assert "test-learned-root" in list_geometries()
+        assert get_geometry("test-learned-root").n_states == 8
+    finally:
+        GEOMETRIES.pop("test-learned-root", None)
+
+
+# ---------------------------------------------------------------------------
+# mandala_bloom/ — concept atlas, the seven bases, and the bloom bridge
+# ---------------------------------------------------------------------------
+
+import mandala_bloom  # noqa: E402  (bootstraps root + stack + bloom on sys.path)
+
+import concept_atlas as _atlas  # noqa: E402
+from bloom_bridge import (  # noqa: E402
+    BloomGeometry, geometry_from_bloom, learn_atlas_geometry,
+    register_bloom_geometry, path_to_glyphs, path_to_number,
+    compare_embeddings, solve_on_atlas,
+)
+
+_HAS_TORCH = mandala_bloom.has_torch()
+
+
+# --- concept atlas: numpy-only, must always work ---------------------------
+
+def test_bloom_package_bootstrap():
+    """All three directories share one namespace, one module object each."""
+    assert mandala_bloom.concept_atlas is _atlas
+    assert mandala_bloom.REPO_ROOT in sys.path
+    assert mandala_bloom.STACK in sys.path
+    assert mandala_bloom.HERE in sys.path
+
+
+def test_bloom_does_not_shadow_root_or_stack_modules():
+    for name in ("geometry_core.py", "geometry_learner.py", "mandala_solver.py",
+                 "octahedral_arithmetic.py", "quantum_mandala.py"):
+        assert not os.path.exists(os.path.join(mandala_bloom.HERE, name)), (
+            f"{name} duplicated in mandala_bloom/ — import it instead"
+        )
+
+
+def test_concept_index_is_stable_and_sorted():
+    assert list(_atlas.CONCEPTS) == sorted(_atlas.EMOJI_MAP)
+    assert _atlas.NUM_CONCEPTS == len(_atlas.EMOJI_MAP)
+    for i, emoji in enumerate(_atlas.CONCEPTS):
+        assert _atlas.CONCEPT_INDEX[emoji] == i
+        assert _atlas.concept_id(emoji) == i
+
+
+def test_concept_id_reports_the_missing_symbol():
+    """The pasted scripts guarded on ↻ but indexed 🔄, giving a bare KeyError."""
+    try:
+        _atlas.concept_id("🔄")
+    except KeyError as exc:
+        assert "🔄" in str(exc)
+    else:
+        raise AssertionError("expected KeyError for a concept not in the map")
+
+
+def test_every_entry_concept_resolves():
+    for entry in _atlas.ENTRIES:
+        ids = entry.concept_ids
+        assert len(ids) == len(entry.concept_path)
+        assert all(0 <= i < _atlas.NUM_CONCEPTS for i in ids)
+
+
+def test_knowing_modes_are_single_sourced():
+    """Mode labels must come from one list, so training and reporting agree."""
+    for entry in _atlas.ENTRIES:
+        assert _atlas.KNOWING_MODES[entry.mode_id] == entry.mode
+
+
+def test_atlas_entry_rejects_unknown_mode():
+    try:
+        _atlas.AtlasEntry("9999", "bogus", "◇", ["∞"], mode="telepathy")
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("expected ValueError for an unknown way of knowing")
+
+
+def test_similarity_is_a_proper_similarity():
+    sim = _atlas.similarity()
+    n = len(_atlas.ENTRIES)
+    for i in range(n):
+        assert abs(sim[i, i] - 1.0) < 1e-6
+        for j in range(n):
+            assert -1e-9 <= sim[i, j] <= 1.0 + 1e-9
+            assert abs(sim[i, j] - sim[j, i]) < 1e-12
+
+
+def test_concept_weight_blends_the_two_similarities():
+    only_concept = _atlas.similarity(concept_weight=1.0)
+    only_glyph = _atlas.similarity(concept_weight=0.0)
+    blended = _atlas.similarity(concept_weight=0.6)
+    expected = 0.6 * only_concept + 0.4 * only_glyph
+    assert abs(blended - expected).max() < 1e-12
+    for bad in (-0.1, 1.1):
+        try:
+            _atlas.similarity(concept_weight=bad)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("expected ValueError for out-of-range weight")
+
+
+def test_concept_paths_pad_with_negative_one():
+    paths = _atlas.concept_paths()
+    assert paths.shape[0] == len(_atlas.ENTRIES)
+    for row, entry in enumerate(_atlas.ENTRIES):
+        length = len(entry.concept_path)
+        assert list(paths[row, :length]) == list(entry.concept_ids)
+        assert all(v == -1 for v in paths[row, length:])
+
+
+def test_entry_distance_fn_matches_target_matrix():
+    distance = _atlas.entry_distance_fn()
+    target = _atlas.target_distance()
+    for i, a in enumerate(_atlas.ENTRIES):
+        # not exactly 0: the Jaccard denominator carries a 1e-8 epsilon
+        assert abs(distance(a, a)) < 1e-7
+        for j, b in enumerate(_atlas.ENTRIES):
+            assert abs(distance(a, b) - target[i, j]) < 1e-12
+
+
+# --- bridge: atlas -> stack geometry, no torch needed ----------------------
+
+def test_learn_atlas_geometry_needs_no_torch():
+    geo = learn_atlas_geometry(dim=2, seed=42)
+    assert geo.n_states == len(_atlas.ENTRIES)
+    assert geo.dimension == 2
+    _assert_satisfies_geometry_protocol(geo, list(range(geo.n_states)))
+
+
+def test_atlas_geometry_runs_the_stack_solver():
+    """The concept atlas is a first-class shape for the shape-agnostic solver."""
+    geo = learn_atlas_geometry(seed=42)
+    result = solve_on_atlas(geo, steps=120)
+    assert 0 <= result.best_state < geo.n_states
+    assert math.isfinite(result.best_energy)
+
+
+def test_bloom_geometry_satisfies_protocol_without_instrument():
+    positions = [(0.0, 0.0), (1.0, 0.0), (0.0, 1.0), (1.0, 1.0)]
+    labels = [e.name for e in _atlas.ENTRIES]
+    geo = BloomGeometry(positions, labels, instrument=None)
+    _assert_satisfies_geometry_protocol(geo, list(range(4)))
+    assert abs(geo.transition_cost(0, 1) - 1.0) < 1e-9
+
+
+def test_bloom_geometry_instrument_changes_the_metric():
+    """Base 2: an anisotropic instrument must actually bend distances."""
+    positions = [(0.0, 0.0), (1.0, 0.0), (0.0, 1.0)]
+    labels = ["a", "b", "c"]
+    isotropic = [[[1.0, 0.0], [0.0, 1.0]]] * 3
+    # Sensitive along x, blind along y
+    stretched = [[[4.0, 0.0], [0.0, 1.0]]] * 3
+
+    plain = BloomGeometry(positions, labels, instrument=isotropic, n_neighbors=2)
+    bent = BloomGeometry(positions, labels, instrument=stretched, n_neighbors=2)
+    assert abs(plain._distance(0, 1) - 1.0) < 1e-9
+    assert abs(bent._distance(0, 1) - 2.0) < 1e-9    # sqrt(4)
+    assert abs(bent._distance(0, 2) - 1.0) < 1e-9    # unchanged across y
+
+
+def test_bloom_geometry_rejects_mismatched_labels():
+    try:
+        BloomGeometry([(0.0, 0.0), (1.0, 1.0)], ["only-one"])
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("expected ValueError on positions/labels mismatch")
+
+
+def test_bloom_geometry_distance_matrix_is_symmetric():
+    geo = BloomGeometry([(0.0, 0.0), (1.0, 0.5), (-0.3, 0.9)],
+                        ["a", "b", "c"],
+                        instrument=[[[2.0, 0.3], [0.3, 1.0]]] * 3)
+    matrix = geo.distance_matrix()
+    for i in range(3):
+        assert abs(matrix[i][i]) < 1e-9
+        for j in range(3):
+            assert abs(matrix[i][j] - matrix[j][i]) < 1e-12
+
+
+def test_register_bloom_geometry_reaches_the_stack_registry():
+    geo = BloomGeometry([(0.0, 0.0), (1.0, 0.0), (0.0, 1.0), (1.0, 1.0)],
+                        [e.name for e in _atlas.ENTRIES], name="test-atlas-bloom")
+    key = register_bloom_geometry(geo)
+    try:
+        assert key in list_geometries()
+        assert get_geometry(key).n_states == 4
+    finally:
+        GEOMETRIES.pop(key, None)
+
+
+def test_path_to_glyphs_uses_the_root_alphabet():
+    from octahedral_arithmetic import GLYPHS
+    for entry in _atlas.ENTRIES:
+        rendered = path_to_glyphs(entry)
+        assert len(rendered) == len(entry.concept_path)
+        assert all(ch in GLYPHS for ch in rendered)
+
+
+def test_path_to_number_is_an_exact_octahedral_number():
+    from octahedral_arithmetic import OctahedralNumber
+    number = path_to_number(_atlas.ENTRIES[0])
+    assert isinstance(number, OctahedralNumber)
+    assert number.to_decimal() > 0
+
+
+def test_compare_embeddings_reports_the_control():
+    """The stack learner is always scored, so the bloom has something to beat."""
+    scores = compare_embeddings()
+    assert "stack_learner" in scores
+    assert -1.0 <= scores["stack_learner"] <= 1.0
+
+
+# --- the bloom itself: needs torch -----------------------------------------
+
+def _skip_without_torch():
+    return not _HAS_TORCH
+
+
+def test_bloom_import_error_is_actionable_without_torch():
+    """Without a backend the failure must name the fix, not just ImportError."""
+    if _HAS_TORCH:
+        return
+    try:
+        mandala_bloom.bloom
+    except ImportError as exc:
+        assert "requirements-bloom.txt" in str(exc)
+    else:
+        raise AssertionError("expected an actionable ImportError")
+
+
+def test_bloom_hypernetwork_receives_gradient():
+    """Regression guard for the defect that made the bloom decorative.
+
+    Building a child manifold with `layer.weight.data = W` runs and trains and
+    prints falling losses, while the hypernetwork gets exactly zero gradient —
+    so the parent point never learns to generate the child geometry, and the
+    cross-scale coupling is inert. `_ChildManifold` uses `functional_call`
+    instead. If anyone reverts that, this test fails.
+    """
+    if _skip_without_torch():
+        return
+    import torch
+    from bloom import (MandalaBloom, BloomConfig, curve_curvature,
+                       cross_scale_mismatch)
+
+    model = MandalaBloom(BloomConfig(seed=0))
+    u = model.coordinates()
+    children = model.hypernet(u)
+
+    child_loss = u.new_zeros(())
+    for i, child in enumerate(children):
+        embedded, mask = model.concept_embed(model.paths[i].unsqueeze(0))
+        points = embedded.squeeze(0)[mask.squeeze(0)]
+        child_loss = child_loss + curve_curvature(child, points)
+        child_loss = child_loss + cross_scale_mismatch(
+            model.manifold, u[i], child, points)
+    child_loss.backward()
+
+    trainable = [p for p in model.hypernet.parameters() if p.requires_grad]
+    assert trainable, "hypernetwork has no trainable parameters"
+    assert all(p.grad is not None for p in trainable), (
+        "hypernetwork parameter received no gradient — the child manifolds are "
+        "detached from the graph"
+    )
+    total = sum(float(p.grad.abs().sum()) for p in trainable)
+    assert total > 0.0, f"hypernetwork gradient is identically zero ({total})"
+
+
+def test_bloom_cross_scale_reaches_the_encoder():
+    """The coupling must run both ways: child geometry informs parent layout."""
+    if _skip_without_torch():
+        return
+    from bloom import (MandalaBloom, BloomConfig, curve_curvature,
+                       cross_scale_mismatch)
+
+    model = MandalaBloom(BloomConfig(seed=0))
+    u = model.coordinates()
+    children = model.hypernet(u)
+    loss = u.new_zeros(())
+    for i, child in enumerate(children):
+        embedded, mask = model.concept_embed(model.paths[i].unsqueeze(0))
+        points = embedded.squeeze(0)[mask.squeeze(0)]
+        loss = loss + cross_scale_mismatch(model.manifold, u[i], child, points)
+    loss.backward()
+    reached = [p for p in model.encoder.parameters() if p.grad is not None]
+    assert reached, "cross-scale term never reaches the entry encoder"
+    assert sum(float(p.grad.abs().sum()) for p in reached) > 0.0
+
+
+def test_pullback_metric_handles_single_and_batched_points():
+    """The pasted code did jacrev(f)(u.unsqueeze(0)).squeeze(0), giving rank 3,
+    then transposed it — a crash. Both ranks must come back correct."""
+    if _skip_without_torch():
+        return
+    import torch
+    from bases import pullback_metric
+    from bloom import ContinuousManifold
+
+    manifold = ContinuousManifold(d=2, D=3)
+    single = pullback_metric(manifold, torch.zeros(2))
+    assert single.shape == (2, 2)
+    batched = pullback_metric(manifold, torch.zeros(5, 2))
+    assert batched.shape == (5, 2, 2)
+    assert torch.allclose(batched[0], single, atol=1e-5)
+
+
+def test_metric_is_symmetric_positive_semidefinite():
+    if _skip_without_torch():
+        return
+    import torch
+    from bases import pullback_metric
+    from bloom import ContinuousManifold
+
+    torch.manual_seed(0)
+    metric = pullback_metric(ContinuousManifold(d=2, D=3), torch.randn(4, 2))
+    for g in metric:
+        assert torch.allclose(g, g.T, atol=1e-6)
+        assert float(torch.linalg.eigvalsh(g).min()) >= -1e-6
+
+
+def test_instrument_field_is_positive_definite():
+    """Base 2 must never invert the sign of a distance."""
+    if _skip_without_torch():
+        return
+    import torch
+    from bases import InstrumentField
+
+    torch.manual_seed(0)
+    field = InstrumentField(d=2)
+    matrices = field(torch.randn(16, 2))
+    assert matrices.shape == (16, 2, 2)
+    for mat in matrices:
+        assert torch.allclose(mat, mat.T, atol=1e-6)
+        assert float(torch.linalg.eigvalsh(mat).min()) > 0.0
+
+
+def test_unknown_field_is_non_negative():
+    """Base 5: there is no negative amount of ignorance."""
+    if _skip_without_torch():
+        return
+    import torch
+    from bases import UnknownField
+
+    torch.manual_seed(0)
+    assert float(UnknownField(d=2)(torch.randn(32, 2)).min()) >= 0.0
+
+
+def test_attunement_field_is_bounded():
+    """Base 7: omega is a participation fraction, so it lives in [0, 1]."""
+    if _skip_without_torch():
+        return
+    import torch
+    from bases import AttunementField
+
+    torch.manual_seed(0)
+    omega = AttunementField(d=2)(torch.randn(32, 2) * 10)
+    assert float(omega.min()) >= 0.0 and float(omega.max()) <= 1.0
+
+
+def test_calibration_smoothness_is_zero_for_a_constant_field():
+    if _skip_without_torch():
+        return
+    import torch
+    import torch.nn as nn
+    from bases import CalibrationField, calibration_smoothness
+
+    field = CalibrationField(d=2)
+    with torch.no_grad():   # make mu constant: zero the last layer
+        nn.init.zeros_(field.net[-1].weight)
+        nn.init.constant_(field.net[-1].bias, 0.7)
+    value = calibration_smoothness(field, torch.randn(8, 2))
+    assert float(value) < 1e-8
+
+
+def test_mode_alignment_produces_no_nan():
+    """The original masked the cdist diagonal with inf on a grad-carrying
+    tensor, which propagates NaN backward."""
+    if _skip_without_torch():
+        return
+    import torch
+    from bases import KnowingField, mode_alignment
+
+    torch.manual_seed(0)
+    knowing = KnowingField(d=2, num_modes=_atlas.NUM_MODES)
+    u = torch.randn(4, 2, requires_grad=True)
+    labels = torch.tensor([e.mode_id for e in _atlas.ENTRIES])
+    value = mode_alignment(knowing, u, labels)
+    value.backward()
+    assert not torch.isnan(value).any()
+    assert not torch.isnan(u.grad).any()
+    assert 0.0 <= float(value) <= 2.0 + 1e-6
+
+
+def test_bloom_training_reduces_energy():
+    if _skip_without_torch():
+        return
+    from bloom import bloom, BloomConfig
+
+    result = bloom(BloomConfig(epochs=120, seed=0), verbose=False)
+    assert result.loss_history[-1] < result.loss_history[0]
+    assert len(result.positions) == len(_atlas.ENTRIES)
+    assert all(len(p) == 2 for p in result.positions)
+
+
+def test_bloom_result_is_plain_data():
+    """BloomResult must survive without torch, so a bloom trained elsewhere
+    can be loaded and solved on."""
+    if _skip_without_torch():
+        return
+    import pickle
+    from bloom import bloom, BloomConfig
+
+    result = bloom(BloomConfig(epochs=40, seed=0), verbose=False)
+    restored = pickle.loads(pickle.dumps(result))
+    assert restored.positions == result.positions
+    assert all(isinstance(v, float) for v in restored.unknowns)
+    assert all(isinstance(v, float) for row in restored.positions for v in row)
+
+
+def test_bloom_result_becomes_a_solvable_geometry():
+    if _skip_without_torch():
+        return
+    from bloom import bloom, BloomConfig
+
+    result = bloom(BloomConfig(epochs=60, seed=0), verbose=False)
+    geo = geometry_from_bloom(result)
+    _assert_satisfies_geometry_protocol(geo, list(range(geo.n_states)))
+    outcome = solve_on_atlas(geo, steps=80)
+    assert math.isfinite(outcome.best_energy)
+
+
+def test_bases_can_be_switched_off():
+    """Every basis is opt-out, so the ablation the README reports is runnable."""
+    if _skip_without_torch():
+        return
+    from bloom import MandalaBloom, BloomConfig
+
+    bare = MandalaBloom(BloomConfig(
+        epochs=20, seed=0, use_instruments=False, use_metrology=False,
+        use_knowing=False, use_unknowns=False, use_attunement=False))
+    assert bare.instrument is None and bare.attunement is None
+    result = bare.fit(verbose=False)
+    assert result.loss_history[-1] < result.loss_history[0]
+    # With the bases off, the readout still has the right shape (identity
+    # instrument, zeroed fields) so downstream code needs no special case.
+    assert all(abs(v) < 1e-12 for v in result.unknowns)
+    assert result.instrument[0] == [[1.0, 0.0], [0.0, 1.0]]
+
+
 # Run all tests
 # ---------------------------------------------------------------------------
 
