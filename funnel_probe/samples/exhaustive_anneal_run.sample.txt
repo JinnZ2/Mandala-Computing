@@ -1,0 +1,29 @@
+N=15: 3 cells, exact landscape over 512 states; E_min = 0.2000 at 16 ground states; register pairs [(3, 5), (5, 3)]; distinct energy levels 57
+   greedy single-flip descent reaches the ground set from 224 of 512 starts
+   landscape_scan(1000) x 5 seeds: replay matches scan True; exact min found 5/5; distinct ground states found [15, 14, 15, 14, 13] of 16; configs unvisited [68, 79, 72, 70, 78]; energy levels unseen [1, 0, 0, 0, 1]
+   M      rate       meanP     |F|     minP       meanP greedy-ok meanP greedy-fails
+   50     0.10813    0.344     395     0.000      0.494          0.227
+   200    0.02662    0.360     375     0.000      0.511          0.243
+   800    0.00663    0.365     360     0.000      0.514          0.249
+N=21: 3 cells, exact landscape over 512 states; E_min = 0.0000 at 4 ground states; register pairs [(3, 7), (7, 3)]; distinct energy levels 57
+   greedy single-flip descent reaches the ground set from 288 of 512 starts
+   landscape_scan(1000) x 5 seeds: replay matches scan True; exact min found 5/5; distinct ground states found [4, 4, 4, 3, 3] of 4; configs unvisited [68, 79, 72, 70, 78]; energy levels unseen [1, 0, 0, 1, 1]
+   M      rate       meanP     |F|     minP       meanP greedy-ok meanP greedy-fails
+   50     0.10813    0.334     405     0.000      0.435          0.206
+   200    0.02662    0.441     301     0.000      0.564          0.283
+   800    0.00663    0.435     317     0.000      0.553          0.282
+
+PRE-REGISTERED PREDICTIONS
+  HELD   Q1 ground sets: N=15 -> 16 states at E=0.2; N=21 -> 4 states at E=0
+  HELD   Q2 N=15 mean P_ground rises as the rate falls: ['0.344', '0.360', '0.365']
+  HELD   Q3 N=15 |F| non-increasing as the rate falls: [395, 375, 360]
+  HELD   Q4 N=15 |F| > 0 at the slowest rate
+  HELD   Q6 N=15 at the fastest rate, greedy-fails starts have lower mean P_ground than greedy-ok starts
+  FAILED Q2 N=21 mean P_ground rises as the rate falls: ['0.334', '0.441', '0.435']
+  FAILED Q3 N=21 |F| non-increasing as the rate falls: [405, 301, 317]
+  HELD   Q4 N=21 |F| > 0 at the slowest rate
+  HELD   Q6 N=21 at the fastest rate, greedy-fails starts have lower mean P_ground than greedy-ok starts
+  HELD   Q5 landscape_scan misses >= 1 ground state in >= 1 of 5 seeds (N=15) and finds E_min in 5/5 for both N
+OUTCOME N=15: FUNNEL_FOUND (discrete analog; failure set narrows with slower cooling and persists)
+OUTCOME N=21: NOT_FOUND_IN_RANGE (failure set [405, 301, 317] over rates [0.10813, 0.02662, 0.00663]: not narrowing-and-persisting)
+scope: stochastic (Metropolis annealer, fixed seeds); M in [50, 200, 800], T 2.00 -> 0.01 exponential; DISCRETE state space, open-loop slow drive; 968 s
