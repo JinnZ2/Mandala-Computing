@@ -1,0 +1,50 @@
+{
+ "15": {
+  "F": [
+   395,
+   375,
+   360
+  ],
+  "meanP": [
+   0.3439453125,
+   0.3603515625,
+   0.36474609375
+  ],
+  "gates": {
+   "share": 0.703125,
+   "T1": false,
+   "dispersion": 4.001590373793405,
+   "chi2_tail": 1.1832745806633872e-182,
+   "flagged": 18,
+   "T2": true,
+   "p": 0.36474609375
+  },
+  "outcome": "NOT_FOUND_IN_RANGE, `set not thin` (|F|/N = 0.703 > 0.25)",
+  "Q2_ruleN": true,
+  "Q3_ruleN": true
+ },
+ "21": {
+  "F": [
+   405,
+   301,
+   317
+  ],
+  "meanP": [
+   0.33447265625,
+   0.44111328125,
+   0.4345703125
+  ],
+  "gates": {
+   "share": 0.619140625,
+   "T1": false,
+   "dispersion": 4.266514525237236,
+   "chi2_tail": 4.961556632099485e-205,
+   "flagged": 61,
+   "T2": true,
+   "p": 0.4345703125
+  },
+  "outcome": "NOT_FOUND_IN_RANGE, `set not thin` (|F|/N = 0.619 > 0.25)",
+  "Q2_ruleN": true,
+  "Q3_ruleN": true
+ }
+}

@@ -137,3 +137,43 @@ M in {50, 200, 800}, T 2.00 -> 0.01 exponential, 20 seeds per start, all
 encoding with coupling scaled 0.1; DISCRETE state space, OPEN-LOOP slow
 drive; one parameter set. Nothing here is a statement about factoring or
 about the paper's continuous system.
+
+## Re-scored under RULES V2 (noise band + thinness; `RULES_V2.md`, `rescore_v2.py`, nothing re-run)
+
+Output `samples/rescore_v2.sample.txt`, numbers `samples/rescore_v2_results.json`.
+
+    RULES V2 re-scoring -- Mandala N=15 (512 starts, 20 seeds, rates [0.10812892584791911, 0.0266247103846635, 0.006631185690297918])
+      Rule N on |F| (Q3: non-increasing as the rate falls): ['395', '375', '360']
+         step 0: change -20  band +-19.74  ok
+         step 1: change -15  band +-20.56  ok
+      Rule N on mean P_ground (Q2: non-decreasing as the rate falls): ['0.3439', '0.3604', '0.3647']
+         step 0: change +0.01641  band +-0.01201  ok
+         step 1: change +0.004395  band +-0.01222  ok
+      T gates at the slowest rate 0.00663: |F|/N = 0.703 -> T1 False ; dispersion 4.002 chi2 tail 1.18e-182 flagged 18 -> T2 True
+      delivered-rule reading: FUNNEL_FOUND ; V2 OUTCOME: NOT_FOUND_IN_RANGE, `set not thin` (|F|/N = 0.703 > 0.25)
+      Q2 under Rule N: HELD ; Q3 under Rule N: HELD
+      RULES_V2 prediction for N=15: NOT_FOUND_IN_RANGE, `set not thin` (Q3 N=21 re-scores HELD; T2 passes) -> HELD
+    
+    RULES V2 re-scoring -- Mandala N=21 (512 starts, 20 seeds, rates [0.10812892584791911, 0.0266247103846635, 0.006631185690297918])
+      Rule N on |F| (Q3: non-increasing as the rate falls): ['405', '301', '317']
+         step 0: change -104  band +-19.03  ok
+         step 1: change +16  band +-20.56  wrong direction, inside band
+      Rule N on mean P_ground (Q2: non-decreasing as the rate falls): ['0.3345', '0.4411', '0.4346']
+         step 0: change +0.1066  band +-0.01229  ok
+         step 1: change -0.006543  band +-0.01238  wrong direction, inside band
+      T gates at the slowest rate 0.00663: |F|/N = 0.619 -> T1 False ; dispersion 4.267 chi2 tail 4.96e-205 flagged 61 -> T2 True
+      delivered-rule reading: NOT_FOUND_IN_RANGE ; V2 OUTCOME: NOT_FOUND_IN_RANGE, `set not thin` (|F|/N = 0.619 > 0.25)
+      Q2 under Rule N: HELD ; Q3 under Rule N: HELD
+      RULES_V2 prediction for N=21: NOT_FOUND_IN_RANGE, `set not thin` (Q3 N=21 re-scores HELD; T2 passes) -> HELD
+
+What V2 changes here: N=21's Q2 and Q3 both re-score HELD -- the 301 -> 317 and
+0.441 -> 0.435 reversals are inside the 2 sd bands (+-20.6 and +-0.012), so
+the delivered NOT_FOUND_IN_RANGE for N=21 was Rule N's defect firing on
+noise, exactly as recorded. Both N then fail T1 (|F|/N = 0.70 and 0.62: the
+failure set is the majority, not a thin structure) while PASSING T2 by a
+wide margin (dispersion 4.0 and 4.3, chi2 tails ~1e-182 and ~1e-205, 18 and
+61 configurations flagged at Bonferroni) -- the start matters strongly here,
+which is the greedy-ok / greedy-fails split made per-configuration and the
+exact inverse of SOMS (thin set, no start dependence). Neither is a funnel
+under V2: one has selectivity without thinness, the other thinness without
+selectivity. Both re-scoring predictions HELD.
