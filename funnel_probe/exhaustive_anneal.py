@@ -221,7 +221,17 @@ def main(argv):
     print("scope: stochastic (Metropolis annealer, fixed seeds); M in %s, T %.2f -> %.2f exponential; DISCRETE"
           " state space, open-loop slow drive; %.0f s" % (M_LIST, T_START, T_END, time.time() - t0))
     out["predictions"] = {k: bool(v) for k, v in preds.items()}
-    json.dump(out, open("exhaustive_anneal_results.json", "w"), indent=1)
+    def _json_default(o):           # numpy scalars from the scan/anneal records; values unchanged
+        if isinstance(o, np.bool_):
+            return bool(o)
+        if isinstance(o, np.integer):
+            return int(o)
+        if isinstance(o, np.floating):
+            return float(o)
+        if isinstance(o, np.ndarray):
+            return o.tolist()
+        raise TypeError(type(o).__name__)
+    json.dump(out, open("exhaustive_anneal_results.json", "w"), indent=1, default=_json_default)
     return 0
 
 
