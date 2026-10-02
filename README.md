@@ -226,7 +226,7 @@ See `CLAUDE.md` for full technical reference.
 
 ## License
 
-MIT (JinnZ2). Open source. Contributions welcome.
+CC0-1.0 (JinnZ2). Open source. Contributions welcome.
 
 ---
 
