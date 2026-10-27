@@ -1,0 +1,209 @@
+{
+  "sim_id": "EDGE4-HOLO-DIAGNOSIS",
+  "outcome": "CLOSED",
+  "strict": false,
+  "guards_schema": "1",
+  "declaration": {
+    "question": "which mechanism makes the holographic solver fail as n grows",
+    "statistic": "first-hit success count per condition, same budget",
+    "discriminates": "each condition removes one mechanism; the condition that restores success to the plain-anneal level names the mechanism; first-hit scoring is applied to every condition, so the comparison is one measurand",
+    "expected": "if the ring schedule (M2/M5) is the cause: whole_anneal ~ plain, and no_M3/no_M4 stay near base. If the extra energy terms (M4) are the cause: no_M4 recovers",
+    "resolution": [
+      {
+        "name": "instances per size vs smallest gap read",
+        "instrument_scale": 1.0,
+        "feature_scale": 3.0,
+        "margin": 2.0,
+        "passes": true,
+        "note": "a gap of 3/10 or more is read; 1-2 is noise"
+      }
+    ],
+    "controls": [
+      {
+        "name": "plain anneal, n=20",
+        "predicted": ">= 8/10 (scaling run: 9/10)",
+        "observed": "10/10",
+        "run": true
+      },
+      {
+        "name": "base, n=12",
+        "predicted": ">= 8/10 under first-hit scoring",
+        "observed": "7/10",
+        "run": true
+      }
+    ],
+    "shares_input_with": [],
+    "declared_at": "2026-10-27T17:49:07"
+  },
+  "expected": "if the ring schedule (M2/M5) is the cause: whole_anneal ~ plain, and no_M3/no_M4 stay near base. If the extra energy terms (M4) are the cause: no_M4 recovers",
+  "observed": "see edge4_holo_diagnosis_results.json",
+  "diverged": null,
+  "quantities": {
+    "base_n12": {
+      "value": 7,
+      "layer": "generator",
+      "object_of": "HolographicMandala SAT solve (code), first-hit success",
+      "note": "out of 10 instances"
+    },
+    "no_M4_n12": {
+      "value": 6,
+      "layer": "generator",
+      "object_of": "HolographicMandala SAT solve (code), first-hit success",
+      "note": "out of 10 instances"
+    },
+    "no_M3_n12": {
+      "value": 7,
+      "layer": "generator",
+      "object_of": "HolographicMandala SAT solve (code), first-hit success",
+      "note": "out of 10 instances"
+    },
+    "no_M3_M4_n12": {
+      "value": 7,
+      "layer": "generator",
+      "object_of": "HolographicMandala SAT solve (code), first-hit success",
+      "note": "out of 10 instances"
+    },
+    "whole_anneal_n12": {
+      "value": 10,
+      "layer": "generator",
+      "object_of": "HolographicMandala SAT solve (code), first-hit success",
+      "note": "out of 10 instances"
+    },
+    "plain_n12": {
+      "value": 10,
+      "layer": "generator",
+      "object_of": "MandalaComputer SAT solve (code), first-hit success",
+      "note": "out of 10 instances"
+    },
+    "base_n20": {
+      "value": 3,
+      "layer": "generator",
+      "object_of": "HolographicMandala SAT solve (code), first-hit success",
+      "note": "out of 10 instances"
+    },
+    "no_M4_n20": {
+      "value": 5,
+      "layer": "generator",
+      "object_of": "HolographicMandala SAT solve (code), first-hit success",
+      "note": "out of 10 instances"
+    },
+    "no_M3_n20": {
+      "value": 2,
+      "layer": "generator",
+      "object_of": "HolographicMandala SAT solve (code), first-hit success",
+      "note": "out of 10 instances"
+    },
+    "no_M3_M4_n20": {
+      "value": 6,
+      "layer": "generator",
+      "object_of": "HolographicMandala SAT solve (code), first-hit success",
+      "note": "out of 10 instances"
+    },
+    "whole_anneal_n20": {
+      "value": 10,
+      "layer": "generator",
+      "object_of": "HolographicMandala SAT solve (code), first-hit success",
+      "note": "out of 10 instances"
+    },
+    "plain_n20": {
+      "value": 10,
+      "layer": "generator",
+      "object_of": "MandalaComputer SAT solve (code), first-hit success",
+      "note": "out of 10 instances"
+    },
+    "base_n28": {
+      "value": 2,
+      "layer": "generator",
+      "object_of": "HolographicMandala SAT solve (code), first-hit success",
+      "note": "out of 10 instances"
+    },
+    "no_M4_n28": {
+      "value": 4,
+      "layer": "generator",
+      "object_of": "HolographicMandala SAT solve (code), first-hit success",
+      "note": "out of 10 instances"
+    },
+    "no_M3_n28": {
+      "value": 2,
+      "layer": "generator",
+      "object_of": "HolographicMandala SAT solve (code), first-hit success",
+      "note": "out of 10 instances"
+    },
+    "no_M3_M4_n28": {
+      "value": 4,
+      "layer": "generator",
+      "object_of": "HolographicMandala SAT solve (code), first-hit success",
+      "note": "out of 10 instances"
+    },
+    "whole_anneal_n28": {
+      "value": 6,
+      "layer": "generator",
+      "object_of": "HolographicMandala SAT solve (code), first-hit success",
+      "note": "out of 10 instances"
+    },
+    "plain_n28": {
+      "value": 9,
+      "layer": "generator",
+      "object_of": "MandalaComputer SAT solve (code), first-hit success",
+      "note": "out of 10 instances"
+    }
+  },
+  "generator_level_quantities": [
+    "base_n12",
+    "base_n20",
+    "base_n28",
+    "no_M3_M4_n12",
+    "no_M3_M4_n20",
+    "no_M3_M4_n28",
+    "no_M3_n12",
+    "no_M3_n20",
+    "no_M3_n28",
+    "no_M4_n12",
+    "no_M4_n20",
+    "no_M4_n28",
+    "plain_n12",
+    "plain_n20",
+    "plain_n28",
+    "whole_anneal_n12",
+    "whole_anneal_n20",
+    "whole_anneal_n28"
+  ],
+  "voided_ratios": [],
+  "claims": [
+    {
+      "text": "the ring-by-ring schedule is the dominant cause of the falloff; the extra energy terms are a secondary cause that appears at n=28; propagation seeding has no measurable effect",
+      "supported_by": [
+        "base_n28",
+        "whole_anneal_n28",
+        "no_M4_n28",
+        "no_M3_n28",
+        "plain_n28"
+      ],
+      "scope": "generator",
+      "support_layers": [
+        "generator"
+      ],
+      "status": "supported"
+    },
+    {
+      "text": "the holographic method cannot shorten SAT search",
+      "supported_by": [
+        "base_n28"
+      ],
+      "scope": "physical",
+      "support_layers": [
+        "generator"
+      ],
+      "status": "qualified",
+      "layer_note": "physical scope claim resting on generator-level support: base_n28"
+    }
+  ],
+  "findings": [
+    {
+      "guard": "G-LAYER",
+      "detail": "the holographic method cannot shorten SAT search | physical scope claim resting on generator-level support: base_n28",
+      "message": "[G-LAYER] untagged quantity: cannot be recorded"
+    }
+  ],
+  "closed_at": "2026-10-27T17:49:07"
+}

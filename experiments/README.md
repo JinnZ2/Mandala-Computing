@@ -27,6 +27,7 @@ nearly triaged as cruft).
 | `constant_swapping_simulator.py` | Swaps a physical constant in a known equation and searches for an operating point where the swapped equation's output is experimentally detectable | Yes — `run_self_consistency_search()` hands a self-consistency cost function to `MandalaComputer.encode_optimization()` |
 | `../geometric_computation_selector.py` | Picks the best Mandala solver strategy for a given problem type/size, learning from real benchmark runs | Yes — `_run_solver()` actually runs `mandala_computer.py`/`holographic_mandala.py`/`quantum_mandala.py` solvers and records real wall-clock time |
 | `../mandala_computing_explorer.py` | Ising model explorer: transverse-field annealing, Trotter-Suzuki QMC, parameter sweeps, Qiskit export | Yes — UI/plotting only; solvers live in `QuantumMandalaComputer.transverse_field_ising_anneal()` / `.trotter_suzuki_qmc()` |
+| `edge4_sat_scaling.py` (added 2026-10-27, co-authored) | Edge 4 of the P=NP glyph: does the holographic coarse→fine path change the *growth rate* of search cost on random 3-SAT, or only the constant? Races `MandalaComputer` annealing and `HolographicMandala` against brute force, DPLL and WalkSAT across sizes; results in `edge4_sat_scaling_results.json` and `P=np-hypothesis.md` | Yes — runs the engine's own `relax_step()` / `holographic_solve()`, counting `compute_total_energy()` calls as the cost unit |
 
 (The latter two live at the repo root, not in `experiments/`, because they're
 closer to production-shaped — this table tracks all three together since
