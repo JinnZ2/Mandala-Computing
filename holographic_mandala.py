@@ -261,6 +261,12 @@ class HolographicMandala(MandalaComputer):
                 # (behavior recorded, not changed); a variable-merging coarsener
                 # is the edge-4 shortcut the hypothesis actually proposes. See
                 # experiments/edge4_sat_scaling.py.
+                # Note 2026-10-27, later (co-authored), correction specimen: the
+                # note above is wrong about the effect. No energy term reads
+                # _coarsened_clauses or _scale_vars (only factorization reads
+                # projected_problem), so for SAT this projection is dead data:
+                # every ring sees the FULL clause set. The truncation does not
+                # cause the failures. See experiments/edge4_holo_diagnosis.py.
                 num_clauses = max(1, int(len(clauses) / max(scale, 1)))
                 projected["_coarsened_clauses"] = clauses[:num_clauses]
                 projected["_scale_vars"] = max(1, parent_problem.get("num_vars", 3) // int(scale))
