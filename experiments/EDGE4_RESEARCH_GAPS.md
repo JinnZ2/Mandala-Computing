@@ -133,3 +133,33 @@ Five gaps. The count is what the record has, not a quota.
 **Falsifier:** withdrawal or refutation of both claims. ETH then stands, and edge 3 returns to "no known shortcut".
 
 **What it opens:** if certified and structural, an existence proof that the shape this hypothesis proposes can beat brute force on 3-SAT, at subexponential scale and not polynomial. That points EDG_001's builds at the specific decomposition the proof uses.
+
+---
+
+## Note 2026-10-27, later: EDG_001 run
+
+EDG_001's falsifier **fired**: co-occurrence pairing did not beat random pairing (n ≤ 60, 20 instances per size). Both multilevel arms beat plain annealing, so the derived coarse formula carries the gain and the block rule does not. Results are in `P=np-hypothesis.md` and `edge4_multilevel_results.json`. Following EDG_001's own "What it opens", the next node is EDG_006.
+
+### EDG_006. EMPIRICAL — What in the derived coarse formula does the work?
+
+**Gap:** the multilevel gain survives random blocks. Two candidate mechanisms remain, and they are not separated: (a) the sign rule picks the tie that makes shared clauses tautological, so each coarse level is a smaller formula with some clauses satisfied by construction; (b) V-cycling itself, meaning restarts from the projection of the current assignment at a fresh temperature.
+
+**Knowledge state:** `UNMEASURED`
+
+**Research question:** with blocks random, does the gain persist when the sign is chosen at random instead of by the tautology rule, and when the V-cycle restarts from a random assignment instead of a projection?
+
+**Disciplines:** combinatorial optimisation (multilevel refinement), Monte Carlo restarts.
+
+**Data sources:**
+  YOUR OWN DATA: the EDG_001 instance set (seed 2026).
+
+**Method:**
+1. Arm `ml_random_sign`: random pairs plus a random sign.
+2. Arm `ml_random_restart`: random pairs, tautology sign, coarsest level restarted from a random assignment each cycle.
+3. Same budget and scoring. Pre-register before running.
+
+**Expected deliverable:** two more columns beside the EDG_001 table.
+
+**Falsifier:** both arms match `ml_random`. Neither mechanism alone would then carry the gain, and the remaining candidate is the coarse level's smaller variable count.
+
+**What it opens:** a named mechanism for why derived coarse-to-fine helps here. That is the first thing worth testing for a growth-rate change (EDG_004), because a constant-factor mechanism and a growth mechanism predict different slopes.

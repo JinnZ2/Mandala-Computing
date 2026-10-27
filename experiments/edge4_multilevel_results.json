@@ -1,0 +1,633 @@
+{
+ "status": "MEASURED (seeded random 3-SAT)",
+ "date": "2026-10-27",
+ "growth_log2_per_var": {
+  "plain": 0.0952,
+  "ml_cooc": 0.0752,
+  "ml_random": 0.0682
+ },
+ "budget_evals": 60000,
+ "rows": [
+  {
+   "n": 12,
+   "solved": {
+    "plain": 20,
+    "ml_cooc": 20,
+    "ml_random": 20
+   },
+   "median_evals_solved": {
+    "plain": 821.0,
+    "ml_cooc": 1924.0,
+    "ml_random": 1867.0
+   },
+   "levels_median": {
+    "ml_cooc": 2.0,
+    "ml_random": 2.0
+   },
+   "first_hit_evals": {
+    "plain": [
+     539,
+     1466,
+     62,
+     1754,
+     7121,
+     3599,
+     1340,
+     344,
+     131,
+     218,
+     704,
+     1145,
+     1796,
+     632,
+     200,
+     140,
+     938,
+     689,
+     4199,
+     4901
+    ],
+    "ml_cooc": [
+     35,
+     176,
+     1807,
+     281,
+     5606,
+     2173,
+     2161,
+     2257,
+     188,
+     965,
+     2122,
+     1807,
+     2020,
+     2161,
+     47,
+     1828,
+     5534,
+     140,
+     9537,
+     5996
+    ],
+    "ml_random": [
+     2,
+     59,
+     1807,
+     74,
+     224,
+     1873,
+     2053,
+     2026,
+     1813,
+     2080,
+     2539,
+     2110,
+     2020,
+     50,
+     1861,
+     1858,
+     2020,
+     1984,
+     89,
+     3205
+    ]
+   }
+  },
+  {
+   "n": 20,
+   "solved": {
+    "plain": 20,
+    "ml_cooc": 17,
+    "ml_random": 19
+   },
+   "median_evals_solved": {
+    "plain": 18989.0,
+    "ml_cooc": 3954,
+    "ml_random": 9510
+   },
+   "levels_median": {
+    "ml_cooc": 3.0,
+    "ml_random": 3.0
+   },
+   "first_hit_evals": {
+    "plain": [
+     11261,
+     23219,
+     19541,
+     27101,
+     10544,
+     33545,
+     27263,
+     18437,
+     13190,
+     23213,
+     8630,
+     13514,
+     29777,
+     4703,
+     1856,
+     37655,
+     28670,
+     7904,
+     33242,
+     15680
+    ],
+    "ml_cooc": [
+     3015,
+     33960,
+     3489,
+     3471,
+     3624,
+     null,
+     21180,
+     3957,
+     155,
+     4818,
+     3591,
+     3051,
+     5202,
+     3954,
+     3663,
+     null,
+     null,
+     4455,
+     25842,
+     4164
+    ],
+    "ml_random": [
+     3321,
+     17076,
+     4971,
+     3840,
+     21234,
+     9810,
+     40578,
+     16317,
+     22191,
+     3816,
+     5982,
+     4125,
+     33831,
+     9510,
+     3516,
+     null,
+     22176,
+     10413,
+     4119,
+     3183
+    ]
+   }
+  },
+  {
+   "n": 28,
+   "solved": {
+    "plain": 19,
+    "ml_cooc": 17,
+    "ml_random": 18
+   },
+   "median_evals_solved": {
+    "plain": 35021,
+    "ml_cooc": 6924,
+    "ml_random": 10788.0
+   },
+   "levels_median": {
+    "ml_cooc": 3.0,
+    "ml_random": 3.0
+   },
+   "first_hit_evals": {
+    "plain": [
+     55397,
+     14456,
+     32828,
+     28022,
+     46445,
+     null,
+     40505,
+     43307,
+     21956,
+     19019,
+     44117,
+     32972,
+     41180,
+     42773,
+     35021,
+     23702,
+     32123,
+     44093,
+     24500,
+     42425
+    ],
+    "ml_cooc": [
+     4779,
+     7134,
+     7242,
+     40446,
+     null,
+     null,
+     6924,
+     23106,
+     4383,
+     52095,
+     46351,
+     6390,
+     4806,
+     null,
+     43623,
+     5634,
+     5826,
+     24174,
+     5658,
+     6537
+    ],
+    "ml_random": [
+     13248,
+     6303,
+     6123,
+     4629,
+     5529,
+     16620,
+     5406,
+     22356,
+     14031,
+     39207,
+     null,
+     8328,
+     23424,
+     22716,
+     null,
+     4926,
+     5199,
+     33207,
+     4368,
+     48714
+    ]
+   }
+  },
+  {
+   "n": 36,
+   "solved": {
+    "plain": 14,
+    "ml_cooc": 16,
+    "ml_random": 18
+   },
+   "median_evals_solved": {
+    "plain": 42602.0,
+    "ml_cooc": 19327.0,
+    "ml_random": 6726.5
+   },
+   "levels_median": {
+    "ml_cooc": 4.0,
+    "ml_random": 4.0
+   },
+   "first_hit_evals": {
+    "plain": [
+     null,
+     40793,
+     38123,
+     37979,
+     44411,
+     48050,
+     50057,
+     null,
+     40358,
+     55511,
+     25613,
+     null,
+     null,
+     null,
+     null,
+     30047,
+     48155,
+     52244,
+     37568,
+     44417
+    ],
+    "ml_cooc": [
+     null,
+     null,
+     32940,
+     19123,
+     20578,
+     null,
+     45737,
+     32370,
+     17542,
+     52027,
+     3789,
+     null,
+     21235,
+     18301,
+     19531,
+     10160,
+     9026,
+     8402,
+     20347,
+     7805
+    ],
+    "ml_random": [
+     29667,
+     6440,
+     6074,
+     50659,
+     6242,
+     null,
+     10604,
+     5957,
+     9740,
+     39011,
+     6668,
+     8054,
+     53152,
+     8120,
+     null,
+     6104,
+     6629,
+     5936,
+     6086,
+     6785
+    ]
+   }
+  },
+  {
+   "n": 44,
+   "solved": {
+    "plain": 9,
+    "ml_cooc": 6,
+    "ml_random": 7
+   },
+   "median_evals_solved": {
+    "plain": 47198,
+    "ml_cooc": 11865.0,
+    "ml_random": 10412
+   },
+   "levels_median": {
+    "ml_cooc": 4.0,
+    "ml_random": 4.0
+   },
+   "first_hit_evals": {
+    "plain": [
+     51128,
+     null,
+     50309,
+     null,
+     null,
+     null,
+     null,
+     null,
+     58886,
+     42005,
+     null,
+     null,
+     43115,
+     null,
+     59225,
+     44192,
+     47198,
+     43781,
+     null,
+     null
+    ],
+    "ml_cooc": [
+     14473,
+     null,
+     null,
+     40773,
+     null,
+     8825,
+     null,
+     8060,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     37539,
+     null,
+     null,
+     null,
+     9257
+    ],
+    "ml_random": [
+     null,
+     null,
+     null,
+     10640,
+     null,
+     null,
+     null,
+     9245,
+     null,
+     null,
+     null,
+     null,
+     12902,
+     null,
+     null,
+     10412,
+     8933,
+     13220,
+     null,
+     9482
+    ]
+   }
+  },
+  {
+   "n": 52,
+   "solved": {
+    "plain": 9,
+    "ml_cooc": 9,
+    "ml_random": 11
+   },
+   "median_evals_solved": {
+    "plain": 54053,
+    "ml_cooc": 12794,
+    "ml_random": 25468
+   },
+   "levels_median": {
+    "ml_cooc": 4.0,
+    "ml_random": 4.0
+   },
+   "first_hit_evals": {
+    "plain": [
+     null,
+     null,
+     49685,
+     null,
+     58703,
+     null,
+     52592,
+     null,
+     56738,
+     47795,
+     null,
+     null,
+     54443,
+     null,
+     null,
+     null,
+     56654,
+     null,
+     51608,
+     54053
+    ],
+    "ml_cooc": [
+     null,
+     null,
+     12794,
+     28796,
+     13186,
+     48468,
+     12332,
+     null,
+     11327,
+     null,
+     null,
+     11150,
+     12689,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     57551
+    ],
+    "ml_random": [
+     41226,
+     null,
+     44736,
+     13670,
+     42891,
+     null,
+     13880,
+     42075,
+     9188,
+     24706,
+     null,
+     null,
+     null,
+     null,
+     null,
+     43959,
+     25468,
+     null,
+     null,
+     14861
+    ]
+   }
+  },
+  {
+   "n": 60,
+   "solved": {
+    "plain": 4,
+    "ml_cooc": 11,
+    "ml_random": 9
+   },
+   "median_evals_solved": {
+    "plain": 51099.5,
+    "ml_cooc": 36028,
+    "ml_random": 33373
+   },
+   "levels_median": {
+    "ml_cooc": 5.0,
+    "ml_random": 4.0
+   },
+   "first_hit_evals": {
+    "plain": [
+     50786,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     47384,
+     null,
+     51413,
+     null,
+     null,
+     null,
+     53903,
+     null,
+     null
+    ],
+    "ml_cooc": [
+     50325,
+     null,
+     null,
+     null,
+     null,
+     36452,
+     55758,
+     15184,
+     null,
+     37385,
+     15076,
+     35312,
+     null,
+     36028,
+     null,
+     null,
+     39089,
+     null,
+     34718,
+     34613
+    ],
+    "ml_random": [
+     null,
+     34222,
+     null,
+     null,
+     null,
+     null,
+     null,
+     16718,
+     49479,
+     10721,
+     null,
+     10979,
+     null,
+     null,
+     52311,
+     null,
+     34882,
+     null,
+     33373,
+     16295
+    ]
+   }
+  }
+ ],
+ "expansion_verifies": true,
+ "interpretation": "unassigned",
+ "gate_claims": [
+  {
+   "text": "locality gap at n=60: ml_cooc - ml_random = +2/20",
+   "status": "supported"
+  },
+  {
+   "text": "coarse-to-fine gap at n=60: ml_cooc - plain = +7/20",
+   "status": "supported"
+  }
+ ],
+ "gate_controls": [
+  {
+   "name": "plain, n=12",
+   "predicted": ">= 9/10",
+   "observed": "20/20",
+   "run": true
+  },
+  {
+   "name": "coarse solution expands to a fine solution",
+   "predicted": "every multilevel hit verifies on the original formula",
+   "observed": "verified",
+   "run": true
+  }
+ ]
+}

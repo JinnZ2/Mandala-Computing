@@ -1,0 +1,221 @@
+{
+  "sim_id": "EDG_001-MULTILEVEL",
+  "outcome": "CLOSED",
+  "strict": false,
+  "guards_schema": "1",
+  "declaration": {
+    "question": "do clause-structure blocks plus a derived coarse formula beat random blocks and plain annealing on 3-SAT",
+    "statistic": "first-hit solved count per n under one budget; median evaluations over solved runs with solved fraction beside it; log2 growth of the median per added variable. AMENDED 2026-10-27 after the --quick run, which saturated solved counts at n<=20 (4/4 in every arm): sizes widened to n=60, k raised to 20, and the median/growth statistics added. The --quick numbers were seen before this amendment",
+    "discriminates": "ml_cooc and ml_random share every step except how pairs are chosen, so a gap between them isolates block locality; plain isolates coarse-to-fine as a whole",
+    "expected": "if locality matters: ml_cooc solves >= 3/10 more than ml_random at the largest n, or (where both saturate) its median cost is lower by 2x or more. If coarse-to-fine helps at all: ml_cooc >= plain on the same reading. A growth-rate change needs the ml_cooc slope below plain's by more than the spread between seeds; otherwise it is a constant factor",
+    "resolution": [
+      {
+        "name": "instances vs gap read",
+        "instrument_scale": 1.0,
+        "feature_scale": 3.0,
+        "margin": 2.0,
+        "passes": true,
+        "note": ""
+      }
+    ],
+    "controls": [
+      {
+        "name": "plain, n=12",
+        "predicted": ">= 9/10",
+        "observed": "20/20",
+        "run": true
+      },
+      {
+        "name": "coarse solution expands to a fine solution",
+        "predicted": "every multilevel hit verifies on the original formula",
+        "observed": "verified",
+        "run": true
+      }
+    ],
+    "shares_input_with": [],
+    "declared_at": "2026-10-27T17:58:51"
+  },
+  "expected": "if locality matters: ml_cooc solves >= 3/10 more than ml_random at the largest n, or (where both saturate) its median cost is lower by 2x or more. If coarse-to-fine helps at all: ml_cooc >= plain on the same reading. A growth-rate change needs the ml_cooc slope below plain's by more than the spread between seeds; otherwise it is a constant factor",
+  "observed": "see edge4_multilevel_results.json",
+  "diverged": null,
+  "quantities": {
+    "plain_n12": {
+      "value": 20,
+      "layer": "generator",
+      "object_of": "multilevel SAT solve on MandalaComputer (code), first-hit",
+      "note": "out of 20"
+    },
+    "ml_cooc_n12": {
+      "value": 20,
+      "layer": "generator",
+      "object_of": "multilevel SAT solve on MandalaComputer (code), first-hit",
+      "note": "out of 20"
+    },
+    "ml_random_n12": {
+      "value": 20,
+      "layer": "generator",
+      "object_of": "multilevel SAT solve on MandalaComputer (code), first-hit",
+      "note": "out of 20"
+    },
+    "plain_n20": {
+      "value": 20,
+      "layer": "generator",
+      "object_of": "multilevel SAT solve on MandalaComputer (code), first-hit",
+      "note": "out of 20"
+    },
+    "ml_cooc_n20": {
+      "value": 17,
+      "layer": "generator",
+      "object_of": "multilevel SAT solve on MandalaComputer (code), first-hit",
+      "note": "out of 20"
+    },
+    "ml_random_n20": {
+      "value": 19,
+      "layer": "generator",
+      "object_of": "multilevel SAT solve on MandalaComputer (code), first-hit",
+      "note": "out of 20"
+    },
+    "plain_n28": {
+      "value": 19,
+      "layer": "generator",
+      "object_of": "multilevel SAT solve on MandalaComputer (code), first-hit",
+      "note": "out of 20"
+    },
+    "ml_cooc_n28": {
+      "value": 17,
+      "layer": "generator",
+      "object_of": "multilevel SAT solve on MandalaComputer (code), first-hit",
+      "note": "out of 20"
+    },
+    "ml_random_n28": {
+      "value": 18,
+      "layer": "generator",
+      "object_of": "multilevel SAT solve on MandalaComputer (code), first-hit",
+      "note": "out of 20"
+    },
+    "plain_n36": {
+      "value": 14,
+      "layer": "generator",
+      "object_of": "multilevel SAT solve on MandalaComputer (code), first-hit",
+      "note": "out of 20"
+    },
+    "ml_cooc_n36": {
+      "value": 16,
+      "layer": "generator",
+      "object_of": "multilevel SAT solve on MandalaComputer (code), first-hit",
+      "note": "out of 20"
+    },
+    "ml_random_n36": {
+      "value": 18,
+      "layer": "generator",
+      "object_of": "multilevel SAT solve on MandalaComputer (code), first-hit",
+      "note": "out of 20"
+    },
+    "plain_n44": {
+      "value": 9,
+      "layer": "generator",
+      "object_of": "multilevel SAT solve on MandalaComputer (code), first-hit",
+      "note": "out of 20"
+    },
+    "ml_cooc_n44": {
+      "value": 6,
+      "layer": "generator",
+      "object_of": "multilevel SAT solve on MandalaComputer (code), first-hit",
+      "note": "out of 20"
+    },
+    "ml_random_n44": {
+      "value": 7,
+      "layer": "generator",
+      "object_of": "multilevel SAT solve on MandalaComputer (code), first-hit",
+      "note": "out of 20"
+    },
+    "plain_n52": {
+      "value": 9,
+      "layer": "generator",
+      "object_of": "multilevel SAT solve on MandalaComputer (code), first-hit",
+      "note": "out of 20"
+    },
+    "ml_cooc_n52": {
+      "value": 9,
+      "layer": "generator",
+      "object_of": "multilevel SAT solve on MandalaComputer (code), first-hit",
+      "note": "out of 20"
+    },
+    "ml_random_n52": {
+      "value": 11,
+      "layer": "generator",
+      "object_of": "multilevel SAT solve on MandalaComputer (code), first-hit",
+      "note": "out of 20"
+    },
+    "plain_n60": {
+      "value": 4,
+      "layer": "generator",
+      "object_of": "multilevel SAT solve on MandalaComputer (code), first-hit",
+      "note": "out of 20"
+    },
+    "ml_cooc_n60": {
+      "value": 11,
+      "layer": "generator",
+      "object_of": "multilevel SAT solve on MandalaComputer (code), first-hit",
+      "note": "out of 20"
+    },
+    "ml_random_n60": {
+      "value": 9,
+      "layer": "generator",
+      "object_of": "multilevel SAT solve on MandalaComputer (code), first-hit",
+      "note": "out of 20"
+    }
+  },
+  "generator_level_quantities": [
+    "ml_cooc_n12",
+    "ml_cooc_n20",
+    "ml_cooc_n28",
+    "ml_cooc_n36",
+    "ml_cooc_n44",
+    "ml_cooc_n52",
+    "ml_cooc_n60",
+    "ml_random_n12",
+    "ml_random_n20",
+    "ml_random_n28",
+    "ml_random_n36",
+    "ml_random_n44",
+    "ml_random_n52",
+    "ml_random_n60",
+    "plain_n12",
+    "plain_n20",
+    "plain_n28",
+    "plain_n36",
+    "plain_n44",
+    "plain_n52",
+    "plain_n60"
+  ],
+  "voided_ratios": [],
+  "claims": [
+    {
+      "text": "locality gap at n=60: ml_cooc - ml_random = +2/20",
+      "supported_by": [
+        "ml_cooc_n60",
+        "ml_random_n60"
+      ],
+      "scope": "generator",
+      "support_layers": [
+        "generator"
+      ],
+      "status": "supported"
+    },
+    {
+      "text": "coarse-to-fine gap at n=60: ml_cooc - plain = +7/20",
+      "supported_by": [
+        "ml_cooc_n60",
+        "plain_n60"
+      ],
+      "scope": "generator",
+      "support_layers": [
+        "generator"
+      ],
+      "status": "supported"
+    }
+  ],
+  "findings": [],
+  "closed_at": "2026-10-27T18:11:12"
+}

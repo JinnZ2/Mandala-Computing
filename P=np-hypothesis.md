@@ -229,3 +229,28 @@ Tool readouts (`experiments/holo_tool_audit.py`, run against a JinnZ2/Simulators
 - `reasoning-gate`: the scaling run as originally declared is denied at `pre()` (G-PRE, no expected output); the diagnosis passes. The claim "the holographic method cannot shorten SAT search" is downgraded to **qualified**: it is a physical-scope claim resting on generator-level support. That is the right status. These runs measure this code, not geometric relaxation in general.
 
 Status of edge 4: **still OPEN, untested.** What failed is a block schedule over index groups. The proposed shortcut needs the two variables the physics binding freezes: blocks built from clause co-occurrence, and a coarse problem derived from the fine one.
+
+### EDG_001 result — blocks from clause structure vs random blocks (2026-10-27, MEASURED, co-authored)
+
+`experiments/edge4_multilevel.py`. Three arms on the engine with a clause-count cost only, so no extra energy terms enter any arm. First-hit scoring, 60,000 evaluations, 20 instances per size. Pre-registered in `reasoning-gate`, amended once after a quick run (the amendment and the peek behind it are recorded in the gate file).
+
+| n | plain anneal | multilevel, co-occurrence blocks | multilevel, random blocks |
+|---|---|---|---|
+| 12 | 20/20 @821 | 20/20 @1,924 | 20/20 @1,867 |
+| 20 | 20/20 @18,989 | 17/20 @3,954 | 19/20 @9,510 |
+| 28 | 19/20 @35,021 | 17/20 @6,924 | 18/20 @10,788 |
+| 36 | 14/20 @42,602 | 16/20 @19,327 | 18/20 @6,726 |
+| 44 | 9/20 @47,198 | 6/20 @11,865 | 7/20 @10,412 |
+| 52 | 9/20 @54,053 | 9/20 @12,794 | 11/20 @25,468 |
+| 60 | **4/20** @51,099 | **11/20** @36,028 | **9/20** @33,373 |
+
+(solved / 20 @ median evaluations over solved runs). Check: every coarse solution expands to a solution of the original formula.
+
+Read against the pre-registration:
+
+- **Coarse-to-fine with a derived coarse problem: supported on this engine.** At n = 60 both multilevel arms solve more than plain (11 and 9 vs 4). From n = 20 to 52, solved runs cost about 2.5–6× fewer evaluations.
+- **Block locality: falsifier FIRED.** Co-occurrence blocks do not beat random blocks: +2/20 at n = 60, inside the pre-declared noise band of under 3, and mixed in both directions across n. EDG_001's falsifier was "co-occurrence no better than random pairing", and that is what happened.
+- **So the operative ingredient is the derived coarse problem, not the block rule.** Of the two variables Kadanoff's binding freezes, the one doing the work here is *coarse problem derived from fine*. *Blocks group interacting variables* made no measurable difference at n ≤ 60. The holographic solver had neither, which fits its falloff.
+- **Growth rate: unresolved.** The fitted slopes (plain ×1.068, co-occurrence ×1.054, random ×1.048 per variable) are pinned by the budget cap: plain's median sits near 60,000 from n = 36 on, and unsolved runs are censored. They are not growth rates. EDG_004 stays open.
+
+Status of edge 4: **partly answered.** A derived coarse-to-fine path helps on this engine, at n ≤ 60 and as a constant factor plus a higher solve rate under a fixed budget. Locality of blocks is not the reason. Whether the help changes the growth rate is untested (EDG_004). Nothing here bears on P vs NP.
