@@ -182,3 +182,24 @@ Three scope marks:
 - **Factorization is not the NP-complete specimen.** Factoring is in NP ∩ coNP and is not known to be NP-complete; Shor's algorithm factors in polynomial time on quantum hardware without implying P = NP. Factoring results here bear on factoring, not on P vs NP. SAT and graph coloring are the NP-complete test cases.
 - **The Exponential Time Hypothesis (ETH)** — 3-SAT needs exponential time — sits one rung below P vs NP. In October 2026 OpenAI (Oct 26) and an Anthropic Claude model (Hexagon preprint 2610.00577) each claimed a subexponential algorithm for #3-SAT, which would refute ETH. Status: **claimed, unrefereed, under working-group review.** If it holds, edge 3 moves from "no shortcut through the search" to "some shortcut exists" — the direction this hypothesis points — but subexponential is not polynomial, and both labs state P vs NP is untouched.
 - **Edge 4 is the measurable edge.** A scaling run comparing the holographic solver against plain annealing and classical baselines on growing 3-SAT is in `experiments/edge4_sat_scaling.py`; results below.
+
+### Edge-4 scaling run — results (2026-10-27, MEASURED, co-authored)
+
+Random 3-SAT at clause ratio 4.26, satisfiable instances only, 10 instances per size, budget 100,000 energy evaluations. Cost = candidate evaluations to the first satisfying state. Script: `experiments/edge4_sat_scaling.py`; raw data: `experiments/edge4_sat_scaling_results.json`.
+
+| n | brute force (expected) | DPLL nodes | WalkSAT flips | mandala anneal | holographic (ladder) |
+|---|---|---|---|---|---|
+| 8 | 69 | 14 | 5 (10/10) | 189 (10/10) | 1,609 (9/10) |
+| 12 | 1,024 | 22 | 30 (10/10) | 802 (10/10) | 22,427 (3/10) |
+| 16 | 11,235 | 24 | 37 (10/10) | 1,591 (10/10) | 88,044 (3/10) |
+| 20 | 218,454 | 51 | 38 (10/10) | 2,984 (9/10) | 8,022 (3/10) |
+| 24 | 2,160,702 | 88 | 284 (10/10) | 3,766 (8/10) | 2,011 (3/10) |
+| 28 | — | 68 | 74 (10/10) | 11,680 (7/10) | 9,626 (1/10) |
+
+Medians over solved runs; (solved / 10) in brackets. Growth per added variable (log-linear fit of medians): brute force ×1.92, DPLL ×1.10, WalkSAT ×1.16, mandala anneal ×1.20 (a lower bound, since unsolved runs rise with n).
+
+Reading, scoped to n ≤ 28:
+
+- **Plain annealing on the mandala engine scales like classical local search, with a larger constant.** Its growth (×1.20) sits near WalkSAT's (×1.16); its cost runs roughly 30–150× higher at equal n. Its success rate drops from 10/10 to 7/10 as n grows.
+- **The holographic solver did not shorten the walk.** Its success rate falls from 9/10 at n = 8 to 1/10 at n = 28, below plain annealing on the same engine. Its flat solved-median slope (×0.995) is a censoring artifact: only the easy instances get solved, so the median of solved runs stays low. It is not a growth-rate result.
+- **This does not test the edge-4 hypothesis yet.** The SAT coarsener in `holographic_mandala.py` keeps the first len/scale clauses and drops the rest; it merges no variables (see the dated note in that file). The coarse scale therefore solves an arbitrary sub-problem, which plausibly explains the falling success rate. The proposed shortcut, a structural coarse→fine path, has not been built for SAT, so its status stays **OPEN, untested**. Next step: a variable-merging coarsener (e.g. merge variables by clause co-occurrence), rerun unchanged against this table as the baseline.
