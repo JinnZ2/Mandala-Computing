@@ -193,3 +193,12 @@ Falsifier fired (results and table in `P=np-hypothesis.md`). The sign rule does 
 **Falsifier:** `plain_cycled` reaches `ml_random` (within 2/20 at n >= 44). The gain would then be the cycle schedule, and coarse-to-fine would add nothing on this engine.
 
 **What it opens:** if the coarse problem carries the gain, EDG_004 (does it change the growth rate?) becomes the test worth paying for. If the schedule carries it, edge 4 has no evidence on this engine, and the multilevel result reduces to a restart effect.
+
+---
+
+## Held, to return to (2026-10-27)
+
+Marked by the operator as questions to return to, not started:
+
+- **Literature for EDG_006/EDG_007.** Multilevel SAT local search (Walshaw and successors): has anyone ablated the coarsening against matched restarts? Does multilevel change the growth rate or only the constant? A prior answer would sharpen EDG_007's falsifier before it runs.
+- **EDG_005 status.** The October 2026 subexponential #3-SAT claims. Has the working group certified the formal statement, the stronger bound, or neither? EDG_005's method stays the one to use: append-only log, earlier entries never edited.
