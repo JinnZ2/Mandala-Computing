@@ -254,3 +254,28 @@ Read against the pre-registration:
 - **Growth rate: unresolved.** The fitted slopes (plain ×1.068, co-occurrence ×1.054, random ×1.048 per variable) are pinned by the budget cap: plain's median sits near 60,000 from n = 36 on, and unsolved runs are censored. They are not growth rates. EDG_004 stays open.
 
 Status of edge 4: **partly answered.** A derived coarse-to-fine path helps on this engine, at n ≤ 60 and as a constant factor plus a higher solve rate under a fixed budget. Locality of blocks is not the reason. Whether the help changes the growth rate is untested (EDG_004). Nothing here bears on P vs NP.
+
+### EDG_006 result — what carries the multilevel gain (2026-10-27, MEASURED, co-authored)
+
+Pre-registered at commit `7534a9f` before any run. Same 140 instances, seeds, budget (60000 energy calls) and first-hit scoring as EDG_001. `experiments/edge4_mechanism.py`, results in `experiments/edge4_mechanism_results.json`. Control: `ml_random` rerun here reproduces EDG_001's column exactly, at every n.
+
+```
+ n   ml_random   ml_random_sign   ml_random_restart   clauses dropped as tautology (median)
+                 (random sign)    (random coarse       rule / random sign
+                                   restart)
+ 12   20/20        20/20            20/20                11 / 7
+ 20   19/20        19/20            19/20                27 / 18.5
+ 28   18/20        18/20            17/20                28 / 18
+ 36   18/20        16/20            18/20                52.5 / 36
+ 44    7/20         8/20             8/20                52 / 39.5
+ 52   11/20         9/20             9/20                60 / 40
+ 60    9/20         8/20            10/20                62 / 43
+```
+
+**The pre-registered falsifier fired.** Both arms stay within 2/20 of `ml_random` at every n >= 44. Neither switch meets the "carries the gain" bar (3 or more fewer solved at n=60, or 2 or more fewer at both 52 and 60).
+
+- **Sign rule: not what carries the gain.** A random sign drops about 30% fewer clauses as tautologies at every size, and it solves the same counts to within 2. My stated prior lean ("the sign rule carries more than projection") is refuted.
+- **Projection: not measurable by this arm.** Per run, the restart arm gives the **identical** first-hit count as the control on 18–20 of 20 runs at every n, and differs on only 0–2 runs. Two reasons: most solved runs hit inside the first V-cycle, before projection is used, and unsolved runs stay unsolved under either start. An arm that can differ on at most 2 runs cannot reach a pre-registered gap of 3. Its falsifier could not fire, so it was silent by construction (`null-harness` CONSTANT_SILENT; G-FIT in `reasoning-gate`). What it does show is narrower: on the instances that exhausted the budget, a random coarse restart did no worse than projection.
+- **What remains.** EDG_006's own text names the remaining candidate: the coarse levels' smaller variable count. Plain annealing still differs from every multilevel arm in two ways at once. It works on the full variable set, and it runs as one long anneal instead of many short cycles. EDG_007 separates the two.
+
+Gate log: `experiments/edge4_mechanism_out/gate_EDG_006-MECHANISM.json`. Both gate claims are recorded `supported` at generator scope. They state the measured gaps, not a mechanism.

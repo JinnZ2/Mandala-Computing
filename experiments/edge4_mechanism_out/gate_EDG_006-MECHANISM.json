@@ -1,0 +1,215 @@
+{
+  "sim_id": "EDG_006-MECHANISM",
+  "outcome": "CLOSED",
+  "strict": false,
+  "guards_schema": "1",
+  "declaration": {
+    "question": "with random blocks, does the multilevel gain survive (a) a random tie sign instead of the tautology rule, (b) a random restart of the coarsest level instead of projection",
+    "statistic": "first-hit solved count per n (20 instances, budget 60000), median evaluations over solved runs with solved fraction beside it; same instances and seeds as EDG_001. Not blind: EDG_001's ml_random column (9/20 at n=60) was seen first",
+    "discriminates": "each arm differs from ml_random by one switch, so a gap names that switch; ml_random is rerun here as the control and must reproduce EDG_001's column exactly",
+    "expected": "a switch CARRIES the gain if its arm solves >= 3/20 fewer than ml_random at n=60, or at n=52 and n=60 both by >= 2. Falsifier (EDG_006 as written): both arms within 2/20 of ml_random at every n >= 44, leaving the smaller coarse variable count as the remaining candidate. Prior lean, stated so it can be wrong: the sign rule carries more than projection, because random pairs share a clause often at these densities and the rule then removes clauses",
+    "resolution": [
+      {
+        "name": "instances vs gap read",
+        "instrument_scale": 1.0,
+        "feature_scale": 3.0,
+        "margin": 2.0,
+        "passes": true,
+        "note": ""
+      }
+    ],
+    "controls": [
+      {
+        "name": "ml_random rerun equals EDG_001 ml_random",
+        "predicted": "identical first-hit evals, every n",
+        "observed": "identical",
+        "run": true
+      }
+    ],
+    "shares_input_with": [],
+    "declared_at": "2026-10-27T18:32:28"
+  },
+  "expected": "a switch CARRIES the gain if its arm solves >= 3/20 fewer than ml_random at n=60, or at n=52 and n=60 both by >= 2. Falsifier (EDG_006 as written): both arms within 2/20 of ml_random at every n >= 44, leaving the smaller coarse variable count as the remaining candidate. Prior lean, stated so it can be wrong: the sign rule carries more than projection, because random pairs share a clause often at these densities and the rule then removes clauses",
+  "observed": "see edge4_mechanism_results.json",
+  "diverged": null,
+  "quantities": {
+    "ml_random_n12": {
+      "value": 20,
+      "layer": "generator",
+      "object_of": "multilevel SAT solve on MandalaComputer (code), first-hit",
+      "note": "out of 20"
+    },
+    "ml_random_sign_n12": {
+      "value": 20,
+      "layer": "generator",
+      "object_of": "multilevel SAT solve on MandalaComputer (code), first-hit",
+      "note": "out of 20"
+    },
+    "ml_random_restart_n12": {
+      "value": 20,
+      "layer": "generator",
+      "object_of": "multilevel SAT solve on MandalaComputer (code), first-hit",
+      "note": "out of 20"
+    },
+    "ml_random_n20": {
+      "value": 19,
+      "layer": "generator",
+      "object_of": "multilevel SAT solve on MandalaComputer (code), first-hit",
+      "note": "out of 20"
+    },
+    "ml_random_sign_n20": {
+      "value": 19,
+      "layer": "generator",
+      "object_of": "multilevel SAT solve on MandalaComputer (code), first-hit",
+      "note": "out of 20"
+    },
+    "ml_random_restart_n20": {
+      "value": 19,
+      "layer": "generator",
+      "object_of": "multilevel SAT solve on MandalaComputer (code), first-hit",
+      "note": "out of 20"
+    },
+    "ml_random_n28": {
+      "value": 18,
+      "layer": "generator",
+      "object_of": "multilevel SAT solve on MandalaComputer (code), first-hit",
+      "note": "out of 20"
+    },
+    "ml_random_sign_n28": {
+      "value": 18,
+      "layer": "generator",
+      "object_of": "multilevel SAT solve on MandalaComputer (code), first-hit",
+      "note": "out of 20"
+    },
+    "ml_random_restart_n28": {
+      "value": 17,
+      "layer": "generator",
+      "object_of": "multilevel SAT solve on MandalaComputer (code), first-hit",
+      "note": "out of 20"
+    },
+    "ml_random_n36": {
+      "value": 18,
+      "layer": "generator",
+      "object_of": "multilevel SAT solve on MandalaComputer (code), first-hit",
+      "note": "out of 20"
+    },
+    "ml_random_sign_n36": {
+      "value": 16,
+      "layer": "generator",
+      "object_of": "multilevel SAT solve on MandalaComputer (code), first-hit",
+      "note": "out of 20"
+    },
+    "ml_random_restart_n36": {
+      "value": 18,
+      "layer": "generator",
+      "object_of": "multilevel SAT solve on MandalaComputer (code), first-hit",
+      "note": "out of 20"
+    },
+    "ml_random_n44": {
+      "value": 7,
+      "layer": "generator",
+      "object_of": "multilevel SAT solve on MandalaComputer (code), first-hit",
+      "note": "out of 20"
+    },
+    "ml_random_sign_n44": {
+      "value": 8,
+      "layer": "generator",
+      "object_of": "multilevel SAT solve on MandalaComputer (code), first-hit",
+      "note": "out of 20"
+    },
+    "ml_random_restart_n44": {
+      "value": 8,
+      "layer": "generator",
+      "object_of": "multilevel SAT solve on MandalaComputer (code), first-hit",
+      "note": "out of 20"
+    },
+    "ml_random_n52": {
+      "value": 11,
+      "layer": "generator",
+      "object_of": "multilevel SAT solve on MandalaComputer (code), first-hit",
+      "note": "out of 20"
+    },
+    "ml_random_sign_n52": {
+      "value": 9,
+      "layer": "generator",
+      "object_of": "multilevel SAT solve on MandalaComputer (code), first-hit",
+      "note": "out of 20"
+    },
+    "ml_random_restart_n52": {
+      "value": 9,
+      "layer": "generator",
+      "object_of": "multilevel SAT solve on MandalaComputer (code), first-hit",
+      "note": "out of 20"
+    },
+    "ml_random_n60": {
+      "value": 9,
+      "layer": "generator",
+      "object_of": "multilevel SAT solve on MandalaComputer (code), first-hit",
+      "note": "out of 20"
+    },
+    "ml_random_sign_n60": {
+      "value": 8,
+      "layer": "generator",
+      "object_of": "multilevel SAT solve on MandalaComputer (code), first-hit",
+      "note": "out of 20"
+    },
+    "ml_random_restart_n60": {
+      "value": 10,
+      "layer": "generator",
+      "object_of": "multilevel SAT solve on MandalaComputer (code), first-hit",
+      "note": "out of 20"
+    }
+  },
+  "generator_level_quantities": [
+    "ml_random_n12",
+    "ml_random_n20",
+    "ml_random_n28",
+    "ml_random_n36",
+    "ml_random_n44",
+    "ml_random_n52",
+    "ml_random_n60",
+    "ml_random_restart_n12",
+    "ml_random_restart_n20",
+    "ml_random_restart_n28",
+    "ml_random_restart_n36",
+    "ml_random_restart_n44",
+    "ml_random_restart_n52",
+    "ml_random_restart_n60",
+    "ml_random_sign_n12",
+    "ml_random_sign_n20",
+    "ml_random_sign_n28",
+    "ml_random_sign_n36",
+    "ml_random_sign_n44",
+    "ml_random_sign_n52",
+    "ml_random_sign_n60"
+  ],
+  "voided_ratios": [],
+  "claims": [
+    {
+      "text": "ml_random_sign - ml_random at n=60 = -1/20",
+      "supported_by": [
+        "ml_random_sign_n60",
+        "ml_random_n60"
+      ],
+      "scope": "generator",
+      "support_layers": [
+        "generator"
+      ],
+      "status": "supported"
+    },
+    {
+      "text": "ml_random_restart - ml_random at n=60 = +1/20",
+      "supported_by": [
+        "ml_random_restart_n60",
+        "ml_random_n60"
+      ],
+      "scope": "generator",
+      "support_layers": [
+        "generator"
+      ],
+      "status": "supported"
+    }
+  ],
+  "findings": [],
+  "closed_at": "2026-10-27T18:43:36"
+}

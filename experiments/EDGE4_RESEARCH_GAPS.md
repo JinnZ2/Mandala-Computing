@@ -163,3 +163,33 @@ EDG_001's falsifier **fired**: co-occurrence pairing did not beat random pairing
 **Falsifier:** both arms match `ml_random`. Neither mechanism alone would then carry the gain, and the remaining candidate is the coarse level's smaller variable count.
 
 **What it opens:** a named mechanism for why derived coarse-to-fine helps here. That is the first thing worth testing for a growth-rate change (EDG_004), because a constant-factor mechanism and a growth mechanism predict different slopes.
+
+---
+
+## Note 2026-10-27, later: EDG_006 run
+
+Falsifier fired (results and table in `P=np-hypothesis.md`). The sign rule does not carry the gain. The restart arm was underpowered by construction: projection is exercised on at most 2 runs per size, below the pre-registered gap of 3. The record keeps that as a limit of the arm, not as a result about projection.
+
+### EDG_007. EMPIRICAL — Smaller coarse problem, or just the cycle schedule?
+
+**Gap:** every multilevel arm differs from plain annealing in two ways at once: (a) it anneals reduced formulas over fewer variables, and (b) it splits the budget into many short anneals with fresh high-temperature starts. EDG_006 ruled out the two finer mechanisms. These two have not been separated.
+
+**Knowledge state:** `UNMEASURED`
+
+**Research question:** with the same budget, does plain annealing on the full formula, restarted on the multilevel cycle schedule (same steps per cycle, same temperature profile), reach the multilevel solve counts?
+
+**Disciplines:** Monte Carlo restarts, multilevel refinement.
+
+**Data sources:**
+  YOUR OWN DATA: the EDG_001 instance set (seed 2026).
+
+**Method:**
+1. Arm `plain_cycled`: full formula only, with the cycle structure and per-cycle step counts copied from `run_arm`. Each cycle starts from the previous cycle's end state (the analogue of projection) at T = 2.0.
+2. Arm `plain_cycled_random`: the same, but each cycle starts from a fresh random state.
+3. Pre-register. The power check comes first this time: count the runs where the arm and its comparison can differ, and confirm that count exceeds the gap threshold before running.
+
+**Expected deliverable:** two columns beside the EDG_006 table.
+
+**Falsifier:** `plain_cycled` reaches `ml_random` (within 2/20 at n >= 44). The gain would then be the cycle schedule, and coarse-to-fine would add nothing on this engine.
+
+**What it opens:** if the coarse problem carries the gain, EDG_004 (does it change the growth rate?) becomes the test worth paying for. If the schedule carries it, edge 4 has no evidence on this engine, and the multilevel result reduces to a restart effect.

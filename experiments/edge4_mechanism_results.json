@@ -1,0 +1,657 @@
+{
+ "status": "MEASURED (seeded random 3-SAT)",
+ "date": "2026-10-27",
+ "budget_evals": 60000,
+ "k": 20,
+ "rows": [
+  {
+   "n": 12,
+   "solved": {
+    "ml_random": 20,
+    "ml_random_sign": 20,
+    "ml_random_restart": 20
+   },
+   "median_evals_solved": {
+    "ml_random": 1867.0,
+    "ml_random_sign": 2000.5,
+    "ml_random_restart": 1867.0
+   },
+   "first_hit_evals": {
+    "ml_random": [
+     2,
+     59,
+     1807,
+     74,
+     224,
+     1873,
+     2053,
+     2026,
+     1813,
+     2080,
+     2539,
+     2110,
+     2020,
+     50,
+     1861,
+     1858,
+     2020,
+     1984,
+     89,
+     3205
+    ],
+    "ml_random_sign": [
+     1840,
+     1855,
+     1804,
+     227,
+     2299,
+     1873,
+     2647,
+     2092,
+     1906,
+     5561,
+     2539,
+     1975,
+     1993,
+     2023,
+     1837,
+     2008,
+     2491,
+     98,
+     9435,
+     2389
+    ],
+    "ml_random_restart": [
+     2,
+     59,
+     1807,
+     74,
+     224,
+     1873,
+     2053,
+     2026,
+     1813,
+     2080,
+     2539,
+     2110,
+     2020,
+     50,
+     1861,
+     1858,
+     2020,
+     1984,
+     89,
+     3205
+    ]
+   },
+   "tautologies_dropped_median": {
+    "ml_random": 11.0,
+    "ml_random_sign": 7.0,
+    "ml_random_restart": 11.0
+   },
+   "vcycles_median": {
+    "ml_random": 1.0,
+    "ml_random_sign": 1.0,
+    "ml_random_restart": 1.0
+   }
+  },
+  {
+   "n": 20,
+   "solved": {
+    "ml_random": 19,
+    "ml_random_sign": 19,
+    "ml_random_restart": 19
+   },
+   "median_evals_solved": {
+    "ml_random": 9510,
+    "ml_random_sign": 9366,
+    "ml_random_restart": 9510
+   },
+   "first_hit_evals": {
+    "ml_random": [
+     3321,
+     17076,
+     4971,
+     3840,
+     21234,
+     9810,
+     40578,
+     16317,
+     22191,
+     3816,
+     5982,
+     4125,
+     33831,
+     9510,
+     3516,
+     null,
+     22176,
+     10413,
+     4119,
+     3183
+    ],
+    "ml_random_sign": [
+     11127,
+     null,
+     3492,
+     3840,
+     3351,
+     22137,
+     27753,
+     1558,
+     27843,
+     3357,
+     3519,
+     9366,
+     9987,
+     4230,
+     3105,
+     28755,
+     9441,
+     10521,
+     15492,
+     3897
+    ],
+    "ml_random_restart": [
+     3321,
+     11325,
+     4971,
+     3840,
+     21234,
+     9810,
+     40578,
+     16317,
+     9705,
+     3816,
+     5982,
+     4125,
+     33831,
+     9510,
+     3516,
+     null,
+     22176,
+     10413,
+     4119,
+     3183
+    ]
+   },
+   "tautologies_dropped_median": {
+    "ml_random": 27.0,
+    "ml_random_sign": 18.5,
+    "ml_random_restart": 27.0
+   },
+   "vcycles_median": {
+    "ml_random": 2.0,
+    "ml_random_sign": 2.0,
+    "ml_random_restart": 2.0
+   }
+  },
+  {
+   "n": 28,
+   "solved": {
+    "ml_random": 18,
+    "ml_random_sign": 18,
+    "ml_random_restart": 17
+   },
+   "median_evals_solved": {
+    "ml_random": 10788.0,
+    "ml_random_sign": 13939.5,
+    "ml_random_restart": 8328
+   },
+   "first_hit_evals": {
+    "ml_random": [
+     13248,
+     6303,
+     6123,
+     4629,
+     5529,
+     16620,
+     5406,
+     22356,
+     14031,
+     39207,
+     null,
+     8328,
+     23424,
+     22716,
+     null,
+     4926,
+     5199,
+     33207,
+     4368,
+     48714
+    ],
+    "ml_random_sign": [
+     32280,
+     4668,
+     5232,
+     4728,
+     30474,
+     null,
+     47925,
+     5361,
+     13944,
+     null,
+     14487,
+     5706,
+     4965,
+     13935,
+     38730,
+     5859,
+     14505,
+     22827,
+     32454,
+     5412
+    ],
+    "ml_random_restart": [
+     13248,
+     6303,
+     6123,
+     4629,
+     5529,
+     null,
+     5406,
+     22356,
+     14031,
+     39207,
+     null,
+     8328,
+     23424,
+     22716,
+     null,
+     4926,
+     5199,
+     33207,
+     4368,
+     48714
+    ]
+   },
+   "tautologies_dropped_median": {
+    "ml_random": 28.0,
+    "ml_random_sign": 18.0,
+    "ml_random_restart": 28.0
+   },
+   "vcycles_median": {
+    "ml_random": 2.0,
+    "ml_random_sign": 2.0,
+    "ml_random_restart": 2.0
+   }
+  },
+  {
+   "n": 36,
+   "solved": {
+    "ml_random": 18,
+    "ml_random_sign": 16,
+    "ml_random_restart": 18
+   },
+   "median_evals_solved": {
+    "ml_random": 6726.5,
+    "ml_random_sign": 9350.0,
+    "ml_random_restart": 6726.5
+   },
+   "first_hit_evals": {
+    "ml_random": [
+     29667,
+     6440,
+     6074,
+     50659,
+     6242,
+     null,
+     10604,
+     5957,
+     9740,
+     39011,
+     6668,
+     8054,
+     53152,
+     8120,
+     null,
+     6104,
+     6629,
+     5936,
+     6086,
+     6785
+    ],
+    "ml_random_sign": [
+     null,
+     28284,
+     9536,
+     7478,
+     9164,
+     null,
+     8192,
+     8576,
+     30039,
+     7181,
+     18085,
+     30975,
+     null,
+     6158,
+     null,
+     9860,
+     18565,
+     8336,
+     10730,
+     6680
+    ],
+    "ml_random_restart": [
+     29667,
+     6440,
+     6074,
+     50659,
+     6242,
+     null,
+     10604,
+     5957,
+     9740,
+     18961,
+     6668,
+     8054,
+     53152,
+     8120,
+     null,
+     6104,
+     6629,
+     5936,
+     6086,
+     6785
+    ]
+   },
+   "tautologies_dropped_median": {
+    "ml_random": 52.5,
+    "ml_random_sign": 36.0,
+    "ml_random_restart": 52.5
+   },
+   "vcycles_median": {
+    "ml_random": 1.0,
+    "ml_random_sign": 1.0,
+    "ml_random_restart": 1.0
+   }
+  },
+  {
+   "n": 44,
+   "solved": {
+    "ml_random": 7,
+    "ml_random_sign": 8,
+    "ml_random_restart": 8
+   },
+   "median_evals_solved": {
+    "ml_random": 10412,
+    "ml_random_sign": 31547.0,
+    "ml_random_restart": 10526.0
+   },
+   "first_hit_evals": {
+    "ml_random": [
+     null,
+     null,
+     null,
+     10640,
+     null,
+     null,
+     null,
+     9245,
+     null,
+     null,
+     null,
+     null,
+     12902,
+     null,
+     null,
+     10412,
+     8933,
+     13220,
+     null,
+     9482
+    ],
+    "ml_random_sign": [
+     null,
+     null,
+     null,
+     51218,
+     null,
+     38640,
+     null,
+     9623,
+     39519,
+     null,
+     null,
+     null,
+     null,
+     null,
+     11051,
+     10097,
+     36864,
+     null,
+     null,
+     26230
+    ],
+    "ml_random_restart": [
+     null,
+     null,
+     null,
+     10640,
+     null,
+     null,
+     null,
+     9245,
+     null,
+     null,
+     null,
+     null,
+     12902,
+     null,
+     49370,
+     10412,
+     8933,
+     13220,
+     null,
+     9482
+    ]
+   },
+   "tautologies_dropped_median": {
+    "ml_random": 52.0,
+    "ml_random_sign": 39.5,
+    "ml_random_restart": 52.0
+   },
+   "vcycles_median": {
+    "ml_random": 5.0,
+    "ml_random_sign": 5.0,
+    "ml_random_restart": 5.0
+   }
+  },
+  {
+   "n": 52,
+   "solved": {
+    "ml_random": 11,
+    "ml_random_sign": 9,
+    "ml_random_restart": 9
+   },
+   "median_evals_solved": {
+    "ml_random": 25468,
+    "ml_random_sign": 25726,
+    "ml_random_restart": 25468
+   },
+   "first_hit_evals": {
+    "ml_random": [
+     41226,
+     null,
+     44736,
+     13670,
+     42891,
+     null,
+     13880,
+     42075,
+     9188,
+     24706,
+     null,
+     null,
+     null,
+     null,
+     null,
+     43959,
+     25468,
+     null,
+     null,
+     14861
+    ],
+    "ml_random_sign": [
+     25783,
+     null,
+     9527,
+     26779,
+     58103,
+     14582,
+     45933,
+     25726,
+     8915,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     25165,
+     null,
+     null,
+     null
+    ],
+    "ml_random_restart": [
+     41226,
+     null,
+     44736,
+     13670,
+     42891,
+     null,
+     13880,
+     null,
+     9188,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     43959,
+     25468,
+     null,
+     null,
+     14861
+    ]
+   },
+   "tautologies_dropped_median": {
+    "ml_random": 60.0,
+    "ml_random_sign": 40.0,
+    "ml_random_restart": 60.0
+   },
+   "vcycles_median": {
+    "ml_random": 3.0,
+    "ml_random_sign": 4.0,
+    "ml_random_restart": 4.0
+   }
+  },
+  {
+   "n": 60,
+   "solved": {
+    "ml_random": 9,
+    "ml_random_sign": 8,
+    "ml_random_restart": 10
+   },
+   "median_evals_solved": {
+    "ml_random": 33373,
+    "ml_random_sign": 31085.5,
+    "ml_random_restart": 32362.0
+   },
+   "first_hit_evals": {
+    "ml_random": [
+     null,
+     34222,
+     null,
+     null,
+     null,
+     null,
+     null,
+     16718,
+     49479,
+     10721,
+     null,
+     10979,
+     null,
+     null,
+     52311,
+     null,
+     34882,
+     null,
+     33373,
+     16295
+    ],
+    "ml_random_sign": [
+     10829,
+     30034,
+     null,
+     null,
+     null,
+     null,
+     null,
+     32176,
+     null,
+     34645,
+     null,
+     11684,
+     null,
+     null,
+     null,
+     48900,
+     null,
+     16310,
+     32137,
+     null
+    ],
+    "ml_random_restart": [
+     null,
+     34222,
+     null,
+     null,
+     31351,
+     null,
+     null,
+     16718,
+     49479,
+     10721,
+     null,
+     10979,
+     null,
+     null,
+     52311,
+     null,
+     34882,
+     null,
+     33373,
+     16295
+    ]
+   },
+   "tautologies_dropped_median": {
+    "ml_random": 62.0,
+    "ml_random_sign": 43.0,
+    "ml_random_restart": 62.0
+   },
+   "vcycles_median": {
+    "ml_random": 4.0,
+    "ml_random_sign": 4.0,
+    "ml_random_restart": 3.5
+   }
+  }
+ ],
+ "control_reproduces_edg001": true,
+ "interpretation": "unassigned",
+ "gate_claims": [
+  {
+   "text": "ml_random_sign - ml_random at n=60 = -1/20",
+   "status": "supported"
+  },
+  {
+   "text": "ml_random_restart - ml_random at n=60 = +1/20",
+   "status": "supported"
+  }
+ ]
+}
