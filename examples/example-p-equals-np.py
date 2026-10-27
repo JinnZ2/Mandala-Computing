@@ -5,6 +5,20 @@ Demonstrates concepts from P=np-hypothesis.md:
   - P=NP convergence factor: A / log(problem_size)
   - Mandala step count vs classical step count
   - Fractal depth scaling analysis
+
+Note 2026-10-27 (co-authored): ILLUSTRATIVE. The numbers below are
+symbolic, not measured. Two scope marks, original code kept as a specimen:
+  - the classical baseline is O(n^2). For NP-complete problems the classical
+    reference is exponential in the worst case (brute force 2^n; best
+    known 3-SAT algorithms are still exponential, ~1.3^n). Many problems
+    already solved in O(n^2) are in P, so beating n^2 says nothing about NP.
+  - the "convergence score > 1000" threshold has no measurement behind it;
+    "symbolic P=NP: yes" is a label, not a result.
+  - factorization (used in the bridge below) is not known to be NP-complete
+    (it is in NP ∩ coNP); Shor's algorithm factors in polynomial time on a
+    quantum computer without implying P = NP. Factoring speedups do not bear
+    on P vs NP. SAT and graph coloring are the NP-complete specimens.
+Measured scaling on 3-SAT: experiments/edge4_sat_scaling.py.
 """
 
 import math

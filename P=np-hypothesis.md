@@ -162,3 +162,23 @@ scale is an open question. The P=NP hypothesis remains unresolved.
 The value of this work is the framework itself: a testable, runnable
 platform for exploring geometric approaches to hard problems, with
 exact glyph arithmetic, multi-scale solvers, and verifiable results.
+
+---
+
+## Note 2026-10-27 (co-authored): where the hypothesis sits on the complexity map
+
+English vocabulary for the edges of the glyph, each with its status:
+
+| Edge | What it asks | Established term | Status |
+|------|--------------|------------------|--------|
+| 1 Encode | write the problem into the shape | Ising / QUBO formulation (Lucas 2014) | True, cheap |
+| 2 Landscape | the answer is the lowest point | ground state, energy landscape | True |
+| 3 Path | can physics walk there fast? | mixing time, relaxation time, spectral gap (adiabatic runtime ~ 1/gap²) | **Open — this edge is P vs NP** |
+| 4 Scale structure | does self-similar coarse→fine shortcut the walk? | renormalization group, multigrid | **Open, testable** |
+| 5 Readout | read the answer off | — | True, cheap |
+
+Three scope marks:
+
+- **Factorization is not the NP-complete specimen.** Factoring is in NP ∩ coNP and is not known to be NP-complete; Shor's algorithm factors in polynomial time on quantum hardware without implying P = NP. Factoring results here bear on factoring, not on P vs NP. SAT and graph coloring are the NP-complete test cases.
+- **The Exponential Time Hypothesis (ETH)** — 3-SAT needs exponential time — sits one rung below P vs NP. In October 2026 OpenAI (Oct 26) and an Anthropic Claude model (Hexagon preprint 2610.00577) each claimed a subexponential algorithm for #3-SAT, which would refute ETH. Status: **claimed, unrefereed, under working-group review.** If it holds, edge 3 moves from "no shortcut through the search" to "some shortcut exists" — the direction this hypothesis points — but subexponential is not polynomial, and both labs state P vs NP is untouched.
+- **Edge 4 is the measurable edge.** A scaling run comparing the holographic solver against plain annealing and classical baselines on growing 3-SAT is in `experiments/edge4_sat_scaling.py`; results below.

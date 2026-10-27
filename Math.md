@@ -200,6 +200,10 @@ for n_bits in [10, 20, 30, 40, 64, 128, 256, 512, 1024, 2048]:
 
 **BUT:** This assumes geometric relaxation actually works in practice.
 
+> Note 2026-10-27 (co-authored): two scope marks on the table above, original kept as a correction specimen.
+> (1) The classical column is full diagonalization of the 2ⁿ-dimensional Hilbert space, (2ⁿ)³ operations. That is not the classical baseline for factoring; the best known classical method is the general number field sieve, which is subexponential in the bit count. The 2^6144 speedup is measured against a strawman baseline.
+> (2) `geometric_relaxation_ops = 1` is an assumption, not a measurement. It is the whole open question (relaxation time / mixing time / spectral gap), so the speedup figure inherits its status: PROPOSED, conditional on the assumption.
+
 ## Rigorous Ground State Analysis
 
 ### Proving Ground State Uniqueness
@@ -538,6 +542,8 @@ for n_bits in [128, 512, 1024, 2048]:
 ✓ Energy landscape is convex near solution
 ✓ Encoding complexity is O(log N)
 ✓ Speedup factor is exponential IF relaxation is O(1)
+
+> Note 2026-10-27 (co-authored): the checkmark on the last line sits on the IF, not the result. "Relaxation is O(1)" is the open question itself (also listed below under SPECULATIVE), so "speedup is exponential" is conditional, not proven. Known hardness pushes against the condition in general: finding the ground state of a 2D Ising spin glass is NP-hard (Barahona 1982), already recorded in `P=np-hypothesis.md`. The "convex near solution" line is local: convexity near the minimum does not say a walker reaches that neighborhood quickly. "Encoding complexity is O(log N)" holds for writing the bits (O(n_bits)); it does not cover the Hamiltonian construction in the complexity section, which is 4^n_bits matrix elements.
 
 ### PHYSICALLY PLAUSIBLE:
 
