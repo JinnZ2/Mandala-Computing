@@ -1,0 +1,147 @@
+{
+ "date": "2026-10-27",
+ "status": "co-authored audit; interpretation per tool output, no aggregate verdict",
+ "reasoning-gate": {
+  "scaling_pre_denied": "[G-PRE] no expected output recorded: divergence will not be visible | field 'expected' is empty",
+  "scaling_mid_denied": "[G-PRE] no expected output recorded: divergence will not be visible | pre() has not been called: nothing may run",
+  "retro_ratio": null,
+  "retro_voided": [
+   {
+    "name": "holo_vs_anneal",
+    "numerator": "holo_solved_n28",
+    "numerator_object": "final state of a fixed-cost holographic run",
+    "denominator": "anneal_solved_n28",
+    "denominator_object": "trajectory of an annealing run (first hit)"
+   }
+  ],
+  "diagnosis_claims": [
+   {
+    "text": "the ring-by-ring schedule is the dominant cause of the falloff; the extra energy terms are a secondary cause that appears at n=28; propagation seeding has no measurable effect",
+    "status": "supported",
+    "note": ""
+   },
+   {
+    "text": "the holographic method cannot shorten SAT search",
+    "status": "qualified",
+    "note": "physical scope claim resting on generator-level support: base_n28"
+   }
+  ],
+  "diagnosis_controls": [
+   {
+    "name": "plain anneal, n=20",
+    "predicted": ">= 8/10 (scaling run: 9/10)",
+    "observed": "10/10",
+    "run": true
+   },
+   {
+    "name": "base, n=12",
+    "predicted": ">= 8/10 under first-hit scoring",
+    "observed": "7/10",
+    "run": true
+   }
+  ]
+ },
+ "category-weld": {
+  "weld_file": "experiments/holo_tool_audit_out/renormalization_holographic_sat.json",
+  "score": {
+   "term": "renormalization (holographic SAT solve)",
+   "domain": "Mandala-Computing holographic_mandala.py, SAT path",
+   "n_components": 5,
+   "n_cases": 2,
+   "n_quantified": 2,
+   "n_unquantified": 0,
+   "max_spread": 54.94505494505494,
+   "bias": 1.0
+  }
+ },
+ "constraint-assembly": {
+  "case": "holographic-sat-solve",
+  "components_used": 4,
+  "class_mix": {
+   "invariant": 1,
+   "soft": 3
+  },
+  "invariant_count": 1,
+  "consumable_count": 0,
+  "soft_count": 3,
+  "composition_present": false,
+  "single_sufficient_component": true,
+  "sufficiency_unknown": false,
+  "rejected_count": 1,
+  "rejections_grounded": 1,
+  "rejections_all_grounded": true,
+  "selection_not_assembly": false,
+  "consumables_destroyable_by_partial_use": 0,
+  "relies_on_soft_term": true,
+  "diagnostic_known_at_action": true,
+  "diagnostic_deferred": false,
+  "budget_terms": [
+   "energy evaluations",
+   "steps per ring"
+  ],
+  "source_class": "measured - seeded random 3-SAT, this repo",
+  "open": [
+   "a coarsener that merges variables by clause co-occurrence has not been built; until then edge 4 is untested, not refuted"
+  ]
+ },
+ "scope-bound-shapes": {
+  "kadanoff_block_spin__vs__mandala_sat": {
+   "verdict": "UNDECLARED_OVERLAP",
+   "collisions": [],
+   "undeclared_in_a": [
+    "block membership by bloom depth (variable index)",
+    "entanglement decay",
+    "holographic weight",
+    "steps per scale",
+    "sweeps",
+    "temperature schedule"
+   ],
+   "undeclared_in_b": [
+    "block size",
+    "blocks group interacting variables (spatial locality)",
+    "coarse problem derived from fine (decimation)",
+    "coupling strength",
+    "temperature"
+   ]
+  },
+  "kadanoff_block_spin__vs__mandala_factorization": {
+   "verdict": "UNDECLARED_OVERLAP",
+   "collisions": [],
+   "undeclared_in_a": [
+    "block membership by bloom depth (variable index)",
+    "steps per scale",
+    "sweeps",
+    "temperature schedule"
+   ],
+   "undeclared_in_b": [
+    "block size",
+    "blocks group interacting variables (spatial locality)",
+    "coupling strength",
+    "temperature"
+   ]
+  },
+  "mandala_factorization__vs__mandala_sat": {
+   "verdict": "UNDECLARED_OVERLAP",
+   "collisions": [],
+   "undeclared_in_a": [
+    "entanglement decay",
+    "holographic weight"
+   ],
+   "undeclared_in_b": [
+    "coarse problem derived from fine (decimation)"
+   ]
+  },
+  "infer_frozen_refusal": {
+   "inferred": null,
+   "state": "REFUSED_BY_CONSTRAINT",
+   "would_have_returned": [
+    "block size",
+    "blocks group interacting variables (spatial locality)",
+    "coarse problem derived from fine (decimation)",
+    "coupling strength",
+    "temperature"
+   ],
+   "why": "FROZEN entries are declared by the builder, not inferred. These variables are UNDECLARED in this binding, which is a claim nobody made, and calling them FROZEN would be a claim this tool made instead"
+  }
+ }
+}

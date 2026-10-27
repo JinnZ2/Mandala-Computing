@@ -203,3 +203,29 @@ Reading, scoped to n ≤ 28:
 - **Plain annealing on the mandala engine scales like classical local search, with a larger constant.** Its growth (×1.20) sits near WalkSAT's (×1.16); its cost runs roughly 30–150× higher at equal n. Its success rate drops from 10/10 to 7/10 as n grows.
 - **The holographic solver did not shorten the walk.** Its success rate falls from 9/10 at n = 8 to 1/10 at n = 28, below plain annealing on the same engine. Its flat solved-median slope (×0.995) is a censoring artifact: only the easy instances get solved, so the median of solved runs stays low. It is not a growth-rate result.
 - **This does not test the edge-4 hypothesis yet.** The SAT coarsener in `holographic_mandala.py` keeps the first len/scale clauses and drops the rest; it merges no variables (see the dated note in that file). The coarse scale therefore solves an arbitrary sub-problem, which plausibly explains the falling success rate. The proposed shortcut, a structural coarse→fine path, has not been built for SAT, so its status stays **OPEN, untested**. Next step: a variable-merging coarsener (e.g. merge variables by clause co-occurrence), rerun unchanged against this table as the baseline.
+
+### Why the holographic solver gets worse — ablation + tool audit (2026-10-27, MEASURED, co-authored)
+
+Correction to the section above: the SAT coarsener's truncated clauses are dead data (no energy term reads them), so they are not the cause. That run also scored the holographic solver on its final state and plain annealing on first hit, which is two different measurands; the Simulators `reasoning-gate` voids that comparison under G-DIM (record in `experiments/holo_tool_audit_out/`). Below, every condition is scored the same way: first-hit success, same budget (60,000 energy evaluations), 10 instances per size.
+
+| n | base | no extra terms (M4) | no propagation (M3) | M3+M4 off | whole-system anneal, same energy | plain anneal |
+|---|---|---|---|---|---|---|
+| 12 | 7 | 6 | 7 | 7 | **10** | 10 |
+| 20 | 3 | 5 | 2 | 6 | **10** | 10 |
+| 28 | 2 | 4 | 2 | 4 | **6** | 9 |
+
+Unsatisfying final states with energy below a satisfying assignment (energy ranks a non-solution better than a solution): 0/10, 4/10, 4/10.
+
+- **Main cause, the ring-by-ring schedule (M2 + M5).** Annealing the same energy over all cells at once restores full success at n ≤ 20. Rings are groups of variables by index (ring 0 = variable 1 alone), unrelated to clause structure, and every ring gets the same step budget regardless of size: at golden_depth 5, variable 1 gets 1,000 proposals per pass and each outer variable about 91.
+- **Second cause, which grows with n: the extra energy terms (M4).** Ring mode-matching and link entanglement reward linked variables for taking equal states, which has nothing to do with the clauses. At n = 28 the whole-system anneal on this energy reaches 6/10 against 9/10 for plain annealing, and in 4/10 runs at n ≥ 20 the energy rates an unsatisfying state below a satisfying one.
+- **Propagation seeding (M3): no measurable effect.**
+- **My own pre-registered control missed:** I predicted base ≥ 8/10 at n = 12 and measured 7/10. Kept as recorded.
+
+Tool readouts (`experiments/holo_tool_audit.py`, run against a JinnZ2/Simulators checkout):
+
+- `category-weld`: "renormalization" is a weld with spread ×55 and bias 1.0. The ring label moves 5 levels while the coarse problem stays identical (102 → 102 clauses) and the proposal share per variable moves ×11 in the opposite direction.
+- `constraint-assembly`: `single_sufficient_component: true`. The full-problem energy annealed over all cells carries the solve; the three holographic components are soft terms, so this is not an assembly.
+- `scope-bound-shapes`: coarse-grain-then-refine is a shape whose physics binding (Kadanoff block spins) freezes two variables: *blocks group interacting variables* and *coarse problem derived from fine*. The SAT binding declares neither. The factorization binding declares the second, since its residues are read. `infer_frozen` refuses to fill the gap and prints what it would have inferred.
+- `reasoning-gate`: the scaling run as originally declared is denied at `pre()` (G-PRE, no expected output); the diagnosis passes. The claim "the holographic method cannot shorten SAT search" is downgraded to **qualified**: it is a physical-scope claim resting on generator-level support. That is the right status. These runs measure this code, not geometric relaxation in general.
+
+Status of edge 4: **still OPEN, untested.** What failed is a block schedule over index groups. The proposed shortcut needs the two variables the physics binding freezes: blocks built from clause co-occurrence, and a coarse problem derived from the fine one.

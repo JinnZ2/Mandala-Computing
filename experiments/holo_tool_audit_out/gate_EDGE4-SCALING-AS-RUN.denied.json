@@ -1,0 +1,18 @@
+{
+  "sim_id": "EDGE4-SCALING-AS-RUN",
+  "outcome": "DENIED",
+  "denied_by": "G-PRE",
+  "detail": "pre() has not been called: nothing may run",
+  "message": "[G-PRE] no expected output recorded: divergence will not be visible",
+  "strict": false,
+  "guards_schema": "1",
+  "declaration": {},
+  "expected": null,
+  "observed": null,
+  "quantities": {},
+  "generator_level_quantities": [],
+  "voided_ratios": [],
+  "claims": [],
+  "findings": [],
+  "denied_at": "2026-10-27T17:49:07"
+}

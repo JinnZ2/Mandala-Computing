@@ -1,0 +1,71 @@
+{
+ "term": "renormalization (holographic SAT solve)",
+ "domain": "Mandala-Computing holographic_mandala.py, SAT path",
+ "tracked_by_label": "scale_level",
+ "note": "The solver is described as coarse-to-fine renormalization. In the SAT path the label rides on ring index; the components that make renormalization work in physics are tracked by nothing.",
+ "components": [
+  {
+   "id": "scale_level",
+   "name": "ring index (bloom depth)",
+   "unit": "ring"
+  },
+  {
+   "id": "coarse_problem",
+   "name": "clauses the coarse scale actually optimises",
+   "unit": "clauses"
+  },
+  {
+   "id": "block_locality",
+   "name": "whether a block groups interacting variables",
+   "unit": "co-occurring clause pairs inside block / total"
+  },
+  {
+   "id": "proposal_share",
+   "name": "Metropolis proposals each variable receives per pass",
+   "unit": "proposals"
+  },
+  {
+   "id": "success",
+   "name": "first-hit success under fixed budget",
+   "unit": "instances solved"
+  }
+ ],
+ "divergences": [
+  {
+   "id": "coarse-is-not-coarse",
+   "note": "_project_problem builds _coarsened_clauses for SAT, but no energy term reads it. Every scale optimises the full clause set; the coarse problem the label promises does not exist.",
+   "readings": {
+    "scale_level": {
+     "before": 5,
+     "after": 1,
+     "unit": "ring count from finest to coarsest scale",
+     "source": "_build_rings, golden_depth 5"
+    },
+    "coarse_problem": {
+     "before": 102,
+     "after": 102,
+     "unit": "clauses at finest vs coarsest scale, n=24",
+     "source": "holographic_mandala.py _holographic_energy (reads projected_problem only for FACTORIZATION)"
+    }
+   }
+  },
+  {
+   "id": "budget-by-ring-not-by-variable",
+   "note": "max_steps_per_scale is spent per ring. With rings of 1, 2, 4, 6, 11 cells (golden_depth 5), variable 1 receives every proposal in ring 0 and each outer variable 1/11 of ring 4's.",
+   "readings": {
+    "scale_level": {
+     "before": 5,
+     "after": 1,
+     "unit": "ring count from finest to coarsest scale",
+     "source": "_build_rings, golden_depth 5"
+    },
+    "proposal_share": {
+     "before": 91,
+     "after": 1000,
+     "unit": "proposals per variable per pass, ring 4 (finest) vs ring 0 (coarsest), 1000 steps/ring",
+     "source": "renormalization_solve loop, golden_depth 5"
+    }
+   }
+  }
+ ]
+}
