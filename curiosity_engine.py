@@ -4,7 +4,7 @@ curiosity_engine.py  —  CC0, stdlib only, model-update-resilient
 Third module in the kit. Companion to constraint_genealogy.py and
 sensor_action_loop.py.
 
-Premise (Kavik):
+Premise (JinnZ2):
   Physics has been running the experiment at the speed of light, across every
   substrate and regime, for the age of the universe. A configuration that
   PERSISTS — L-amino-acid chirality, a protein fold, ice floating, hexagonal
